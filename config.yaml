@@ -1,0 +1,16 @@
+oauth:
+  port: "18080"
+  redirect_uri: "http://localhost:18080/callback"
+anilist:
+  client_id: "19524"
+  client_secret: ""
+  auth_url: "https://anilist.co/api/v2/oauth/authorize"
+  token_url: "https://anilist.co/api/v2/oauth/token"
+  username: "bigspawn"
+myanimelist:
+  client_id: "4c3b845e836f79ba977abab5c551be54"
+  client_secret: ""
+  auth_url: "https://myanimelist.net/v1/oauth2/authorize"
+  token_url: "https://myanimelist.net/v1/oauth2/token"
+  username: "bigspawn"
+token_file_path: "" # Absolute path to token file, empty string use default path

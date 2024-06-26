@@ -1,0 +1,4 @@
+.token
+.token*
+bin/
+config.yaml

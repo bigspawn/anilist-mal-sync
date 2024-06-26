@@ -1,0 +1,16 @@
+oauth:
+  port: "18080" # Port for OAuth server to listen on (default: 18080).
+  redirect_uri: "http://localhost:18080/callback" # Redirect URI for OAuth server (default: http://localhost:18080/callback).
+anilist:
+  client_id: "1" # AniList client ID.
+  client_secret: "secret" # AniList client secret.
+  auth_url: "https://anilist.co/api/v2/oauth/authorize"
+  token_url: "https://anilist.co/api/v2/oauth/token"
+  username: "username" # Your AniList username.
+myanimelist:
+  client_id: "1" # MyAnimeList client ID.
+  client_secret: "secret" # MyAnimeList client secret.
+  auth_url: "https://myanimelist.net/v1/oauth2/authorize"
+  token_url: "https://myanimelist.net/v1/oauth2/token"
+  username: "username" # Your MyAnimeList username.
+token_file_path: "" # Absolute path to token file, empty string use default path.
