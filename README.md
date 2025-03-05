@@ -57,7 +57,7 @@ myanimelist:
   auth_url: "https://myanimelist.net/v1/oauth2/authorize"
   token_url: "https://myanimelist.net/v1/oauth2/token"
   username: "username" # Your MyAnimeList username.
-token_file_path: "" # Absolute path to token file, empty string use default path.
+token_file_path: "" # Absolute path to token file, empty string use default path `$HOME/.config/anilist-mal-sync/token.json`
 ```
 
 #### Environment variables
@@ -97,6 +97,64 @@ Or install the program:
 go install github.com/bigspawn/anilist-mal-sync@latest
 anilist-mal-sync
 ```
+
+### Running with Docker
+
+You can also run the application using Docker.
+
+#### Using pre-built image
+
+The image is available on GitHub Container Registry:
+
+```bash
+docker pull ghcr.io/bigspawn/anilist-mal-sync:main
+```
+
+Run the container:
+
+```bash
+docker run \
+    -p 18080:18080 \
+    -v /path/to/your/config.yaml:/etc/anilist-mal-sync/config.yaml \
+    -v /path/to/token/directory:/root/.config/anilist-mal-sync \
+    ghcr.io/bigspawn/anilist-mal-sync:main
+```
+
+#### Building your own image
+
+1. Clone the repository: `git clone https://github.com/bigspawn/anilist-mal-sync.git`
+2. Change directory: `cd anilist-mal-sync`
+3. Build the Docker image: `docker build -t anilist-mal-sync .`
+4. Run the container
+
+#### Using Docker Compose
+
+Create a `docker-compose.yml` file:
+
+```yaml
+version: '3'
+
+services:
+  anilist-mal-sync:
+    image: ghcr.io/bigspawn/anilist-mal-sync:main
+    ports:
+      - "18080:18080"
+    volumes:
+      - ./config.yaml:/etc/anilist-mal-sync/config.yaml
+      - ./tokens:/root/.config/anilist-mal-sync # it must be a directory
+    environment:
+      - CLIENT_SECRET_ANILIST=your_secret_here  # Optional
+      - CLIENT_SECRET_MYANIMELIST=your_secret_here  # Optional
+      - PORT=18080  # Optional
+```
+
+Run with Docker Compose:
+
+```bash
+docker-compose up
+```
+
+Note: When running in Docker, the browser authentication flow requires that port 18080 is exposed and accessible from your host machine. Also ensure that your token storage directory is mounted as a volume to preserve authentication between runs.
 
 ## Disclaimer
 
