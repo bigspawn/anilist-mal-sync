@@ -107,7 +107,7 @@ You can also run the application using Docker.
 The image is available on GitHub Container Registry:
 
 ```bash
-docker pull ghcr.io/bigspawn/anilist-mal-sync:main
+docker pull ghcr.io/bigspawn/anilist-mal-sync:latest
 ```
 
 Run the container:
@@ -117,7 +117,7 @@ docker run \
     -p 18080:18080 \
     -v /path/to/your/config.yaml:/etc/anilist-mal-sync/config.yaml \
     -v /path/to/token/directory:/root/.config/anilist-mal-sync \
-    ghcr.io/bigspawn/anilist-mal-sync:main
+    ghcr.io/bigspawn/anilist-mal-sync:latest
 ```
 
 #### Building your own image
@@ -136,7 +136,7 @@ version: '3'
 
 services:
   anilist-mal-sync:
-    image: ghcr.io/bigspawn/anilist-mal-sync:main
+    image: ghcr.io/bigspawn/anilist-mal-sync:latest
     ports:
       - "18080:18080"
     volumes:
