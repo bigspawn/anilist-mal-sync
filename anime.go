@@ -468,7 +468,7 @@ func newSourcesFromAnimes(animes []Anime) []Source {
 	return res
 }
 
-func buildDiffString(pairs ...interface{}) string {
+func buildDiffString(pairs ...any) string {
 	if len(pairs)%3 != 0 {
 		return "Diff{invalid params}"
 	}
