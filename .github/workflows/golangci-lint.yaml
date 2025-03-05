@@ -23,7 +23,6 @@ jobs:
           go-version: stable
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
+        run: golangci-lint run --new
         with:
           version: v1.64.6
-          args: --new
-          entrypoint: golangci-lint run
