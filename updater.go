@@ -125,9 +125,8 @@ func (u *Updater) findTarget(ctx context.Context, src Source) (Target, error) {
 		if src.SameTypeWithTarget(tgt) {
 			DPrintf("[%s] Found target by name: %s", u.Prefix, src.GetTitle())
 			return tgt, nil
-		} else {
-			DPrintf("[%s] Ignoring target by name: %s", u.Prefix, tgt.String())
 		}
+		DPrintf("[%s] Ignoring target by name: %s", u.Prefix, tgt.String())
 	}
 
 	return nil, fmt.Errorf("no target found for source: %s", src.GetTitle())

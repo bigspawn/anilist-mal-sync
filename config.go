@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v2"
 )
 
 type OAuthConfig struct {

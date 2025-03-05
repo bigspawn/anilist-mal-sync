@@ -178,7 +178,8 @@ func shutdownServer(server *http.Server) {
 
 func startServer(ctx context.Context, oauth *OAuth, port string, done chan<- bool) {
 	server := &http.Server{
-		Addr: ":" + port,
+		Addr:              ":" + port,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	mux := http.NewServeMux()

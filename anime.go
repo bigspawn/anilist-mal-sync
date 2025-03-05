@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"reflect"
 	"regexp"
 	"strings"
 	"time"
@@ -73,22 +74,12 @@ func (a Anime) GetStringDiffWithTarget(t Target) string {
 		return "Diff{undefined}"
 	}
 
-	sb := strings.Builder{}
-	sb.WriteString("Diff{")
-	if a.Status != b.Status {
-		sb.WriteString(fmt.Sprintf("Status: %s -> %s, ", a.Status, b.Status))
-	}
-	if a.Score != b.Score {
-		sb.WriteString(fmt.Sprintf("Score: %f -> %f, ", a.Score, b.Score))
-	}
-	if a.Progress != b.Progress {
-		sb.WriteString(fmt.Sprintf("Progress: %d -> %d, ", a.Progress, b.Progress))
-	}
-	if a.NumEpisodes != b.NumEpisodes {
-		sb.WriteString(fmt.Sprintf("NumEpisodes: %d -> %d, ", a.NumEpisodes, b.NumEpisodes))
-	}
-	sb.WriteString("}")
-	return sb.String()
+	return buildDiffString(
+		"Status", a.Status, b.Status,
+		"Score", a.Score, b.Score,
+		"Progress", a.Progress, b.Progress,
+		"NumEpisodes", a.NumEpisodes, b.NumEpisodes,
+	)
 }
 
 func (a Anime) SameProgressWithTarget(t Target) bool {
@@ -475,4 +466,26 @@ func newSourcesFromAnimes(animes []Anime) []Source {
 		res = append(res, anime)
 	}
 	return res
+}
+
+func buildDiffString(pairs ...any) string {
+	if len(pairs)%3 != 0 {
+		return "Diff{invalid params}"
+	}
+
+	sb := strings.Builder{}
+	sb.WriteString("Diff{")
+
+	for i := 0; i < len(pairs); i += 3 {
+		field := pairs[i].(string)
+		a := pairs[i+1]
+		b := pairs[i+2]
+
+		if !reflect.DeepEqual(a, b) {
+			sb.WriteString(fmt.Sprintf("%s: %v -> %v, ", field, a, b))
+		}
+	}
+
+	sb.WriteString("}")
+	return sb.String()
 }
