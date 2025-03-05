@@ -1,18 +1,20 @@
 package main
 
 import (
-	"time"
-
-	"golang.org/x/exp/rand"
+	"crypto/rand"
+	"math/big"
 )
 
 var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
-func randHttpParamString(n int) string {
-	rand.Seed(uint64(time.Now().UnixNano()))
+func randHTTPParamString(n int) string {
 	b := make([]byte, n)
 	for i := range b {
-		b[i] = byte(letters[rand.Intn(len(letters))])
+		num, err := rand.Int(rand.Reader, big.NewInt(int64(len(letters))))
+		if err != nil {
+			return ""
+		}
+		b[i] = byte(letters[num.Int64()])
 	}
 	return string(b)
 }

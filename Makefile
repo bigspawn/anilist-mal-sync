@@ -1,8 +1,8 @@
 .PHONY: build test lint help clean
 
 BINARY_NAME=anilist-mal-sync
-LINT_VERSION=1.64.6
-LINT_BINARY=bin/golangci-lint
+LINT_VERSION=v1.64.6
+DOCKER_LINT_CMD=docker run --rm -v $(PWD):/app -w /app golangci/golangci-lint:$(LINT_VERSION)
 
 .DEFAULT_GOAL := help
 
@@ -14,11 +14,10 @@ build:
 test:
 	go test ./... -v
 
-# Install and run linter
+# Run linter using Docker
 lint:
-	@mkdir -p bin
-	@[ -f $(LINT_BINARY) ] curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s v$(LINT_VERSION)
-	$(LINT_BINARY) run
+	@echo "Running golangci-lint $(LINT_VERSION) in Docker..."
+	$(DOCKER_LINT_CMD) golangci-lint run --new
 
 # Clean build artifacts, temporary files and test cache
 clean:
@@ -32,6 +31,6 @@ help:
 	@echo "Available commands:"
 	@echo "  build     - Build the application"
 	@echo "  test      - Run tests"
-	@echo "  lint      - Run linter (installs golangci-lint $(LINT_VERSION) if needed)"
+	@echo "  lint      - Run linter using Docker (golangci-lint $(LINT_VERSION))"
 	@echo "  clean     - Remove build artifacts, temporary files and clean test cache"
 	@echo "  help      - Show this help message"

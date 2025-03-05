@@ -69,22 +69,12 @@ func (m Manga) GetStringDiffWithTarget(t Target) string {
 		return "Diff{undefined}"
 	}
 
-	sb := strings.Builder{}
-	sb.WriteString("Diff{")
-	if m.Status != b.Status {
-		sb.WriteString(fmt.Sprintf("Status: %s -> %s, ", m.Status, b.Status))
-	}
-	if m.Score != b.Score {
-		sb.WriteString(fmt.Sprintf("Score: %f -> %f, ", m.Score, b.Score))
-	}
-	if m.Progress != b.Progress {
-		sb.WriteString(fmt.Sprintf("Progress: %d -> %d, ", m.Progress, b.Progress))
-	}
-	if m.ProgressVolumes != b.ProgressVolumes {
-		sb.WriteString(fmt.Sprintf("ProgressVolumes: %d -> %d, ", m.ProgressVolumes, b.ProgressVolumes))
-	}
-	sb.WriteString("}")
-	return sb.String()
+	return buildDiffString(
+		"Status", m.Status, b.Status,
+		"Score", m.Score, b.Score,
+		"Progress", m.Progress, b.Progress,
+		"ProgressVolumes", m.ProgressVolumes, b.ProgressVolumes,
+	)
 }
 
 func (m Manga) SameProgressWithTarget(t Target) bool {

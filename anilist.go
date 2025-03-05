@@ -15,14 +15,14 @@ type AnilistClient struct {
 	username string
 }
 
-func NewAnilistClient(ctx context.Context, oauth *OAuth, username string) (*AnilistClient, error) {
+func NewAnilistClient(ctx context.Context, oauth *OAuth, username string) *AnilistClient {
 	httpClient := oauth2.NewClient(ctx, oauth.TokenSource())
 	httpClient.Timeout = 10 * time.Minute
 
 	v := verniy.New()
 	v.Http = *httpClient
 
-	return &AnilistClient{c: v, username: username}, nil
+	return &AnilistClient{c: v, username: username}
 }
 
 func (c *AnilistClient) GetUserAnimeList(ctx context.Context) ([]verniy.MediaListGroup, error) {
@@ -49,7 +49,6 @@ func (c *AnilistClient) GetUserAnimeList(ctx context.Context) ([]verniy.MediaLis
 			),
 		),
 	)
-
 }
 
 func (c *AnilistClient) GetUserMangaList(ctx context.Context) ([]verniy.MediaListGroup, error) {

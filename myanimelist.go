@@ -11,6 +11,8 @@ import (
 	"golang.org/x/oauth2"
 )
 
+const randNumb = 43
+
 var errEmptyMalID = errors.New("mal id is empty")
 
 var animeFields = mal.Fields{
@@ -34,13 +36,13 @@ type MyAnimeListClient struct {
 	username string
 }
 
-func NewMyAnimeListClient(ctx context.Context, oauth *OAuth, username string) (*MyAnimeListClient, error) {
+func NewMyAnimeListClient(ctx context.Context, oauth *OAuth, username string) *MyAnimeListClient {
 	httpClient := oauth2.NewClient(ctx, oauth.TokenSource())
 	httpClient.Timeout = 10 * time.Minute
 
 	client := mal.NewClient(httpClient)
 
-	return &MyAnimeListClient{c: client, username: username}, nil
+	return &MyAnimeListClient{c: client, username: username}
 }
 
 func (c *MyAnimeListClient) GetUserAnimeList(ctx context.Context) ([]mal.UserAnime, error) {
@@ -152,7 +154,7 @@ func (c *MyAnimeListClient) UpdateMangaByIDAndOptions(ctx context.Context, id in
 }
 
 func NewMyAnimeListOAuth(ctx context.Context, config Config) (*OAuth, error) {
-	code := url.QueryEscape(randHttpParamString(43))
+	code := url.QueryEscape(randHTTPParamString(randNumb))
 
 	oauthMAL, err := NewOAuth(
 		ctx,
