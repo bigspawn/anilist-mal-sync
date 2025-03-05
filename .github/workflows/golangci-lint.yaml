@@ -26,3 +26,4 @@ jobs:
         with:
           version: v1.64.6
           args: --new
+          entrypoint: golangci-lint run
