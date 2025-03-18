@@ -77,7 +77,7 @@ func (oauth *OAuth) GetAuthURL() string {
 func (oauth *OAuth) ExchangeToken(ctx context.Context, code string) error {
 	token, err := oauth.Config.Exchange(ctx, code, oauth.authCodeOptions...)
 	if err != nil {
-		return err
+		return fmt.Errorf("error exchanging code for token: %w", err)
 	}
 	oauth.token = token
 	return oauth.saveTokenToFile()
@@ -92,7 +92,7 @@ func (oauth *OAuth) Token() (*oauth2.Token, error) {
 
 	t, err := oauth.Config.TokenSource(oauth.ctx, oauth.token).Token()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error refreshing token: %w", err)
 	}
 
 	log.Printf("Token refreshed for %s", oauth.siteName)
@@ -100,7 +100,7 @@ func (oauth *OAuth) Token() (*oauth2.Token, error) {
 	oauth.token = t
 
 	if err = oauth.saveTokenToFile(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error saving token: %w", err)
 	}
 
 	log.Printf("Token saved for %s", oauth.siteName)
@@ -129,7 +129,7 @@ func (oauth *OAuth) saveTokenToFile() error {
 	tokenFile, err := readTokenFile(oauth.tokenFilePath)
 	if err != nil {
 		log.Println("Error reading token file:", err)
-		return err
+		return fmt.Errorf("error reading token file: %w", err)
 	}
 
 	tokenFile.Tokens[oauth.siteName] = oauth.token
@@ -143,14 +143,14 @@ func readTokenFile(tokenFilePath string) (*TokenFile, error) {
 		if errors.Is(err, os.ErrNotExist) {
 			return NewTokenFile(), nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("error opening token file: %w", err)
 	}
 	defer file.Close()
 
 	tokenFile := NewTokenFile()
 	err = json.NewDecoder(file).Decode(tokenFile)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error decoding token file: %w", err)
 	}
 
 	return tokenFile, nil
@@ -159,7 +159,7 @@ func readTokenFile(tokenFilePath string) (*TokenFile, error) {
 func writeTokenFile(tokenFilePath string, tokenFile *TokenFile) error {
 	file, err := os.Create(tokenFilePath)
 	if err != nil {
-		return err
+		return fmt.Errorf("error creating token file: %w", err)
 	}
 	defer file.Close()
 
@@ -251,5 +251,5 @@ func createDirIfNotExists(path string) error {
 			return fmt.Errorf("error creating directory: %w", err)
 		}
 	}
-	return err
+	return fmt.Errorf("error checking directory: %w", err)
 }

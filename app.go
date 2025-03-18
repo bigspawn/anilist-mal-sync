@@ -173,14 +173,14 @@ func (a *App) syncManga(ctx context.Context) error {
 
 	srcList, err := a.anilist.GetUserMangaList(ctx)
 	if err != nil {
-		return fmt.Errorf("error getting user anime list from anilist: %w", err)
+		return fmt.Errorf("error getting user manga list from anilist: %w", err)
 	}
 
 	log.Printf("[%s] Fetching MAL...", a.mangaUpdater.Prefix)
 
 	tgtList, err := a.mal.GetUserMangaList(ctx)
 	if err != nil {
-		return fmt.Errorf("error getting user anime list from mal: %w", err)
+		return fmt.Errorf("error getting user manga list from mal: %w", err)
 	}
 
 	srcs := newSourcesFromMangas(newMangasFromMediaListGroups(srcList))
