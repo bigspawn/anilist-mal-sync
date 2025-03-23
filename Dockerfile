@@ -5,10 +5,10 @@ RUN apk --no-cache add ca-certificates tzdata git
 RUN adduser -D -u 10001 appuser
 
 WORKDIR /build
-COPY go.mod go.sum ./
-RUN go mod download
 
 COPY . .
+
+RUN go mod vendor
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=vendor -ldflags="-w -s" -o main
 
