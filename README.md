@@ -116,7 +116,7 @@ Run the container:
 docker run \
     -p 18080:18080 \
     -v /path/to/your/config.yaml:/etc/anilist-mal-sync/config.yaml \
-    -v /path/to/token/directory:/root/.config/anilist-mal-sync \
+    -v /path/to/token/directory:/home/appuser/.config/anilist-mal-sync \
     ghcr.io/bigspawn/anilist-mal-sync:latest
 ```
 
