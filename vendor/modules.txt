@@ -1,0 +1,16 @@
+# github.com/nstratos/go-myanimelist v0.9.5
+## explicit; go 1.16
+github.com/nstratos/go-myanimelist/mal
+# github.com/rl404/verniy v0.3.1
+## explicit; go 1.20
+github.com/rl404/verniy
+github.com/rl404/verniy/internal/limiter
+# golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f
+## explicit; go 1.22.0
+# golang.org/x/oauth2 v0.24.0
+## explicit; go 1.18
+golang.org/x/oauth2
+golang.org/x/oauth2/internal
+# gopkg.in/yaml.v2 v2.4.0
+## explicit; go 1.15
+gopkg.in/yaml.v2
