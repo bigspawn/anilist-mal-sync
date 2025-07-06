@@ -94,7 +94,7 @@ func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts ma
 	}
 
 	if *dryRun { // skip update if dry run
-		log.Printf("[%s] Dry run: Skipping update for anime %s", u.Prefix, src.GetTitle())
+		log.Printf("[%s] Dry run: Skipping update for %s", u.Prefix, src.GetTitle())
 		return
 	}
 

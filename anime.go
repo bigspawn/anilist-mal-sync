@@ -45,6 +45,23 @@ func (s Status) GetMalStatus() (mal.AnimeStatus, error) {
 	}
 }
 
+func (s Status) GetAnilistStatus() string {
+	switch s {
+	case StatusWatching:
+		return "CURRENT"
+	case StatusCompleted:
+		return "COMPLETED"
+	case StatusOnHold:
+		return "PAUSED"
+	case StatusDropped:
+		return "DROPPED"
+	case StatusPlanToWatch:
+		return "PLANNING"
+	default:
+		return "PLANNING"
+	}
+}
+
 type Anime struct {
 	NumEpisodes int
 	IDAnilist   int
@@ -61,6 +78,9 @@ type Anime struct {
 }
 
 func (a Anime) GetTargetID() TargetID {
+	if *reverseDirection {
+		return TargetID(a.IDAnilist)
+	}
 	return TargetID(a.IDMal)
 }
 
@@ -213,6 +233,10 @@ func (a Anime) GetUpdateOptions() []mal.UpdateMyAnimeListStatusOption {
 	}
 
 	return opts
+}
+
+func (a Anime) GetAnilistUpdateParams() (mediaID int, status string, progress int, score int) {
+	return a.IDAnilist, a.Status.GetAnilistStatus(), a.Progress, int(a.Score)
 }
 
 func (a Anime) GetTitle() string {
@@ -375,9 +399,15 @@ func newAnimeFromMalAnime(malAnime mal.Anime) (Anime, error) {
 		titleJP = malAnime.AlternativeTitles.Ja
 	}
 
+	// In reverse sync mode, we need to leave AniList ID as 0 so the updater can find it by name
+	anilistID := -1
+	if *reverseDirection {
+		anilistID = 0 // This will trigger name-based search in reverse sync
+	}
+
 	return Anime{
 		NumEpisodes: malAnime.NumEpisodes,
-		IDAnilist:   -1,
+		IDAnilist:   anilistID,
 		IDMal:       malAnime.ID,
 		Progress:    malAnime.MyListStatus.NumEpisodesWatched,
 		Score:       float64(malAnime.MyListStatus.Score),
@@ -466,6 +496,70 @@ func newSourcesFromAnimes(animes []Anime) []Source {
 		res = append(res, anime)
 	}
 	return res
+}
+
+func newAnimesFromVerniyMedias(medias []verniy.Media) []Anime {
+	res := make([]Anime, 0, len(medias))
+	for _, media := range medias {
+		a, err := newAnimeFromVerniyMedia(media)
+		if err != nil {
+			log.Printf("failed to convert verniy media to anime: %v", err)
+			continue
+		}
+		res = append(res, a)
+	}
+	return res
+}
+
+func newAnimeFromVerniyMedia(media verniy.Media) (Anime, error) {
+	if media.ID == 0 {
+		return Anime{}, errors.New("ID is 0")
+	}
+
+	var titleEN string
+	if media.Title != nil && media.Title.English != nil {
+		titleEN = *media.Title.English
+	}
+
+	var titleJP string
+	if media.Title != nil && media.Title.Native != nil {
+		titleJP = *media.Title.Native
+	}
+
+	var romajiTitle string
+	if media.Title != nil && media.Title.Romaji != nil {
+		romajiTitle = *media.Title.Romaji
+	}
+
+	var episodeNumber int
+	if media.Episodes != nil {
+		episodeNumber = *media.Episodes
+	}
+
+	var year int
+	if media.SeasonYear != nil {
+		year = *media.SeasonYear
+	}
+
+	var idMal int
+	if media.IDMAL != nil {
+		idMal = *media.IDMAL
+	}
+
+	return Anime{
+		NumEpisodes: episodeNumber,
+		IDAnilist:   media.ID,
+		IDMal:       idMal,
+		Progress:    0, // Will be set from MAL source
+		Score:       0, // Will be set from MAL source  
+		SeasonYear:  year,
+		Status:      StatusUnknown, // Will be set from MAL source
+		TitleEN:     titleEN,
+		TitleJP:     titleJP,
+		TitleRomaji: romajiTitle,
+		StartedAt:   nil, // Will be set from MAL source
+		FinishedAt:  nil, // Will be set from MAL source
+	}, nil
 }
 
 func buildDiffString(pairs ...any) string {

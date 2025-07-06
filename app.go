@@ -12,8 +12,10 @@ type App struct {
 	mal     *MyAnimeListClient
 	anilist *AnilistClient
 
-	animeUpdater *Updater
-	mangaUpdater *Updater
+	animeUpdater        *Updater
+	mangaUpdater        *Updater
+	reverseAnimeUpdater *Updater
+	reverseMangaUpdater *Updater
 }
 
 func NewApp(ctx context.Context, config Config) (*App, error) {
@@ -116,16 +118,102 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		},
 	}
 
+	// Reverse updaters for MAL -> AniList sync
+	reverseAnimeUpdater := &Updater{
+		Prefix:       "Reverse Anime",
+		Statistics:   new(Statistics),
+		IgnoreTitles: map[string]struct{}{},
+
+		GetTargetByIDFunc: func(ctx context.Context, id TargetID) (Target, error) {
+			resp, err := anilistClient.GetAnimeByID(ctx, int(id))
+			if err != nil {
+				return nil, fmt.Errorf("error getting anilist anime by id: %w", err)
+			}
+			ani, err := newAnimeFromVerniyMedia(*resp)
+			if err != nil {
+				return nil, fmt.Errorf("error creating anime from anilist media: %w", err)
+			}
+			return ani, nil
+		},
+
+		GetTargetsByNameFunc: func(ctx context.Context, name string) ([]Target, error) {
+			resp, err := anilistClient.GetAnimesByName(ctx, name)
+			if err != nil {
+				return nil, fmt.Errorf("error getting anilist anime by name: %w", err)
+			}
+			return newTargetsFromAnimes(newAnimesFromVerniyMedias(resp)), nil
+		},
+
+		UpdateTargetBySourceFunc: func(ctx context.Context, id TargetID, src Source) error {
+			a, ok := src.(Anime)
+			if !ok {
+				return fmt.Errorf("source is not an anime")
+			}
+			mediaID, status, progress, score := a.GetAnilistUpdateParams()
+			if err := anilistClient.UpdateAnimeEntry(ctx, mediaID, status, progress, score); err != nil {
+				return fmt.Errorf("error updating anilist anime: %w", err)
+			}
+			return nil
+		},
+	}
+
+	reverseMangaUpdater := &Updater{
+		Prefix:       "Reverse Manga",
+		Statistics:   new(Statistics),
+		IgnoreTitles: map[string]struct{}{},
+
+		GetTargetByIDFunc: func(ctx context.Context, id TargetID) (Target, error) {
+			resp, err := anilistClient.GetMangaByID(ctx, int(id))
+			if err != nil {
+				return nil, fmt.Errorf("error getting anilist manga by id: %w", err)
+			}
+			manga, err := newMangaFromVerniyMedia(*resp)
+			if err != nil {
+				return nil, fmt.Errorf("error creating manga from anilist media: %w", err)
+			}
+			return manga, nil
+		},
+
+		GetTargetsByNameFunc: func(ctx context.Context, name string) ([]Target, error) {
+			resp, err := anilistClient.GetMangasByName(ctx, name)
+			if err != nil {
+				return nil, fmt.Errorf("error getting anilist manga by name: %w", err)
+			}
+			return newTargetsFromMangas(newMangasFromVerniyMedias(resp)), nil
+		},
+
+		UpdateTargetBySourceFunc: func(ctx context.Context, id TargetID, src Source) error {
+			m, ok := src.(Manga)
+			if !ok {
+				return fmt.Errorf("source is not a manga")
+			}
+			mediaID, status, progress, progressVolumes, score := m.GetAnilistUpdateParams()
+			if err := anilistClient.UpdateMangaEntry(ctx, mediaID, status, progress, progressVolumes, score); err != nil {
+				return fmt.Errorf("error updating anilist manga: %w", err)
+			}
+			return nil
+		},
+	}
+
 	return &App{
-		config:       config,
-		mal:          malClient,
-		anilist:      anilistClient,
-		animeUpdater: animeUpdater,
-		mangaUpdater: mangaUpdater,
+		config:              config,
+		mal:                 malClient,
+		anilist:             anilistClient,
+		animeUpdater:        animeUpdater,
+		mangaUpdater:        mangaUpdater,
+		reverseAnimeUpdater: reverseAnimeUpdater,
+		reverseMangaUpdater: reverseMangaUpdater,
 	}, nil
 }
 
 func (a *App) Run(ctx context.Context) error {
+	if *reverseDirection {
+		return a.runReverseSync(ctx)
+	}
+	return a.runNormalSync(ctx)
+}
+
+func (a *App) runNormalSync(ctx context.Context) error {
 	if *mangaSync || *allSync {
 		if err := a.syncManga(ctx); err != nil {
 			return fmt.Errorf("error syncing manga: %w", err)
@@ -135,6 +223,22 @@ func (a *App) Run(ctx context.Context) error {
 	if !(*mangaSync) || *allSync {
 		if err := a.syncAnime(ctx); err != nil {
 			return fmt.Errorf("error syncing anime: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (a *App) runReverseSync(ctx context.Context) error {
+	if *mangaSync || *allSync {
+		if err := a.reverseSyncManga(ctx); err != nil {
+			return fmt.Errorf("error reverse syncing manga: %w", err)
+		}
+	}
+
+	if !(*mangaSync) || *allSync {
+		if err := a.reverseSyncAnime(ctx); err != nil {
+			return fmt.Errorf("error reverse syncing anime: %w", err)
 		}
 	}
 
@@ -191,6 +295,60 @@ func (a *App) syncManga(ctx context.Context) error {
 
 	a.mangaUpdater.Update(ctx, srcs, tgts)
 	a.mangaUpdater.Statistics.Print(a.mangaUpdater.Prefix)
+
+	return nil
+}
+
+func (a *App) reverseSyncAnime(ctx context.Context) error {
+	log.Printf("[%s] Fetching MAL...", a.reverseAnimeUpdater.Prefix)
+
+	srcList, err := a.mal.GetUserAnimeList(ctx)
+	if err != nil {
+		return fmt.Errorf("error getting user anime list from mal: %w", err)
+	}
+
+	log.Printf("[%s] Fetching AniList...", a.reverseAnimeUpdater.Prefix)
+
+	tgtList, err := a.anilist.GetUserAnimeList(ctx)
+	if err != nil {
+		return fmt.Errorf("error getting user anime list from anilist: %w", err)
+	}
+
+	srcAnimes := newSourcesFromAnimes(newAnimesFromMalUserAnimes(srcList))
+	tgtAnimes := newTargetsFromAnimes(newAnimesFromMediaListGroups(tgtList))
+
+	log.Printf("[%s] Got %d from MAL", a.reverseAnimeUpdater.Prefix, len(srcAnimes))
+	log.Printf("[%s] Got %d from AniList", a.reverseAnimeUpdater.Prefix, len(tgtAnimes))
+
+	a.reverseAnimeUpdater.Update(ctx, srcAnimes, tgtAnimes)
+	a.reverseAnimeUpdater.Statistics.Print(a.reverseAnimeUpdater.Prefix)
+
+	return nil
+}
+
+func (a *App) reverseSyncManga(ctx context.Context) error {
+	log.Printf("[%s] Fetching MAL...", a.reverseMangaUpdater.Prefix)
+
+	srcList, err := a.mal.GetUserMangaList(ctx)
+	if err != nil {
+		return fmt.Errorf("error getting user manga list from mal: %w", err)
+	}
+
+	log.Printf("[%s] Fetching AniList...", a.reverseMangaUpdater.Prefix)
+
+	tgtList, err := a.anilist.GetUserMangaList(ctx)
+	if err != nil {
+		return fmt.Errorf("error getting user manga list from anilist: %w", err)
+	}
+
+	srcs := newSourcesFromMangas(newMangasFromMalUserMangas(srcList))
+	tgts := newTargetsFromMangas(newMangasFromMediaListGroups(tgtList))
+
+	log.Printf("[%s] Got %d from MAL", a.reverseMangaUpdater.Prefix, len(srcs))
+	log.Printf("[%s] Got %d from AniList", a.reverseMangaUpdater.Prefix, len(tgts))
+
+	a.reverseMangaUpdater.Update(ctx, srcs, tgts)
+	a.reverseMangaUpdater.Statistics.Print(a.reverseMangaUpdater.Prefix)
 
 	return nil
 }

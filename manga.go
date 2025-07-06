@@ -39,6 +39,23 @@ func (s MangaStatus) GetMalStatus() (mal.MangaStatus, error) {
 	}
 }
 
+func (s MangaStatus) GetAnilistStatus() string {
+	switch s {
+	case MangaStatusReading:
+		return "CURRENT"
+	case MangaStatusCompleted:
+		return "COMPLETED"
+	case MangaStatusOnHold:
+		return "PAUSED"
+	case MangaStatusDropped:
+		return "DROPPED"
+	case MangaStatusPlanToRead:
+		return "PLANNING"
+	default:
+		return "PLANNING"
+	}
+}
+
 type Manga struct {
 	IDAnilist       int
 	IDMal           int
@@ -56,6 +73,9 @@ type Manga struct {
 }
 
 func (m Manga) GetTargetID() TargetID {
+	if *reverseDirection {
+		return TargetID(m.IDAnilist)
+	}
 	return TargetID(m.IDMal)
 }
 
@@ -196,6 +216,10 @@ func (m Manga) GetUpdateOptions() []mal.UpdateMyMangaListStatusOption {
 	return opts
 }
 
+func (m Manga) GetAnilistUpdateParams() (mediaID int, status string, progress int, progressVolumes int, score int) {
+	return m.IDAnilist, m.Status.GetAnilistStatus(), m.Progress, m.ProgressVolumes, int(m.Score)
+}
+
 func newMangaFromMediaListEntry(mediaList verniy.MediaList) (Manga, error) {
 	if mediaList.Media == nil {
 		return Manga{}, errors.New("media is nil")
@@ -292,8 +316,14 @@ func newMangaFromMalManga(manga mal.Manga) (Manga, error) {
 		titleJP = manga.AlternativeTitles.Ja
 	}
 
+	// In reverse sync mode, we need to leave AniList ID as 0 so the updater can find it by name
+	anilistID := -1
+	if *reverseDirection {
+		anilistID = 0 // This will trigger name-based search in reverse sync
+	}
+
 	return Manga{
-		IDAnilist:       -1,
+		IDAnilist:       anilistID,
 		IDMal:           manga.ID,
 		Progress:        manga.MyListStatus.NumChaptersRead,
 		ProgressVolumes: manga.MyListStatus.NumVolumesRead,
@@ -403,4 +433,69 @@ func newSourcesFromMangas(mangas []Manga) []Source {
 		res = append(res, manga)
 	}
 	return res
+}
+
+func newMangasFromVerniyMedias(medias []verniy.Media) []Manga {
+	res := make([]Manga, 0, len(medias))
+	for _, media := range medias {
+		m, err := newMangaFromVerniyMedia(media)
+		if err != nil {
+			log.Printf("failed to convert verniy media to manga: %v", err)
+			continue
+		}
+		res = append(res, m)
+	}
+	return res
+}
+
+func newMangaFromVerniyMedia(media verniy.Media) (Manga, error) {
+	if media.ID == 0 {
+		return Manga{}, errors.New("ID is 0")
+	}
+
+	var titleEN string
+	if media.Title != nil && media.Title.English != nil {
+		titleEN = *media.Title.English
+	}
+
+	var titleJP string
+	if media.Title != nil && media.Title.Native != nil {
+		titleJP = *media.Title.Native
+	}
+
+	var romajiTitle string
+	if media.Title != nil && media.Title.Romaji != nil {
+		romajiTitle = *media.Title.Romaji
+	}
+
+	var chapters int
+	if media.Chapters != nil {
+		chapters = *media.Chapters
+	}
+
+	var volumes int
+	if media.Volumes != nil {
+		volumes = *media.Volumes
+	}
+
+	var idMal int
+	if media.IDMAL != nil {
+		idMal = *media.IDMAL
+	}
+
+	return Manga{
+		IDAnilist:       media.ID,
+		IDMal:           idMal,
+		Progress:        0, // Will be set from MAL source
+		ProgressVolumes: 0, // Will be set from MAL source
+		Score:           0, // Will be set from MAL source
+		Status:          MangaStatusUnknown, // Will be set from MAL source
+		TitleEN:         titleEN,
+		TitleJP:         titleJP,
+		TitleRomaji:     romajiTitle,
+		Chapters:        chapters,
+		Volumes:         volumes,
+		StartedAt:       nil, // Will be set from MAL source
+		FinishedAt:      nil, // Will be set from MAL source
+	}, nil
 }
