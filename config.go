@@ -27,6 +27,7 @@ type Config struct {
 }
 
 func loadConfigFromFile(filename string) (Config, error) {
+	// #nosec G304 - Config file path is provided by user via command line flag
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		return Config{}, err

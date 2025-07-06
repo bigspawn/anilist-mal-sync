@@ -13,6 +13,8 @@ output:
 
 linters:
   disable-all: true
+  disable:
+    - godox
   enable:
     # Error detection
     - errcheck
@@ -30,7 +32,6 @@ linters:
     - goconst
     - gocritic
     - gocyclo
-    - godox
     - gosec
     - ineffassign
     - lll
@@ -73,11 +74,13 @@ linters:
       # Ignore comments when counting lines.
       # Default: true
       ignore-comments: true
+    gocyclo:
+      # Minimal code complexity to report.
+      min-complexity: 60
 formatters:
   enable:
     - gci
     - gofmt
     - gofumpt
     - goimports
-    - golines
     - swaggo

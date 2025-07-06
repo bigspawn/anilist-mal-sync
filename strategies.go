@@ -44,7 +44,7 @@ func (s IDStrategy) Name() string {
 	return "IDStrategy"
 }
 
-func (s IDStrategy) FindTarget(ctx context.Context, src Source, existingTargets map[TargetID]Target, prefix string) (Target, bool, error) {
+func (s IDStrategy) FindTarget(_ context.Context, src Source, existingTargets map[TargetID]Target, prefix string) (Target, bool, error) {
 	target, found := existingTargets[src.GetTargetID()]
 	if found {
 		DPrintf("[%s] Found target by ID: %d", prefix, src.GetTargetID())
@@ -59,7 +59,7 @@ func (s TitleStrategy) Name() string {
 	return "TitleStrategy"
 }
 
-func (s TitleStrategy) FindTarget(ctx context.Context, src Source, existingTargets map[TargetID]Target, prefix string) (Target, bool, error) {
+func (s TitleStrategy) FindTarget(_ context.Context, src Source, existingTargets map[TargetID]Target, prefix string) (Target, bool, error) {
 	srcTitle := src.GetTitle()
 
 	targetSlice := make([]Target, 0, len(existingTargets))
@@ -102,7 +102,12 @@ func (s APISearchStrategy) Name() string {
 	return "APISearchStrategy"
 }
 
-func (s APISearchStrategy) FindTarget(ctx context.Context, src Source, existingTargets map[TargetID]Target, prefix string) (Target, bool, error) {
+func (s APISearchStrategy) FindTarget(
+	ctx context.Context,
+	src Source,
+	existingTargets map[TargetID]Target,
+	prefix string,
+) (Target, bool, error) {
 	// Check for context cancellation before potentially long-running search
 	select {
 	case <-ctx.Done():

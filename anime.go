@@ -133,7 +133,10 @@ func (a Anime) SameProgressWithTarget(t Target) bool {
 		return progress
 	}
 	if progress && (a.NumEpisodes-b.NumEpisodes != 0) {
-		DPrintf("Both anime have 0 progress but different number of episodes: %d, %d", a.NumEpisodes, b.NumEpisodes)
+		DPrintf(
+			"Both anime have 0 progress but different number of episodes: %d, %d",
+			a.NumEpisodes, b.NumEpisodes,
+		)
 		return true
 	}
 
@@ -169,7 +172,10 @@ func (a Anime) SameTitleWithTarget(t Target) bool {
 		return false
 	}
 
-	return titleMatchingLevels(a.TitleEN, a.TitleJP, a.TitleRomaji, b.TitleEN, b.TitleJP, b.TitleRomaji)
+	return titleMatchingLevels(
+		a.TitleEN, a.TitleJP, a.TitleRomaji,
+		b.TitleEN, b.TitleJP, b.TitleRomaji,
+	)
 }
 
 func (a Anime) GetUpdateOptions() []mal.UpdateMyAnimeListStatusOption {

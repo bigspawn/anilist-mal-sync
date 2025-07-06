@@ -15,26 +15,33 @@ var (
 	mangaSync        = flag.Bool("manga", false, "sync manga instead of anime")
 	allSync          = flag.Bool("all", false, "sync all animes and mangas")
 	verbose          = flag.Bool("verbose", false, "enable verbose logging")
-	reverseDirection = flag.Bool("reverse-direction", false, "sync from MyAnimeList to AniList (default is AniList to MyAnimeList)")
+	reverseDirection = flag.Bool(
+		"reverse-direction",
+		false,
+		"sync from MyAnimeList to AniList (default is AniList to MyAnimeList)",
+	)
 )
 
 func main() {
 	flag.Parse()
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer cancel()
 
 	config, err := loadConfigFromFile(*configFile)
 	if err != nil {
+		cancel()
 		log.Fatalf("error: %v", err)
 	}
 
 	app, err := NewApp(ctx, config)
 	if err != nil {
+		cancel()
 		log.Fatalf("create app: %v", err)
 	}
 
 	if err := app.Run(ctx); err != nil {
+		cancel()
 		log.Fatalf("run app: %v", err)
 	}
+	cancel()
 }

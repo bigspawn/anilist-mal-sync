@@ -1,3 +1,4 @@
+// Package main implements a synchronization tool for AniList and MyAnimeList accounts
 package main
 
 import (
@@ -158,7 +159,9 @@ type SaveMediaListEntry struct {
 }
 
 // UpdateAnimeEntry updates an anime entry in AniList using GraphQL mutation with retry logic
-func (c *AnilistClient) UpdateAnimeEntry(ctx context.Context, mediaID int, status string, progress int, score int, prefix string) error {
+func (c *AnilistClient) UpdateAnimeEntry(
+	ctx context.Context, mediaID int, status string, progress int, score int, prefix string,
+) error {
 	return retryWithBackoff(ctx, func() error {
 		mutation := `
 			mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $score: Float) {
@@ -217,7 +220,15 @@ func (c *AnilistClient) UpdateAnimeEntry(ctx context.Context, mediaID int, statu
 }
 
 // UpdateMangaEntry updates a manga entry in AniList using GraphQL mutation with retry logic
-func (c *AnilistClient) UpdateMangaEntry(ctx context.Context, mediaID int, status string, progress int, progressVolumes int, score int, prefix string) error {
+func (c *AnilistClient) UpdateMangaEntry(
+	ctx context.Context,
+	mediaID int,
+	status string,
+	progress int,
+	progressVolumes int,
+	score int,
+	prefix string,
+) error {
 	return retryWithBackoff(ctx, func() error {
 		mutation := `
 			mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $progressVolumes: Int, $score: Float) {

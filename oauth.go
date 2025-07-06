@@ -135,6 +135,7 @@ func (oauth *OAuth) saveTokenToFile() error {
 }
 
 func readTokenFile(tokenFilePath string) (*TokenFile, error) {
+	// #nosec G304 - Token file path is user's config directory for OAuth tokens
 	file, err := os.Open(tokenFilePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -158,6 +159,7 @@ func readTokenFile(tokenFilePath string) (*TokenFile, error) {
 }
 
 func writeTokenFile(tokenFilePath string, tokenFile *TokenFile) error {
+	// #nosec G304 - Token file path is user's config directory for OAuth tokens
 	file, err := os.Create(tokenFilePath)
 	if err != nil {
 		return fmt.Errorf("error creating token file: %w", err)
@@ -174,10 +176,11 @@ func writeTokenFile(tokenFilePath string, tokenFile *TokenFile) error {
 func shutdownServer(ctx context.Context, server *http.Server) {
 	log.Println("Shutting down server...")
 	shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
 	if err := server.Shutdown(shutdownCtx); err != nil {
+		cancel()
 		log.Fatalf("Error shutting down server: %v", err)
 	}
+	cancel()
 	log.Println("Server shut down")
 }
 
@@ -204,6 +207,7 @@ func startServer(ctx context.Context, oauth *OAuth, port string, done chan<- boo
 			w.Header().Set("Content-Type", "text/html")
 			w.WriteHeader(http.StatusOK)
 
+			//nolint:lll //ok
 			_, e := w.Write([]byte(`<html><body>Authorization successful. You can close this window.<br><script>window.close();</script></body></html>`))
 			if e != nil {
 				log.Fatalf("Error writing response: %v", e)
@@ -252,7 +256,7 @@ func createDirIfNotExists(path string) error {
 		return nil
 	}
 	if os.IsNotExist(err) {
-		if err = os.MkdirAll(dir, os.ModePerm); err != nil {
+		if err = os.MkdirAll(dir, 0o750); err != nil {
 			return fmt.Errorf("error creating directory: %w", err)
 		}
 	}
