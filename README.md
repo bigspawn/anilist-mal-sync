@@ -165,5 +165,5 @@ Just stop it and wait for a while and run again.
 ## TODO
 
 - [ ] Sync favorites
-- [ ] Sync MAL to AniList
+- [x] Sync MAL to AniList
 - [ ] Sync rewatching and rereading
