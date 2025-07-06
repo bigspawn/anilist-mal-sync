@@ -1,5 +1,6 @@
+version: "2"
 linters:
-  disable-all: true
+  default: none
   enable:
     - bodyclose
     - copyloopvar
@@ -15,138 +16,148 @@ linters:
     - gocritic
     - gocyclo
     - godox
-    - gofmt
-    - goimports
-    - mnd
     - goprintffuncname
     - gosec
-    - gosimple
     - govet
-    - intrange
     - ineffassign
+    - intrange
     - lll
     - misspell
+    - mnd
     - nakedret
     - noctx
     - nolintlint
     - revive
     - staticcheck
-    - stylecheck
     - testifylint
     - unconvert
     - unparam
     - unused
     - whitespace
-
-linters-settings:
-  # dupl:
-  #   threshold: 100
-  funlen:
-    lines: -1 # the number of lines (code + empty lines) is not a right metric and leads to code without empty line or one-liner.
-    statements: 50
-  goconst:
-    min-len: 2
-    min-occurrences: 3
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - experimental
-      - opinionated
-      - performance
-      - style
-    disabled-checks:
-      - dupImport # https://github.com/go-critic/go-critic/issues/845
-      - ifElseChain
-      - octalLiteral
-      - whyNoLint
-  gocyclo:
-    min-complexity: 15
-  godox:
-    keywords:
-      - FIXME
-  gofmt:
-    rewrite-rules:
-      - pattern: "interface{}"
-        replacement: "any"
-  goimports:
-    local-prefixes: github.com/golangci/golangci-lint
-  mnd:
-    # don't include the "operation" and "assign"
-    checks:
-      - argument
-      - case
-      - condition
-      - return
-    ignored-numbers:
-      - "0"
-      - "1"
-      - "2"
-      - "3"
-    ignored-functions:
-      - strings.SplitN
-  govet:
-    enable:
-      - nilness
-      - shadow
-  errorlint:
-    asserts: false
-  lll:
-    line-length: 140
-  misspell:
-    locale: US
-    ignore-words:
-      - "importas" # linter name
-  nolintlint:
-    allow-unused: false # report any unused nolint directives
-    require-explanation: true # require an explanation for nolint directives
-    require-specific: true # require nolint directives to be specific about which linter is being skipped
-  revive:
+  settings:
+    errorlint:
+      asserts: false
+    funlen:
+      lines: -1
+      statements: 50
+    goconst:
+      min-len: 2
+      min-occurrences: 3
+    gocritic:
+      disabled-checks:
+        - dupImport
+        - ifElseChain
+        - octalLiteral
+        - whyNoLint
+      enabled-tags:
+        - diagnostic
+        - experimental
+        - opinionated
+        - performance
+        - style
+    gocyclo:
+      min-complexity: 15
+    godox:
+      keywords:
+        - FIXME
+    govet:
+      enable:
+        - nilness
+        - shadow
+    lll:
+      line-length: 140
+    misspell:
+      locale: US
+      ignore-rules:
+        - importas
+    mnd:
+      checks:
+        - argument
+        - case
+        - condition
+        - return
+      ignored-numbers:
+        - "0"
+        - "1"
+        - "2"
+        - "3"
+      ignored-functions:
+        - strings.SplitN
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+      allow-unused: false
+    revive:
+      rules:
+        - name: indent-error-flow
+        - name: unexported-return
+          disabled: true
+        - name: unused-parameter
+        - name: unused-receiver
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
     rules:
-      - name: indent-error-flow
-      - name: unexported-return
-        disabled: true
-      - name: unused-parameter
-      - name: unused-receiver
-
-issues:
-  exclude-rules:
-    - path: (.+)_test\.go
-      linters:
-        - dupl
-        - mnd
-        - lll
-
-    # Deprecated linter options.
-    - path: pkg/golinters/errcheck/errcheck.go
-      linters: [staticcheck]
-      text: "SA1019: errCfg.Exclude is deprecated: use ExcludeFunctions instead"
-    - path: pkg/golinters/errcheck/errcheck.go
-      linters: [staticcheck]
-      text: "SA1019: errCfg.Ignore is deprecated: use ExcludeFunctions instead"
-    - path: pkg/golinters/govet/govet.go
-      linters: [staticcheck]
-      text: "SA1019: cfg.CheckShadowing is deprecated: the linter should be enabled inside Enable."
-    - path: pkg/golinters/godot/godot.go
-      linters: [staticcheck]
-      text: "SA1019: settings.CheckAll is deprecated: use Scope instead"
-    - path: pkg/goformatters/gci/gci.go
-      linters: [staticcheck]
-      text: "SA1019: settings.LocalPrefixes is deprecated: use Sections instead."
-
-    # Related to `run.go`, it cannot be removed.
-    - path: pkg/golinters/gofumpt/gofumpt.go
-      linters: [staticcheck]
-      text: "SA1019: settings.LangVersion is deprecated: use the global `run.go` instead."
-
-    # Based on existing code, the modifications should be limited to make maintenance easier.
-    - path: pkg/golinters/unused/unused.go
-      linters: [gocritic]
-      text: "rangeValCopy: each iteration copies 160 bytes \\(consider pointers or indexing\\)"
-
-    # Related to the result of computation but divided multiple times by 1024.
-    - path: test/bench/bench_test.go
-      linters: [gosec]
-      text: "G115: integer overflow conversion uint64 -> int"
-
-run:
-  timeout: 5m
+      - linters:
+          - dupl
+          - lll
+          - mnd
+        path: (.+)_test\.go
+      - linters:
+          - staticcheck
+        path: pkg/golinters/errcheck/errcheck.go
+        text: 'SA1019: errCfg.Exclude is deprecated: use ExcludeFunctions instead'
+      - linters:
+          - staticcheck
+        path: pkg/golinters/errcheck/errcheck.go
+        text: 'SA1019: errCfg.Ignore is deprecated: use ExcludeFunctions instead'
+      - linters:
+          - staticcheck
+        path: pkg/golinters/govet/govet.go
+        text: 'SA1019: cfg.CheckShadowing is deprecated: the linter should be enabled inside Enable.'
+      - linters:
+          - staticcheck
+        path: pkg/golinters/godot/godot.go
+        text: 'SA1019: settings.CheckAll is deprecated: use Scope instead'
+      - linters:
+          - staticcheck
+        path: pkg/goformatters/gci/gci.go
+        text: 'SA1019: settings.LocalPrefixes is deprecated: use Sections instead.'
+      - linters:
+          - staticcheck
+        path: pkg/golinters/gofumpt/gofumpt.go
+        text: 'SA1019: settings.LangVersion is deprecated: use the global `run.go` instead.'
+      - linters:
+          - gocritic
+        path: pkg/golinters/unused/unused.go
+        text: 'rangeValCopy: each iteration copies 160 bytes \(consider pointers or indexing\)'
+      - linters:
+          - gosec
+        path: test/bench/bench_test.go
+        text: 'G115: integer overflow conversion uint64 -> int'
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    gofmt:
+      rewrite-rules:
+        - pattern: interface{}
+          replacement: any
+    goimports:
+      local-prefixes:
+        - github.com/golangci/golangci-lint
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
