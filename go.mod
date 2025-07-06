@@ -7,9 +7,11 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 )
 
-require (
-	github.com/rl404/verniy v0.3.1
-	golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f
-)
+require github.com/rl404/verniy v0.3.1
 
 require github.com/nstratos/go-myanimelist v0.9.5
+
+require (
+	github.com/cenkalti/backoff/v4 v4.3.0
+	github.com/google/go-cmp v0.6.0 // indirect
+)

@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/rl404/verniy"
 	"golang.org/x/oauth2"
 )
@@ -106,6 +108,52 @@ func NewAnilistOAuth(ctx context.Context, config Config) (*OAuth, error) {
 	return oauthAnilist, nil
 }
 
+// createBackoffPolicy creates a configured exponential backoff policy for rate limiting
+func createBackoffPolicy() *backoff.ExponentialBackOff {
+	b := backoff.NewExponentialBackOff()
+	b.InitialInterval = 1 * time.Second
+	b.MaxInterval = 30 * time.Second
+	b.MaxElapsedTime = 2 * time.Minute
+	b.Multiplier = 2.0
+	b.RandomizationFactor = 0.1 // Add jitter
+	return b
+}
+
+// isRateLimitError checks if the error is a rate limiting error
+func isRateLimitError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := strings.ToLower(err.Error())
+	return strings.Contains(errStr, "too many requests") || 
+		   strings.Contains(errStr, "rate limit") ||
+		   strings.Contains(errStr, "429")
+}
+
+// retryWithBackoff wraps an operation with exponential backoff for rate limit handling
+func retryWithBackoff(ctx context.Context, operation func() error, operationName string) error {
+	b := createBackoffPolicy()
+	
+	retryableOperation := func() error {
+		err := operation()
+		if err != nil && !isRateLimitError(err) {
+			// Don't retry non-rate-limit errors
+			return backoff.Permanent(err)
+		}
+		return err
+	}
+	
+	return backoff.RetryNotify(
+		retryableOperation,
+		backoff.WithContext(b, ctx),
+		func(err error, duration time.Duration) {
+			if isRateLimitError(err) {
+				log.Printf("Rate limit hit for %s, retrying in %v: %v", operationName, duration, err)
+			}
+		},
+	)
+}
+
 // SaveMediaListEntry represents the response from AniList SaveMediaListEntry mutation
 type SaveMediaListEntry struct {
 	Data struct {
@@ -118,174 +166,214 @@ type SaveMediaListEntry struct {
 	} `json:"data"`
 }
 
-// UpdateAnimeEntry updates an anime entry in AniList using GraphQL mutation
+// UpdateAnimeEntry updates an anime entry in AniList using GraphQL mutation with retry logic
 func (c *AnilistClient) UpdateAnimeEntry(ctx context.Context, mediaID int, status string, progress int, score int) error {
-	mutation := `
-		mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $score: Int) {
-			SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, score: $score) {
-				id
-				status
-				progress
-				score
+	return retryWithBackoff(ctx, func() error {
+		mutation := `
+			mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $score: Int) {
+				SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, score: $score) {
+					id
+					status
+					progress
+					score
+				}
 			}
+		`
+
+		variables := map[string]interface{}{
+			"mediaId":  mediaID,
+			"status":   status,
+			"progress": progress,
+			"score":    score,
 		}
-	`
 
-	variables := map[string]interface{}{
-		"mediaId":  mediaID,
-		"status":   status,
-		"progress": progress,
-		"score":    score,
-	}
+		requestBody := map[string]interface{}{
+			"query":     mutation,
+			"variables": variables,
+		}
 
-	requestBody := map[string]interface{}{
-		"query":     mutation,
-		"variables": variables,
-	}
+		jsonBody, err := json.Marshal(requestBody)
+		if err != nil {
+			return fmt.Errorf("failed to marshal request body: %w", err)
+		}
 
-	jsonBody, err := json.Marshal(requestBody)
-	if err != nil {
-		return fmt.Errorf("failed to marshal request body: %w", err)
-	}
+		responseBody, code, err := c.c.MakeRequest(ctx, jsonBody)
+		if err != nil {
+			return fmt.Errorf("failed to make request: %w", err)
+		}
 
-	responseBody, code, err := c.c.MakeRequest(ctx, jsonBody)
-	if err != nil {
-		return fmt.Errorf("failed to make request: %w", err)
-	}
+		if code != 200 {
+			return fmt.Errorf("AniList API returned status code %d: %s", code, string(responseBody))
+		}
 
-	if code != 200 {
-		return fmt.Errorf("AniList API returned status code %d: %s", code, string(responseBody))
-	}
+		var response SaveMediaListEntry
+		if err := json.Unmarshal(responseBody, &response); err != nil {
+			return fmt.Errorf("failed to unmarshal response: %w", err)
+		}
 
-	var response SaveMediaListEntry
-	if err := json.Unmarshal(responseBody, &response); err != nil {
-		return fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	return nil
+		return nil
+	}, fmt.Sprintf("update anime entry: %d", mediaID))
 }
 
-// UpdateMangaEntry updates a manga entry in AniList using GraphQL mutation
+// UpdateMangaEntry updates a manga entry in AniList using GraphQL mutation with retry logic
 func (c *AnilistClient) UpdateMangaEntry(ctx context.Context, mediaID int, status string, progress int, progressVolumes int, score int) error {
-	mutation := `
-		mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $progressVolumes: Int, $score: Int) {
-			SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, progressVolumes: $progressVolumes, score: $score) {
-				id
-				status
-				progress
-				progressVolumes
-				score
+	return retryWithBackoff(ctx, func() error {
+		mutation := `
+			mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $progressVolumes: Int, $score: Int) {
+				SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, progressVolumes: $progressVolumes, score: $score) {
+					id
+					status
+					progress
+					progressVolumes
+					score
+				}
 			}
+		`
+
+		variables := map[string]interface{}{
+			"mediaId":         mediaID,
+			"status":          status,
+			"progress":        progress,
+			"progressVolumes": progressVolumes,
+			"score":           score,
 		}
-	`
 
-	variables := map[string]interface{}{
-		"mediaId":         mediaID,
-		"status":          status,
-		"progress":        progress,
-		"progressVolumes": progressVolumes,
-		"score":           score,
-	}
+		requestBody := map[string]interface{}{
+			"query":     mutation,
+			"variables": variables,
+		}
 
-	requestBody := map[string]interface{}{
-		"query":     mutation,
-		"variables": variables,
-	}
+		jsonBody, err := json.Marshal(requestBody)
+		if err != nil {
+			return fmt.Errorf("failed to marshal request body: %w", err)
+		}
 
-	jsonBody, err := json.Marshal(requestBody)
-	if err != nil {
-		return fmt.Errorf("failed to marshal request body: %w", err)
-	}
+		responseBody, code, err := c.c.MakeRequest(ctx, jsonBody)
+		if err != nil {
+			return fmt.Errorf("failed to make request: %w", err)
+		}
 
-	responseBody, code, err := c.c.MakeRequest(ctx, jsonBody)
-	if err != nil {
-		return fmt.Errorf("failed to make request: %w", err)
-	}
+		if code != 200 {
+			return fmt.Errorf("AniList API returned status code %d: %s", code, string(responseBody))
+		}
 
-	if code != 200 {
-		return fmt.Errorf("AniList API returned status code %d: %s", code, string(responseBody))
-	}
+		var response SaveMediaListEntry
+		if err := json.Unmarshal(responseBody, &response); err != nil {
+			return fmt.Errorf("failed to unmarshal response: %w", err)
+		}
 
-	var response SaveMediaListEntry
-	if err := json.Unmarshal(responseBody, &response); err != nil {
-		return fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	return nil
+		return nil
+	}, fmt.Sprintf("update manga entry: %d", mediaID))
 }
 
-// GetAnimeByID gets an anime from AniList by ID
+// GetAnimeByID gets an anime from AniList by ID with retry logic
 func (c *AnilistClient) GetAnimeByID(ctx context.Context, id int) (*verniy.Media, error) {
-	return c.c.GetAnimeWithContext(ctx, id,
-		verniy.MediaFieldID,
-		verniy.MediaFieldIDMAL,
-		verniy.MediaFieldTitle(
-			verniy.MediaTitleFieldRomaji,
-			verniy.MediaTitleFieldEnglish,
-			verniy.MediaTitleFieldNative,
-		),
-		verniy.MediaFieldStatusV2,
-		verniy.MediaFieldEpisodes,
-		verniy.MediaFieldSeasonYear,
-	)
+	var result *verniy.Media
+	
+	err := retryWithBackoff(ctx, func() error {
+		media, err := c.c.GetAnimeWithContext(ctx, id,
+			verniy.MediaFieldID,
+			verniy.MediaFieldIDMAL,
+			verniy.MediaFieldTitle(
+				verniy.MediaTitleFieldRomaji,
+				verniy.MediaTitleFieldEnglish,
+				verniy.MediaTitleFieldNative,
+			),
+			verniy.MediaFieldStatusV2,
+			verniy.MediaFieldEpisodes,
+			verniy.MediaFieldSeasonYear,
+		)
+		if err != nil {
+			return err
+		}
+		result = media
+		return nil
+	}, fmt.Sprintf("get anime by ID: %d", id))
+	
+	return result, err
 }
 
-// GetAnimesByName searches for anime on AniList by name
+// GetAnimesByName searches for anime on AniList by name with retry logic
 func (c *AnilistClient) GetAnimesByName(ctx context.Context, name string) ([]verniy.Media, error) {
-	page, err := c.c.SearchAnimeWithContext(ctx, verniy.PageParamMedia{Search: name}, 1, 10,
-		verniy.MediaFieldID,
-		verniy.MediaFieldIDMAL,
-		verniy.MediaFieldTitle(
-			verniy.MediaTitleFieldRomaji,
-			verniy.MediaTitleFieldEnglish,
-			verniy.MediaTitleFieldNative,
-		),
-		verniy.MediaFieldStatusV2,
-		verniy.MediaFieldEpisodes,
-		verniy.MediaFieldSeasonYear,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return page.Media, nil
+	var result []verniy.Media
+	
+	err := retryWithBackoff(ctx, func() error {
+		page, err := c.c.SearchAnimeWithContext(ctx, verniy.PageParamMedia{Search: name}, 1, 10,
+			verniy.MediaFieldID,
+			verniy.MediaFieldIDMAL,
+			verniy.MediaFieldTitle(
+				verniy.MediaTitleFieldRomaji,
+				verniy.MediaTitleFieldEnglish,
+				verniy.MediaTitleFieldNative,
+			),
+			verniy.MediaFieldStatusV2,
+			verniy.MediaFieldEpisodes,
+			verniy.MediaFieldSeasonYear,
+		)
+		if err != nil {
+			return err
+		}
+		result = page.Media
+		return nil
+	}, fmt.Sprintf("search anime by name: %s", name))
+	
+	return result, err
 }
 
-// GetMangaByID gets a manga from AniList by ID
+// GetMangaByID gets a manga from AniList by ID with retry logic
 func (c *AnilistClient) GetMangaByID(ctx context.Context, id int) (*verniy.Media, error) {
-	return c.c.GetMangaWithContext(ctx, id,
-		verniy.MediaFieldID,
-		verniy.MediaFieldIDMAL,
-		verniy.MediaFieldTitle(
-			verniy.MediaTitleFieldRomaji,
-			verniy.MediaTitleFieldEnglish,
-			verniy.MediaTitleFieldNative,
-		),
-		verniy.MediaFieldType,
-		verniy.MediaFieldFormat,
-		verniy.MediaFieldStatusV2,
-		verniy.MediaFieldChapters,
-		verniy.MediaFieldVolumes,
-	)
+	var result *verniy.Media
+	
+	err := retryWithBackoff(ctx, func() error {
+		media, err := c.c.GetMangaWithContext(ctx, id,
+			verniy.MediaFieldID,
+			verniy.MediaFieldIDMAL,
+			verniy.MediaFieldTitle(
+				verniy.MediaTitleFieldRomaji,
+				verniy.MediaTitleFieldEnglish,
+				verniy.MediaTitleFieldNative,
+			),
+			verniy.MediaFieldType,
+			verniy.MediaFieldFormat,
+			verniy.MediaFieldStatusV2,
+			verniy.MediaFieldChapters,
+			verniy.MediaFieldVolumes,
+		)
+		if err != nil {
+			return err
+		}
+		result = media
+		return nil
+	}, fmt.Sprintf("get manga by ID: %d", id))
+	
+	return result, err
 }
 
-// GetMangasByName searches for manga on AniList by name
+// GetMangasByName searches for manga on AniList by name with retry logic
 func (c *AnilistClient) GetMangasByName(ctx context.Context, name string) ([]verniy.Media, error) {
-	page, err := c.c.SearchMangaWithContext(ctx, verniy.PageParamMedia{Search: name}, 1, 10,
-		verniy.MediaFieldID,
-		verniy.MediaFieldIDMAL,
-		verniy.MediaFieldTitle(
-			verniy.MediaTitleFieldRomaji,
-			verniy.MediaTitleFieldEnglish,
-			verniy.MediaTitleFieldNative,
-		),
-		verniy.MediaFieldType,
-		verniy.MediaFieldFormat,
-		verniy.MediaFieldStatusV2,
-		verniy.MediaFieldChapters,
-		verniy.MediaFieldVolumes,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return page.Media, nil
+	var result []verniy.Media
+	
+	err := retryWithBackoff(ctx, func() error {
+		page, err := c.c.SearchMangaWithContext(ctx, verniy.PageParamMedia{Search: name}, 1, 10,
+			verniy.MediaFieldID,
+			verniy.MediaFieldIDMAL,
+			verniy.MediaFieldTitle(
+				verniy.MediaTitleFieldRomaji,
+				verniy.MediaTitleFieldEnglish,
+				verniy.MediaTitleFieldNative,
+			),
+			verniy.MediaFieldType,
+			verniy.MediaFieldFormat,
+			verniy.MediaFieldStatusV2,
+			verniy.MediaFieldChapters,
+			verniy.MediaFieldVolumes,
+		)
+		if err != nil {
+			return err
+		}
+		result = page.Media
+		return nil
+	}, fmt.Sprintf("search manga by name: %s", name))
+	
+	return result, err
 }
