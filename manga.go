@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -18,10 +19,10 @@ var mangaBetweenBraketsRegexp = regexp.MustCompile(`\(.*\)`)
 func mangaNormalizeTitle(title string) string {
 	// Convert to lowercase
 	normalized := strings.ToLower(title)
-	
+
 	// Remove content in brackets/parentheses
 	normalized = mangaBetweenBraketsRegexp.ReplaceAllString(normalized, "")
-	
+
 	// Remove common punctuation and special characters
 	normalized = strings.ReplaceAll(normalized, ":", "")
 	normalized = strings.ReplaceAll(normalized, "!", "")
@@ -32,34 +33,14 @@ func mangaNormalizeTitle(title string) string {
 	normalized = strings.ReplaceAll(normalized, "_", " ")
 	normalized = strings.ReplaceAll(normalized, ".", " ")
 	normalized = strings.ReplaceAll(normalized, ",", " ")
-	
+
 	// Replace multiple spaces with single space
 	normalized = regexp.MustCompile(`\s+`).ReplaceAllString(normalized, " ")
-	
+
 	// Trim whitespace
 	normalized = strings.TrimSpace(normalized)
-	
-	return normalized
-}
 
-// mangaTitleContains checks if one manga title contains another (bidirectional)
-func mangaTitleContains(title1, title2 string) bool {
-	if title1 == "" || title2 == "" {
-		return false
-	}
-	
-	norm1 := mangaNormalizeTitle(title1)
-	norm2 := mangaNormalizeTitle(title2)
-	
-	if norm1 == norm2 {
-		return true
-	}
-	
-	// Check if shorter title is contained in longer title
-	if len(norm1) < len(norm2) {
-		return strings.Contains(norm2, norm1)
-	}
-	return strings.Contains(norm1, norm2)
+	return normalized
 }
 
 // mangaTitleSimilarity calculates prefix similarity between two manga titles
@@ -67,23 +48,23 @@ func mangaTitleSimilarity(title1, title2 string) float64 {
 	if title1 == "" || title2 == "" {
 		return 0.0
 	}
-	
+
 	norm1 := strings.ReplaceAll(mangaNormalizeTitle(title1), " ", "")
 	norm2 := strings.ReplaceAll(mangaNormalizeTitle(title2), " ", "")
-	
+
 	if norm1 == norm2 {
 		return 100.0
 	}
-	
+
 	// Ensure s1 is the longer string
 	if len(norm1) < len(norm2) {
 		norm1, norm2 = norm2, norm1
 	}
-	
+
 	if len(norm2) == 0 {
 		return 0.0
 	}
-	
+
 	// Calculate character-by-character prefix match
 	matchCount := 0
 	for i, r := range norm1 {
@@ -96,7 +77,7 @@ func mangaTitleSimilarity(title1, title2 string) float64 {
 			break
 		}
 	}
-	
+
 	return float64(matchCount) / float64(len(norm1)) * 100.0
 }
 
@@ -164,7 +145,7 @@ func mangaTitleLevenshteinSimilarity(title1, title2 string) float64 {
 
 	norm1 := mangaNormalizeTitle(title1)
 	norm2 := mangaNormalizeTitle(title2)
-	
+
 	if norm1 == norm2 {
 		return 100.0
 	}
@@ -334,85 +315,96 @@ func (m Manga) SameTitleWithTarget(t Target) bool {
 
 	// Level 1: Exact case-insensitive title matching
 	if m.TitleEN != "" && b.TitleEN != "" && strings.EqualFold(m.TitleEN, b.TitleEN) {
+		DPrintf("Exact match found TitleEN: %s == %s", m.TitleEN, b.TitleEN)
 		return true
 	}
 
 	if m.TitleJP != "" && b.TitleJP != "" && strings.EqualFold(m.TitleJP, b.TitleJP) {
+		DPrintf("Exact match found TitleJP: %s == %s", m.TitleJP, b.TitleJP)
 		return true
 	}
 
 	if m.TitleRomaji != "" && b.TitleRomaji != "" && strings.EqualFold(m.TitleRomaji, b.TitleRomaji) {
+		DPrintf("Exact match found TitleRomaji: %s == %s", m.TitleRomaji, b.TitleRomaji)
 		return true
 	}
 
 	// Level 2: Normalized exact matching (removes punctuation, brackets, etc.)
-	if m.TitleEN != "" && b.TitleEN != "" && mangaNormalizeTitle(m.TitleEN) == mangaNormalizeTitle(b.TitleEN) {
-		return true
+	if m.TitleEN != "" && b.TitleEN != "" {
+		normalizedA := mangaNormalizeTitle(m.TitleEN)
+		normalizedB := mangaNormalizeTitle(b.TitleEN)
+		if normalizedA == normalizedB {
+			DPrintf("Normalized match found TitleEN: '%s' == '%s' (original: '%s' vs '%s')", normalizedA, normalizedB, m.TitleEN, b.TitleEN)
+			return true
+		}
 	}
 
-	if m.TitleJP != "" && b.TitleJP != "" && mangaNormalizeTitle(m.TitleJP) == mangaNormalizeTitle(b.TitleJP) {
-		return true
+	if m.TitleJP != "" && b.TitleJP != "" {
+		normalizedA := mangaNormalizeTitle(m.TitleJP)
+		normalizedB := mangaNormalizeTitle(b.TitleJP)
+		if normalizedA == normalizedB {
+			DPrintf("Normalized match found TitleJP: '%s' == '%s' (original: '%s' vs '%s')", normalizedA, normalizedB, m.TitleJP, b.TitleJP)
+			return true
+		}
 	}
 
-	if m.TitleRomaji != "" && b.TitleRomaji != "" && mangaNormalizeTitle(m.TitleRomaji) == mangaNormalizeTitle(b.TitleRomaji) {
-		return true
+	if m.TitleRomaji != "" && b.TitleRomaji != "" {
+		normalizedA := mangaNormalizeTitle(m.TitleRomaji)
+		normalizedB := mangaNormalizeTitle(b.TitleRomaji)
+		if normalizedA == normalizedB {
+			DPrintf("Normalized match found TitleRomaji: '%s' == '%s' (original: '%s' vs '%s')", normalizedA, normalizedB, m.TitleRomaji, b.TitleRomaji)
+			return true
+		}
 	}
 
-	// Level 3: Contains matching (one title contained in another)
-	if mangaTitleContains(m.TitleEN, b.TitleEN) {
-		return true
+	// Level 4: Fuzzy matching with similarity threshold
+	if m.TitleEN != "" && b.TitleEN != "" {
+		similarity := mangaTitleSimilarity(m.TitleEN, b.TitleEN)
+		if similarity >= similarityThreshold {
+			DPrintf("Fuzzy match found TitleEN: '%s' ~= '%s' (similarity: %.2f)", m.TitleEN, b.TitleEN, similarity)
+			return true
+		}
 	}
 
-	if mangaTitleContains(m.TitleJP, b.TitleJP) {
-		return true
+	if m.TitleJP != "" && b.TitleJP != "" {
+		similarity := mangaTitleSimilarity(m.TitleJP, b.TitleJP)
+		if similarity >= similarityThreshold {
+			DPrintf("Fuzzy match found TitleJP: '%s' ~= '%s' (similarity: %.2f)", m.TitleJP, b.TitleJP, similarity)
+			return true
+		}
 	}
 
-	if mangaTitleContains(m.TitleRomaji, b.TitleRomaji) {
-		return true
+	if m.TitleRomaji != "" && b.TitleRomaji != "" {
+		similarity := mangaTitleSimilarity(m.TitleRomaji, b.TitleRomaji)
+		if similarity >= similarityThreshold {
+			DPrintf("Fuzzy match found TitleRomaji: '%s' ~= '%s' (similarity: %.2f)", m.TitleRomaji, b.TitleRomaji, similarity)
+			return true
+		}
 	}
 
-	// Level 4: Cross-language matching (EN vs Romaji, etc.)
-	if mangaTitleContains(m.TitleEN, b.TitleRomaji) || mangaTitleContains(m.TitleRomaji, b.TitleEN) {
-		return true
+	// Level 5: Levenshtein distance-based matching
+	if m.TitleEN != "" && b.TitleEN != "" {
+		similarity := mangaTitleLevenshteinSimilarity(m.TitleEN, b.TitleEN)
+		if similarity >= levenshteinThreshold {
+			DPrintf("Levenshtein match found TitleEN: '%s' ~= '%s' (similarity: %.2f)", m.TitleEN, b.TitleEN, similarity)
+			return true
+		}
 	}
 
-	// Level 5: Fuzzy matching with similarity threshold (85%)
-	const similarityThreshold = 85.0
-	
-	if mangaTitleSimilarity(m.TitleEN, b.TitleEN) >= similarityThreshold {
-		return true
+	if m.TitleJP != "" && b.TitleJP != "" {
+		similarity := mangaTitleLevenshteinSimilarity(m.TitleJP, b.TitleJP)
+		if similarity >= levenshteinThreshold {
+			DPrintf("Levenshtein match found TitleJP: '%s' ~= '%s' (similarity: %.2f)", m.TitleJP, b.TitleJP, similarity)
+			return true
+		}
 	}
 
-	if mangaTitleSimilarity(m.TitleJP, b.TitleJP) >= similarityThreshold {
-		return true
-	}
-
-	if mangaTitleSimilarity(m.TitleRomaji, b.TitleRomaji) >= similarityThreshold {
-		return true
-	}
-
-	// Level 6: Levenshtein distance-based matching (80% threshold)
-	const levenshteinThreshold = 80.0
-	
-	if mangaTitleLevenshteinSimilarity(m.TitleEN, b.TitleEN) >= levenshteinThreshold {
-		return true
-	}
-
-	if mangaTitleLevenshteinSimilarity(m.TitleJP, b.TitleJP) >= levenshteinThreshold {
-		return true
-	}
-
-	if mangaTitleLevenshteinSimilarity(m.TitleRomaji, b.TitleRomaji) >= levenshteinThreshold {
-		return true
-	}
-
-	// Cross-language Levenshtein matching
-	if mangaTitleLevenshteinSimilarity(m.TitleEN, b.TitleRomaji) >= levenshteinThreshold {
-		return true
-	}
-
-	if mangaTitleLevenshteinSimilarity(m.TitleRomaji, b.TitleEN) >= levenshteinThreshold {
-		return true
+	if m.TitleRomaji != "" && b.TitleRomaji != "" {
+		similarity := mangaTitleLevenshteinSimilarity(m.TitleRomaji, b.TitleRomaji)
+		if similarity >= levenshteinThreshold {
+			DPrintf("Levenshtein match found TitleRomaji: '%s' ~= '%s' (similarity: %.2f)", m.TitleRomaji, b.TitleRomaji, similarity)
+			return true
+		}
 	}
 
 	return false
@@ -478,10 +470,6 @@ func (m Manga) GetUpdateOptions() []mal.UpdateMyMangaListStatusOption {
 	}
 
 	return opts
-}
-
-func (m Manga) GetAnilistUpdateParams() (mediaID int, status string, progress int, progressVolumes int, score int) {
-	return m.IDAnilist, m.Status.GetAnilistStatus(), m.Progress, m.ProgressVolumes, int(m.Score)
 }
 
 func newMangaFromMediaListEntry(mediaList verniy.MediaList) (Manga, error) {
@@ -666,6 +654,9 @@ func newMangasFromMalUserMangas(mangas []mal.UserManga) []Manga {
 
 		res = append(res, r)
 	}
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].GetStatusString() < res[j].GetStatusString()
+	})
 	return res
 }
 

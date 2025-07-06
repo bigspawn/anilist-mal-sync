@@ -161,8 +161,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 			if !ok {
 				return fmt.Errorf("source is not an anime")
 			}
-			mediaID, status, progress, score := a.GetAnilistUpdateParams()
-			if err := anilistClient.UpdateAnimeEntry(ctx, mediaID, status, progress, score, "MAL to AniList Anime"); err != nil {
+			if err := anilistClient.UpdateAnimeEntry(ctx, int(id), a.Status.GetAnilistStatus(), a.Progress, int(a.Score), "MAL to AniList Anime"); err != nil {
 				return fmt.Errorf("error updating anilist anime: %w", err)
 			}
 			return nil
@@ -176,7 +175,26 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		StrategyChain: NewStrategyChain(
 			IDStrategy{},
 			TitleStrategy{},
-			APISearchStrategy{},
+			APISearchStrategy{
+				GetTargetByIDFunc: func(ctx context.Context, id TargetID) (Target, error) {
+					resp, err := anilistClient.GetMangaByID(ctx, int(id), "MAL to AniList Manga")
+					if err != nil {
+						return nil, fmt.Errorf("error getting anilist manga by id: %w", err)
+					}
+					manga, err := newMangaFromVerniyMedia(*resp)
+					if err != nil {
+						return nil, fmt.Errorf("error creating manga from anilist media: %w", err)
+					}
+					return manga, nil
+				},
+				GetTargetsByNameFunc: func(ctx context.Context, name string) ([]Target, error) {
+					resp, err := anilistClient.GetMangasByName(ctx, name, "MAL to AniList Manga")
+					if err != nil {
+						return nil, fmt.Errorf("error getting anilist manga by name: %w", err)
+					}
+					return newTargetsFromMangas(newMangasFromVerniyMedias(resp)), nil
+				},
+			},
 		),
 
 		UpdateTargetBySourceFunc: func(ctx context.Context, id TargetID, src Source) error {
@@ -184,8 +202,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 			if !ok {
 				return fmt.Errorf("source is not a manga")
 			}
-			mediaID, status, progress, progressVolumes, score := m.GetAnilistUpdateParams()
-			if err := anilistClient.UpdateMangaEntry(ctx, mediaID, status, progress, progressVolumes, score, "MAL to AniList Manga"); err != nil {
+			if err := anilistClient.UpdateMangaEntry(ctx, int(id), m.Status.GetAnilistStatus(), m.Progress, m.ProgressVolumes, int(m.Score), "MAL to AniList Manga"); err != nil {
 				return fmt.Errorf("error updating anilist manga: %w", err)
 			}
 			return nil

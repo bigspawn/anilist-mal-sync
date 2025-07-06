@@ -51,6 +51,7 @@ func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target) {
 		}
 
 		if src.GetStatusString() == "" {
+			DPrintf("[%s] Skipping source with empty status: %s", u.Prefix, src.String())
 			continue
 		}
 
@@ -92,7 +93,8 @@ func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts ma
 			return
 		}
 
-		log.Printf("[%s] Title: %s", u.Prefix, src.GetTitle())
+		log.Printf("[%s] Src title: %s", u.Prefix, src.String() /*GetTitle()*/)
+		log.Printf("[%s] Tgt title: %s", u.Prefix, tgt.String() /*GetTitle()*/)
 		log.Printf("[%s] Progress is not same, need to update: %s", u.Prefix, src.GetStringDiffWithTarget(tgt))
 
 		tgtID = tgt.GetTargetID()

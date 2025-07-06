@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"sort"
 )
 
 // TargetFindStrategy defines a strategy for finding targets
@@ -60,21 +61,40 @@ func (s TitleStrategy) Name() string {
 
 func (s TitleStrategy) FindTarget(ctx context.Context, src Source, existingTargets map[TargetID]Target, prefix string) (Target, bool, error) {
 	srcTitle := src.GetTitle()
-	
+
+	targetSlice := make([]Target, 0, len(existingTargets))
 	for _, target := range existingTargets {
+		targetSlice = append(targetSlice, target)
+	}
+
+	sort.Slice(targetSlice, func(i, j int) bool {
+		return targetSlice[i].GetTitle() < targetSlice[j].GetTitle()
+	})
+
+	byTitle := map[string]Target{}
+	for _, target := range targetSlice {
+		byTitle[target.GetTitle()] = target
+	}
+
+	if target, ok := byTitle[srcTitle]; ok {
+		DPrintf("[%s] Found target by title: %s", prefix, srcTitle)
+		return target, true, nil
+	}
+
+	for _, target := range targetSlice {
 		if src.SameTitleWithTarget(target) && src.SameTypeWithTarget(target) {
 			DPrintf("[%s] Found target by title comparison: %s", prefix, srcTitle)
 			return target, true, nil
 		}
 	}
-	
+
 	DPrintf("[%s] No target found by title comparison: %s", prefix, srcTitle)
 	return nil, false, nil
 }
 
 // APISearchStrategy finds targets by making API calls
 type APISearchStrategy struct {
-	GetTargetByIDFunc   func(context.Context, TargetID) (Target, error)
+	GetTargetByIDFunc    func(context.Context, TargetID) (Target, error)
 	GetTargetsByNameFunc func(context.Context, string) ([]Target, error)
 }
 
@@ -98,6 +118,14 @@ func (s APISearchStrategy) FindTarget(ctx context.Context, src Source, existingT
 		if err != nil {
 			return nil, false, fmt.Errorf("error getting target by ID %d: %w", tgtID, err)
 		}
+
+		if existingTarget, exists := existingTargets[tgtID]; exists {
+			DPrintf("[%s] Found existing user target by ID: %d", prefix, tgtID)
+			return existingTarget, true, nil
+		}
+
+		DPrintf("[%s] Found target by API ID: %d", prefix, tgtID)
+
 		return target, true, nil
 	}
 
@@ -107,12 +135,17 @@ func (s APISearchStrategy) FindTarget(ctx context.Context, src Source, existingT
 		return nil, false, fmt.Errorf("error getting targets by name %s: %w", src.GetTitle(), err)
 	}
 
-	for _, target := range targets {
-		if src.SameTypeWithTarget(target) {
-			DPrintf("[%s] Found target by API name: %s", prefix, src.GetTitle())
-			return target, true, nil
+	for i, tgt := range targets {
+		if existingTarget, exists := existingTargets[tgt.GetTargetID()]; exists {
+			DPrintf("[%s] Found existing user target by API name: %s: %d", prefix, tgt.GetTitle(), i+1)
+			tgt = existingTarget
 		}
-		DPrintf("[%s] Ignoring target by API name: %s", prefix, target.String())
+
+		if src.SameTypeWithTarget(tgt) {
+			DPrintf("[%s] Found target by API name: %s: %d", prefix, tgt.String(), i+1)
+			return tgt, true, nil
+		}
+		DPrintf("[%s] Ignoring target by API name: %s: %d (type mismatch)", prefix, tgt.GetTitle(), i+1)
 	}
 
 	return nil, false, nil

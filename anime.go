@@ -6,11 +6,17 @@ import (
 	"log"
 	"reflect"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/nstratos/go-myanimelist/mal"
 	"github.com/rl404/verniy"
+)
+
+const (
+	similarityThreshold  = 98.0
+	levenshteinThreshold = 98.0
 )
 
 var errStatusUnknown = errors.New("status unknown")
@@ -21,10 +27,10 @@ var betweenBraketsRegexp = regexp.MustCompile(`\(.*\)`)
 func normalizeTitle(title string) string {
 	// Convert to lowercase
 	normalized := strings.ToLower(title)
-	
+
 	// Remove content in brackets/parentheses
 	normalized = betweenBraketsRegexp.ReplaceAllString(normalized, "")
-	
+
 	// Remove common punctuation and special characters
 	normalized = strings.ReplaceAll(normalized, ":", "")
 	normalized = strings.ReplaceAll(normalized, "!", "")
@@ -35,34 +41,14 @@ func normalizeTitle(title string) string {
 	normalized = strings.ReplaceAll(normalized, "_", " ")
 	normalized = strings.ReplaceAll(normalized, ".", " ")
 	normalized = strings.ReplaceAll(normalized, ",", " ")
-	
+
 	// Replace multiple spaces with single space
 	normalized = regexp.MustCompile(`\s+`).ReplaceAllString(normalized, " ")
-	
+
 	// Trim whitespace
 	normalized = strings.TrimSpace(normalized)
-	
-	return normalized
-}
 
-// titleContains checks if one title contains another (bidirectional)
-func titleContains(title1, title2 string) bool {
-	if title1 == "" || title2 == "" {
-		return false
-	}
-	
-	norm1 := normalizeTitle(title1)
-	norm2 := normalizeTitle(title2)
-	
-	if norm1 == norm2 {
-		return true
-	}
-	
-	// Check if shorter title is contained in longer title
-	if len(norm1) < len(norm2) {
-		return strings.Contains(norm2, norm1)
-	}
-	return strings.Contains(norm1, norm2)
+	return normalized
 }
 
 // titleSimilarity calculates prefix similarity between two titles
@@ -70,23 +56,23 @@ func titleSimilarity(title1, title2 string) float64 {
 	if title1 == "" || title2 == "" {
 		return 0.0
 	}
-	
+
 	norm1 := strings.ReplaceAll(normalizeTitle(title1), " ", "")
 	norm2 := strings.ReplaceAll(normalizeTitle(title2), " ", "")
-	
+
 	if norm1 == norm2 {
 		return 100.0
 	}
-	
+
 	// Ensure s1 is the longer string
 	if len(norm1) < len(norm2) {
 		norm1, norm2 = norm2, norm1
 	}
-	
+
 	if len(norm2) == 0 {
 		return 0.0
 	}
-	
+
 	// Calculate character-by-character prefix match
 	matchCount := 0
 	for i, r := range norm1 {
@@ -99,7 +85,7 @@ func titleSimilarity(title1, title2 string) float64 {
 			break
 		}
 	}
-	
+
 	return float64(matchCount) / float64(len(norm1)) * 100.0
 }
 
@@ -167,7 +153,7 @@ func titleLevenshteinSimilarity(title1, title2 string) float64 {
 
 	norm1 := normalizeTitle(title1)
 	norm2 := normalizeTitle(title2)
-	
+
 	if norm1 == norm2 {
 		return 100.0
 	}
@@ -273,6 +259,9 @@ func (a Anime) GetStringDiffWithTarget(t Target) string {
 		"Score", a.Score, b.Score,
 		"Progress", a.Progress, b.Progress,
 		"NumEpisodes", a.NumEpisodes, b.NumEpisodes,
+		"TitleEN", a.TitleEN, b.TitleEN,
+		"TitleJP", a.TitleJP, b.TitleJP,
+		"TitleRomaji", a.TitleRomaji, b.TitleRomaji,
 	)
 }
 
@@ -340,85 +329,96 @@ func (a Anime) SameTitleWithTarget(t Target) bool {
 
 	// Level 1: Exact case-insensitive title matching
 	if a.TitleEN != "" && b.TitleEN != "" && strings.EqualFold(a.TitleEN, b.TitleEN) {
+		DPrintf("Exact match found TitleEN: %s == %s", a.TitleEN, b.TitleEN)
 		return true
 	}
 
 	if a.TitleJP != "" && b.TitleJP != "" && strings.EqualFold(a.TitleJP, b.TitleJP) {
+		DPrintf("Exact match found TitleJP: %s == %s", a.TitleJP, b.TitleJP)
 		return true
 	}
 
 	if a.TitleRomaji != "" && b.TitleRomaji != "" && strings.EqualFold(a.TitleRomaji, b.TitleRomaji) {
+		DPrintf("Exact match found TitleRomaji: %s == %s", a.TitleRomaji, b.TitleRomaji)
 		return true
 	}
 
 	// Level 2: Normalized exact matching (removes punctuation, brackets, etc.)
-	if a.TitleEN != "" && b.TitleEN != "" && normalizeTitle(a.TitleEN) == normalizeTitle(b.TitleEN) {
-		return true
+	if a.TitleEN != "" && b.TitleEN != "" {
+		normalizedA := normalizeTitle(a.TitleEN)
+		normalizedB := normalizeTitle(b.TitleEN)
+		if normalizedA == normalizedB {
+			DPrintf("Normalized match found TitleEN: '%s' == '%s' (original: '%s' vs '%s')", normalizedA, normalizedB, a.TitleEN, b.TitleEN)
+			return true
+		}
 	}
 
-	if a.TitleJP != "" && b.TitleJP != "" && normalizeTitle(a.TitleJP) == normalizeTitle(b.TitleJP) {
-		return true
+	if a.TitleJP != "" && b.TitleJP != "" {
+		normalizedA := normalizeTitle(a.TitleJP)
+		normalizedB := normalizeTitle(b.TitleJP)
+		if normalizedA == normalizedB {
+			DPrintf("Normalized match found TitleJP: '%s' == '%s' (original: '%s' vs '%s')", normalizedA, normalizedB, a.TitleJP, b.TitleJP)
+			return true
+		}
 	}
 
-	if a.TitleRomaji != "" && b.TitleRomaji != "" && normalizeTitle(a.TitleRomaji) == normalizeTitle(b.TitleRomaji) {
-		return true
+	if a.TitleRomaji != "" && b.TitleRomaji != "" {
+		normalizedA := normalizeTitle(a.TitleRomaji)
+		normalizedB := normalizeTitle(b.TitleRomaji)
+		if normalizedA == normalizedB {
+			DPrintf("Normalized match found TitleRomaji: '%s' == '%s' (original: '%s' vs '%s')", normalizedA, normalizedB, a.TitleRomaji, b.TitleRomaji)
+			return true
+		}
 	}
 
-	// Level 3: Contains matching (one title contained in another)
-	if titleContains(a.TitleEN, b.TitleEN) {
-		return true
+	// Level 4: Fuzzy matching with similarity threshold
+	if a.TitleEN != "" && b.TitleEN != "" {
+		similarity := titleSimilarity(a.TitleEN, b.TitleEN)
+		if similarity >= similarityThreshold {
+			DPrintf("Fuzzy match found TitleEN: '%s' ~= '%s' (similarity: %.2f)", a.TitleEN, b.TitleEN, similarity)
+			return true
+		}
 	}
 
-	if titleContains(a.TitleJP, b.TitleJP) {
-		return true
+	if a.TitleJP != "" && b.TitleJP != "" {
+		similarity := titleSimilarity(a.TitleJP, b.TitleJP)
+		if similarity >= similarityThreshold {
+			DPrintf("Fuzzy match found TitleJP: '%s' ~= '%s' (similarity: %.2f)", a.TitleJP, b.TitleJP, similarity)
+			return true
+		}
 	}
 
-	if titleContains(a.TitleRomaji, b.TitleRomaji) {
-		return true
+	if a.TitleRomaji != "" && b.TitleRomaji != "" {
+		similarity := titleSimilarity(a.TitleRomaji, b.TitleRomaji)
+		if similarity >= similarityThreshold {
+			DPrintf("Fuzzy match found TitleRomaji: '%s' ~= '%s' (similarity: %.2f)", a.TitleRomaji, b.TitleRomaji, similarity)
+			return true
+		}
 	}
 
-	// Level 4: Cross-language matching (EN vs Romaji, etc.)
-	if titleContains(a.TitleEN, b.TitleRomaji) || titleContains(a.TitleRomaji, b.TitleEN) {
-		return true
+	// Level 5: Levenshtein distance-based matching
+	if a.TitleEN != "" && b.TitleEN != "" {
+		similarity := titleLevenshteinSimilarity(a.TitleEN, b.TitleEN)
+		if similarity >= levenshteinThreshold {
+			DPrintf("Levenshtein match found TitleEN: '%s' ~= '%s' (similarity: %.2f)", a.TitleEN, b.TitleEN, similarity)
+			return true
+		}
 	}
 
-	// Level 5: Fuzzy matching with similarity threshold (85%)
-	const similarityThreshold = 85.0
-	
-	if titleSimilarity(a.TitleEN, b.TitleEN) >= similarityThreshold {
-		return true
+	if a.TitleJP != "" && b.TitleJP != "" {
+		similarity := titleLevenshteinSimilarity(a.TitleJP, b.TitleJP)
+		if similarity >= levenshteinThreshold {
+			DPrintf("Levenshtein match found TitleJP: '%s' ~= '%s' (similarity: %.2f)", a.TitleJP, b.TitleJP, similarity)
+			return true
+		}
 	}
 
-	if titleSimilarity(a.TitleJP, b.TitleJP) >= similarityThreshold {
-		return true
-	}
-
-	if titleSimilarity(a.TitleRomaji, b.TitleRomaji) >= similarityThreshold {
-		return true
-	}
-
-	// Level 6: Levenshtein distance-based matching (80% threshold)
-	const levenshteinThreshold = 80.0
-	
-	if titleLevenshteinSimilarity(a.TitleEN, b.TitleEN) >= levenshteinThreshold {
-		return true
-	}
-
-	if titleLevenshteinSimilarity(a.TitleJP, b.TitleJP) >= levenshteinThreshold {
-		return true
-	}
-
-	if titleLevenshteinSimilarity(a.TitleRomaji, b.TitleRomaji) >= levenshteinThreshold {
-		return true
-	}
-
-	// Cross-language Levenshtein matching
-	if titleLevenshteinSimilarity(a.TitleEN, b.TitleRomaji) >= levenshteinThreshold {
-		return true
-	}
-
-	if titleLevenshteinSimilarity(a.TitleRomaji, b.TitleEN) >= levenshteinThreshold {
-		return true
+	if a.TitleRomaji != "" && b.TitleRomaji != "" {
+		similarity := titleLevenshteinSimilarity(a.TitleRomaji, b.TitleRomaji)
+		if similarity >= levenshteinThreshold {
+			DPrintf("Levenshtein match found TitleRomaji: '%s' ~= '%s' (similarity: %.2f)", a.TitleRomaji, b.TitleRomaji, similarity)
+			return true
+		}
 	}
 
 	return false
@@ -450,10 +450,6 @@ func (a Anime) GetUpdateOptions() []mal.UpdateMyAnimeListStatusOption {
 	}
 
 	return opts
-}
-
-func (a Anime) GetAnilistUpdateParams() (mediaID int, status string, progress int, score int) {
-	return a.IDAnilist, a.Status.GetAnilistStatus(), a.Progress, int(a.Score)
 }
 
 func (a Anime) GetTitle() string {
@@ -595,6 +591,10 @@ func newAnimesFromMalUserAnimes(malAnimes []mal.UserAnime) []Anime {
 		}
 		res = append(res, a)
 	}
+
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].GetStatusString() < res[j].GetStatusString()
+	})
 	return res
 }
 
