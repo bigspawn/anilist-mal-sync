@@ -161,7 +161,13 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 			if !ok {
 				return fmt.Errorf("source is not an anime")
 			}
-			if err := anilistClient.UpdateAnimeEntry(ctx, int(id), a.Status.GetAnilistStatus(), a.Progress, int(a.Score), "MAL to AniList Anime"); err != nil {
+			if err := anilistClient.UpdateAnimeEntry(
+				ctx,
+				int(id),
+				a.Status.GetAnilistStatus(),
+				a.Progress,
+				int(a.Score),
+				"MAL to AniList Anime"); err != nil {
 				return fmt.Errorf("error updating anilist anime: %w", err)
 			}
 			return nil
@@ -202,7 +208,14 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 			if !ok {
 				return fmt.Errorf("source is not a manga")
 			}
-			if err := anilistClient.UpdateMangaEntry(ctx, int(id), m.Status.GetAnilistStatus(), m.Progress, m.ProgressVolumes, int(m.Score), "MAL to AniList Manga"); err != nil {
+			if err := anilistClient.UpdateMangaEntry(
+				ctx,
+				int(id),
+				m.Status.GetAnilistStatus(),
+				m.Progress,
+				m.ProgressVolumes,
+				int(m.Score),
+				"MAL to AniList Manga"); err != nil {
 				return fmt.Errorf("error updating anilist manga: %w", err)
 			}
 			return nil

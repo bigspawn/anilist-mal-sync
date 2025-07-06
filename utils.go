@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math"
 	"regexp"
 	"strings"
 )
@@ -36,7 +37,7 @@ func levenshteinDistance(s1, s2 string) int {
 				cost = 1
 			}
 
-			matrix[i][j] = min(
+			matrix[i][j] = min3(
 				matrix[i-1][j]+1,      // deletion
 				matrix[i][j-1]+1,      // insertion
 				matrix[i-1][j-1]+cost, // substitution
@@ -47,15 +48,9 @@ func levenshteinDistance(s1, s2 string) int {
 	return matrix[len(s1)][len(s2)]
 }
 
-// min returns the minimum of three integers
-func min(a, b, c int) int {
-	if a < b && a < c {
-		return a
-	}
-	if b < c {
-		return b
-	}
-	return c
+// min3 returns the minimum of three integers
+func min3(a, b, c int) int {
+	return int(math.Min(math.Min(float64(a), float64(b)), float64(c)))
 }
 
 var betweenBraketsRegexp = regexp.MustCompile(`\(.*\)`)

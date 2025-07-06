@@ -55,3 +55,29 @@ linters:
     - forbidigo
     - forcetypeassert
     - gocheckcompilerdirectives
+  exclusions:
+    rules:
+      - text: "exported: exported"
+        linters:
+          - revive
+  settings:
+    lll:
+      line-length: 140
+    funlen:
+      # Checks the number of lines in a function.
+      # If lower than 0, disable the check.
+      lines: 200
+      # Checks the number of statements in a function.
+      # If lower than 0, disable the check.
+      statements: 100
+      # Ignore comments when counting lines.
+      # Default: true
+      ignore-comments: true
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports
+    - golines
+    - swaggo
