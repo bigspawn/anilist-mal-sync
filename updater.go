@@ -42,6 +42,14 @@ func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target) {
 
 	var statusStr string
 	for _, src := range srcs {
+		// Check for context cancellation
+		select {
+		case <-ctx.Done():
+			log.Printf("[%s] Context cancelled, stopping sync", u.Prefix)
+			return
+		default:
+		}
+
 		if src.GetStatusString() == "" {
 			continue
 		}
@@ -71,6 +79,14 @@ func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts ma
 	if !(*forceSync) { // filter sources by different progress with targets
 		tgt, ok := tgts[src.GetTargetID()]
 		if !ok {
+			// Check for context cancellation before potentially long-running search
+			select {
+			case <-ctx.Done():
+				log.Printf("[%s] Context cancelled during target search", u.Prefix)
+				return
+			default:
+			}
+
 			var err error
 			tgt, err = u.findTarget(ctx, src)
 			if err != nil {
@@ -96,6 +112,14 @@ func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts ma
 	if *dryRun { // skip update if dry run
 		log.Printf("[%s] Dry run: Skipping update for %s", u.Prefix, src.GetTitle())
 		return
+	}
+
+	// Check for context cancellation before update operation
+	select {
+	case <-ctx.Done():
+		log.Printf("[%s] Context cancelled before update", u.Prefix)
+		return
+	default:
 	}
 
 	u.updateTarget(ctx, tgtID, src)
