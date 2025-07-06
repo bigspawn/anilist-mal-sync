@@ -93,8 +93,8 @@ func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts ma
 			return
 		}
 
-		log.Printf("[%s] Src title: %s", u.Prefix, src.String() /*GetTitle()*/)
-		log.Printf("[%s] Tgt title: %s", u.Prefix, tgt.String() /*GetTitle()*/)
+		log.Printf("[%s] Src title: %s", u.Prefix, src.GetTitle())
+		log.Printf("[%s] Tgt title: %s", u.Prefix, tgt.GetTitle())
 		log.Printf("[%s] Progress is not same, need to update: %s", u.Prefix, src.GetStringDiffWithTarget(tgt))
 
 		tgtID = tgt.GetTargetID()

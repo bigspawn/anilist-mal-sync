@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"reflect"
-	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -14,168 +13,7 @@ import (
 	"github.com/rl404/verniy"
 )
 
-const (
-	similarityThreshold  = 98.0
-	levenshteinThreshold = 98.0
-)
-
 var errStatusUnknown = errors.New("status unknown")
-
-var betweenBraketsRegexp = regexp.MustCompile(`\(.*\)`)
-
-// normalizeTitle normalizes a title for better comparison
-func normalizeTitle(title string) string {
-	// Convert to lowercase
-	normalized := strings.ToLower(title)
-
-	// Remove content in brackets/parentheses
-	normalized = betweenBraketsRegexp.ReplaceAllString(normalized, "")
-
-	// Remove common punctuation and special characters
-	normalized = strings.ReplaceAll(normalized, ":", "")
-	normalized = strings.ReplaceAll(normalized, "!", "")
-	normalized = strings.ReplaceAll(normalized, "?", "")
-	normalized = strings.ReplaceAll(normalized, "'", "")
-	normalized = strings.ReplaceAll(normalized, "\"", "")
-	normalized = strings.ReplaceAll(normalized, "-", " ")
-	normalized = strings.ReplaceAll(normalized, "_", " ")
-	normalized = strings.ReplaceAll(normalized, ".", " ")
-	normalized = strings.ReplaceAll(normalized, ",", " ")
-
-	// Replace multiple spaces with single space
-	normalized = regexp.MustCompile(`\s+`).ReplaceAllString(normalized, " ")
-
-	// Trim whitespace
-	normalized = strings.TrimSpace(normalized)
-
-	return normalized
-}
-
-// titleSimilarity calculates prefix similarity between two titles
-func titleSimilarity(title1, title2 string) float64 {
-	if title1 == "" || title2 == "" {
-		return 0.0
-	}
-
-	norm1 := strings.ReplaceAll(normalizeTitle(title1), " ", "")
-	norm2 := strings.ReplaceAll(normalizeTitle(title2), " ", "")
-
-	if norm1 == norm2 {
-		return 100.0
-	}
-
-	// Ensure s1 is the longer string
-	if len(norm1) < len(norm2) {
-		norm1, norm2 = norm2, norm1
-	}
-
-	if len(norm2) == 0 {
-		return 0.0
-	}
-
-	// Calculate character-by-character prefix match
-	matchCount := 0
-	for i, r := range norm1 {
-		if i >= len(norm2) {
-			break
-		}
-		if r == rune(norm2[i]) {
-			matchCount = i + 1
-		} else {
-			break
-		}
-	}
-
-	return float64(matchCount) / float64(len(norm1)) * 100.0
-}
-
-// levenshteinDistance calculates the Levenshtein distance between two strings
-func levenshteinDistance(s1, s2 string) int {
-	if len(s1) == 0 {
-		return len(s2)
-	}
-	if len(s2) == 0 {
-		return len(s1)
-	}
-
-	// Create a 2D slice for dynamic programming
-	matrix := make([][]int, len(s1)+1)
-	for i := range matrix {
-		matrix[i] = make([]int, len(s2)+1)
-	}
-
-	// Initialize first row and column
-	for i := 0; i <= len(s1); i++ {
-		matrix[i][0] = i
-	}
-	for j := 0; j <= len(s2); j++ {
-		matrix[0][j] = j
-	}
-
-	// Fill the matrix
-	for i := 1; i <= len(s1); i++ {
-		for j := 1; j <= len(s2); j++ {
-			cost := 0
-			if s1[i-1] != s2[j-1] {
-				cost = 1
-			}
-
-			matrix[i][j] = min(
-				matrix[i-1][j]+1,      // deletion
-				matrix[i][j-1]+1,      // insertion
-				matrix[i-1][j-1]+cost, // substitution
-			)
-		}
-	}
-
-	return matrix[len(s1)][len(s2)]
-}
-
-// min returns the minimum of three integers
-func min(a, b, c int) int {
-	if a < b {
-		if a < c {
-			return a
-		}
-		return c
-	}
-	if b < c {
-		return b
-	}
-	return c
-}
-
-// titleLevenshteinSimilarity calculates similarity based on Levenshtein distance
-func titleLevenshteinSimilarity(title1, title2 string) float64 {
-	if title1 == "" || title2 == "" {
-		return 0.0
-	}
-
-	norm1 := normalizeTitle(title1)
-	norm2 := normalizeTitle(title2)
-
-	if norm1 == norm2 {
-		return 100.0
-	}
-
-	distance := levenshteinDistance(norm1, norm2)
-	maxLen := len(norm1)
-	if len(norm2) > maxLen {
-		maxLen = len(norm2)
-	}
-
-	if maxLen == 0 {
-		return 100.0
-	}
-
-	// Convert distance to similarity percentage
-	similarity := (1.0 - float64(distance)/float64(maxLen)) * 100.0
-	if similarity < 0 {
-		similarity = 0
-	}
-
-	return similarity
-}
 
 type Status string
 
@@ -200,6 +38,8 @@ func (s Status) GetMalStatus() (mal.AnimeStatus, error) {
 		return mal.AnimeStatusDropped, nil
 	case StatusPlanToWatch:
 		return mal.AnimeStatusPlanToWatch, nil
+	case StatusUnknown:
+		return "", errStatusUnknown
 	default:
 		return "", errStatusUnknown
 	}
@@ -217,8 +57,10 @@ func (s Status) GetAnilistStatus() string {
 		return "DROPPED"
 	case StatusPlanToWatch:
 		return "PLANNING"
+	case StatusUnknown:
+		return ""
 	default:
-		return "PLANNING"
+		return ""
 	}
 }
 
@@ -327,101 +169,7 @@ func (a Anime) SameTitleWithTarget(t Target) bool {
 		return false
 	}
 
-	// Level 1: Exact case-insensitive title matching
-	if a.TitleEN != "" && b.TitleEN != "" && strings.EqualFold(a.TitleEN, b.TitleEN) {
-		DPrintf("Exact match found TitleEN: %s == %s", a.TitleEN, b.TitleEN)
-		return true
-	}
-
-	if a.TitleJP != "" && b.TitleJP != "" && strings.EqualFold(a.TitleJP, b.TitleJP) {
-		DPrintf("Exact match found TitleJP: %s == %s", a.TitleJP, b.TitleJP)
-		return true
-	}
-
-	if a.TitleRomaji != "" && b.TitleRomaji != "" && strings.EqualFold(a.TitleRomaji, b.TitleRomaji) {
-		DPrintf("Exact match found TitleRomaji: %s == %s", a.TitleRomaji, b.TitleRomaji)
-		return true
-	}
-
-	// Level 2: Normalized exact matching (removes punctuation, brackets, etc.)
-	if a.TitleEN != "" && b.TitleEN != "" {
-		normalizedA := normalizeTitle(a.TitleEN)
-		normalizedB := normalizeTitle(b.TitleEN)
-		if normalizedA == normalizedB {
-			DPrintf("Normalized match found TitleEN: '%s' == '%s' (original: '%s' vs '%s')", normalizedA, normalizedB, a.TitleEN, b.TitleEN)
-			return true
-		}
-	}
-
-	if a.TitleJP != "" && b.TitleJP != "" {
-		normalizedA := normalizeTitle(a.TitleJP)
-		normalizedB := normalizeTitle(b.TitleJP)
-		if normalizedA == normalizedB {
-			DPrintf("Normalized match found TitleJP: '%s' == '%s' (original: '%s' vs '%s')", normalizedA, normalizedB, a.TitleJP, b.TitleJP)
-			return true
-		}
-	}
-
-	if a.TitleRomaji != "" && b.TitleRomaji != "" {
-		normalizedA := normalizeTitle(a.TitleRomaji)
-		normalizedB := normalizeTitle(b.TitleRomaji)
-		if normalizedA == normalizedB {
-			DPrintf("Normalized match found TitleRomaji: '%s' == '%s' (original: '%s' vs '%s')", normalizedA, normalizedB, a.TitleRomaji, b.TitleRomaji)
-			return true
-		}
-	}
-
-	// Level 4: Fuzzy matching with similarity threshold
-	if a.TitleEN != "" && b.TitleEN != "" {
-		similarity := titleSimilarity(a.TitleEN, b.TitleEN)
-		if similarity >= similarityThreshold {
-			DPrintf("Fuzzy match found TitleEN: '%s' ~= '%s' (similarity: %.2f)", a.TitleEN, b.TitleEN, similarity)
-			return true
-		}
-	}
-
-	if a.TitleJP != "" && b.TitleJP != "" {
-		similarity := titleSimilarity(a.TitleJP, b.TitleJP)
-		if similarity >= similarityThreshold {
-			DPrintf("Fuzzy match found TitleJP: '%s' ~= '%s' (similarity: %.2f)", a.TitleJP, b.TitleJP, similarity)
-			return true
-		}
-	}
-
-	if a.TitleRomaji != "" && b.TitleRomaji != "" {
-		similarity := titleSimilarity(a.TitleRomaji, b.TitleRomaji)
-		if similarity >= similarityThreshold {
-			DPrintf("Fuzzy match found TitleRomaji: '%s' ~= '%s' (similarity: %.2f)", a.TitleRomaji, b.TitleRomaji, similarity)
-			return true
-		}
-	}
-
-	// Level 5: Levenshtein distance-based matching
-	if a.TitleEN != "" && b.TitleEN != "" {
-		similarity := titleLevenshteinSimilarity(a.TitleEN, b.TitleEN)
-		if similarity >= levenshteinThreshold {
-			DPrintf("Levenshtein match found TitleEN: '%s' ~= '%s' (similarity: %.2f)", a.TitleEN, b.TitleEN, similarity)
-			return true
-		}
-	}
-
-	if a.TitleJP != "" && b.TitleJP != "" {
-		similarity := titleLevenshteinSimilarity(a.TitleJP, b.TitleJP)
-		if similarity >= levenshteinThreshold {
-			DPrintf("Levenshtein match found TitleJP: '%s' ~= '%s' (similarity: %.2f)", a.TitleJP, b.TitleJP, similarity)
-			return true
-		}
-	}
-
-	if a.TitleRomaji != "" && b.TitleRomaji != "" {
-		similarity := titleLevenshteinSimilarity(a.TitleRomaji, b.TitleRomaji)
-		if similarity >= levenshteinThreshold {
-			DPrintf("Levenshtein match found TitleRomaji: '%s' ~= '%s' (similarity: %.2f)", a.TitleRomaji, b.TitleRomaji, similarity)
-			return true
-		}
-	}
-
-	return false
+	return titleMatchingLevels(a.TitleEN, a.TitleJP, a.TitleRomaji, b.TitleEN, b.TitleJP, b.TitleRomaji)
 }
 
 func (a Anime) GetUpdateOptions() []mal.UpdateMyAnimeListStatusOption {
@@ -788,7 +536,10 @@ func buildDiffString(pairs ...any) string {
 	sb.WriteString("Diff{")
 
 	for i := 0; i < len(pairs); i += 3 {
-		field := pairs[i].(string)
+		field, ok := pairs[i].(string)
+		if !ok {
+			continue
+		}
 		a := pairs[i+1]
 		b := pairs[i+2]
 

@@ -28,13 +28,11 @@ type OAuth struct {
 	siteName        string
 	authCodeOptions []oauth2.AuthCodeOption
 	tokenFilePath   string
-	ctx             context.Context
 
 	Config *oauth2.Config
 }
 
 func NewOAuth(
-	ctx context.Context,
 	config SiteConfig,
 	redirectURI string,
 	siteName string,
@@ -62,7 +60,6 @@ func NewOAuth(
 		siteName:        siteName,
 		authCodeOptions: authCodeOptions,
 		tokenFilePath:   tokenFilePath,
-		ctx:             ctx,
 	}
 
 	oauth.loadTokenFromFile()
@@ -90,7 +87,7 @@ func (oauth *OAuth) TokenSource() oauth2.TokenSource {
 func (oauth *OAuth) Token() (*oauth2.Token, error) {
 	log.Printf("Refreshing token for %s", oauth.siteName)
 
-	t, err := oauth.Config.TokenSource(oauth.ctx, oauth.token).Token()
+	t, err := oauth.Config.TokenSource(context.Background(), oauth.token).Token()
 	if err != nil {
 		return nil, fmt.Errorf("error refreshing token: %w", err)
 	}
@@ -145,7 +142,11 @@ func readTokenFile(tokenFilePath string) (*TokenFile, error) {
 		}
 		return nil, fmt.Errorf("error opening token file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			log.Printf("Error closing token file: %v", err)
+		}
+	}()
 
 	tokenFile := NewTokenFile()
 	err = json.NewDecoder(file).Decode(tokenFile)
@@ -161,16 +162,20 @@ func writeTokenFile(tokenFilePath string, tokenFile *TokenFile) error {
 	if err != nil {
 		return fmt.Errorf("error creating token file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			log.Printf("Error closing token file: %v", err)
+		}
+	}()
 
 	return json.NewEncoder(file).Encode(tokenFile)
 }
 
-func shutdownServer(server *http.Server) {
+func shutdownServer(ctx context.Context, server *http.Server) {
 	log.Println("Shutting down server...")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	if err := server.Shutdown(ctx); err != nil {
+	if err := server.Shutdown(shutdownCtx); err != nil {
 		log.Fatalf("Error shutting down server: %v", err)
 	}
 	log.Println("Server shut down")
@@ -206,7 +211,7 @@ func startServer(ctx context.Context, oauth *OAuth, port string, done chan<- boo
 
 			done <- true
 
-			go shutdownServer(server)
+			go shutdownServer(ctx, server)
 		} else {
 			http.Error(w, "Token not set", http.StatusInternalServerError)
 			log.Fatalf("Token not set")

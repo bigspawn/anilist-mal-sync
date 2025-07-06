@@ -259,110 +259,156 @@ func (a *App) runReverseSync(ctx context.Context) error {
 	return nil
 }
 
+// syncAnimeFromAnilistToMAL syncs anime from AniList to MAL
 func (a *App) syncAnime(ctx context.Context) error {
-	log.Printf("[%s] Fetching AniList...", a.animeUpdater.Prefix)
+	return a.performSync(ctx, "anime", false, a.animeUpdater)
+}
 
-	srcList, err := a.anilist.GetUserAnimeList(ctx)
-	if err != nil {
-		return fmt.Errorf("error getting user anime list from anilist: %w", err)
+// syncMangaFromAnilistToMAL syncs manga from AniList to MAL
+func (a *App) syncManga(ctx context.Context) error {
+	return a.performSync(ctx, "manga", false, a.mangaUpdater)
+}
+
+// reverseSyncAnimeFromMALToAnilist syncs anime from MAL to AniList
+func (a *App) reverseSyncAnime(ctx context.Context) error {
+	return a.performSync(ctx, "anime", true, a.reverseAnimeUpdater)
+}
+
+// reverseSyncMangaFromMALToAnilist syncs manga from MAL to AniList
+func (a *App) reverseSyncManga(ctx context.Context) error {
+	return a.performSync(ctx, "manga", true, a.reverseMangaUpdater)
+}
+
+// performSync is a generic sync function that handles both anime and manga syncing
+func (a *App) performSync(ctx context.Context, mediaType string, reverse bool, updater *Updater) error {
+	var srcs []Source
+	var tgts []Target
+	var err error
+
+	if reverse {
+		// Reverse sync: MAL -> AniList
+		srcs, tgts, err = a.fetchReverseSyncData(ctx, mediaType, updater.Prefix)
+	} else {
+		// Normal sync: AniList -> MAL
+		srcs, tgts, err = a.fetchNormalSyncData(ctx, mediaType, updater.Prefix)
 	}
 
-	log.Printf("[%s] Fetching MAL...", a.animeUpdater.Prefix)
-
-	tgtList, err := a.mal.GetUserAnimeList(ctx)
 	if err != nil {
-		return fmt.Errorf("error getting user anime list from mal: %w", err)
+		return err
 	}
 
-	srcAnimes := newSourcesFromAnimes(newAnimesFromMediaListGroups(srcList))
-	tgtAnimes := newTargetsFromAnimes(newAnimesFromMalUserAnimes(tgtList))
-
-	log.Printf("[%s] Got %d from AniList", a.animeUpdater.Prefix, len(srcAnimes))
-	log.Printf("[%s] Got %d from Mal", a.animeUpdater.Prefix, len(tgtAnimes))
-
-	a.animeUpdater.Update(ctx, srcAnimes, tgtAnimes)
-	a.animeUpdater.Statistics.Print(a.animeUpdater.Prefix)
+	updater.Update(ctx, srcs, tgts)
+	updater.Statistics.Print(updater.Prefix)
 
 	return nil
 }
 
-func (a *App) syncManga(ctx context.Context) error {
-	log.Printf("[%s] Fetching AniList...", a.mangaUpdater.Prefix)
+// fetchData is a generic helper for fetching data from both services
+func (a *App) fetchData(ctx context.Context, mediaType string, fromAnilist bool, prefix string) ([]Source, []Target, error) {
+	if fromAnilist {
+		return a.fetchFromAnilistToMAL(ctx, mediaType, prefix)
+	}
+	return a.fetchFromMALToAnilist(ctx, mediaType, prefix)
+}
 
-	srcList, err := a.anilist.GetUserMangaList(ctx)
-	if err != nil {
-		return fmt.Errorf("error getting user manga list from anilist: %w", err)
+// fetchFromAnilistToMAL fetches data for AniList -> MAL sync
+func (a *App) fetchFromAnilistToMAL(ctx context.Context, mediaType string, prefix string) ([]Source, []Target, error) {
+	log.Printf("[%s] Fetching AniList...", prefix)
+
+	if mediaType == "anime" {
+		srcList, err := a.anilist.GetUserAnimeList(ctx)
+		if err != nil {
+			return nil, nil, fmt.Errorf("error getting user anime list from anilist: %w", err)
+		}
+
+		log.Printf("[%s] Fetching MAL...", prefix)
+		tgtList, err := a.mal.GetUserAnimeList(ctx)
+		if err != nil {
+			return nil, nil, fmt.Errorf("error getting user anime list from mal: %w", err)
+		}
+
+		srcs := newSourcesFromAnimes(newAnimesFromMediaListGroups(srcList))
+		tgts := newTargetsFromAnimes(newAnimesFromMalUserAnimes(tgtList))
+
+		log.Printf("[%s] Got %d from AniList", prefix, len(srcs))
+		log.Printf("[%s] Got %d from Mal", prefix, len(tgts))
+
+		return srcs, tgts, nil
 	}
 
-	log.Printf("[%s] Fetching MAL...", a.mangaUpdater.Prefix)
+	// manga
+	srcList, err := a.anilist.GetUserMangaList(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error getting user manga list from anilist: %w", err)
+	}
 
+	log.Printf("[%s] Fetching MAL...", prefix)
 	tgtList, err := a.mal.GetUserMangaList(ctx)
 	if err != nil {
-		return fmt.Errorf("error getting user manga list from mal: %w", err)
+		return nil, nil, fmt.Errorf("error getting user manga list from mal: %w", err)
 	}
 
 	srcs := newSourcesFromMangas(newMangasFromMediaListGroups(srcList))
 	tgts := newTargetsFromMangas(newMangasFromMalUserMangas(tgtList))
 
-	log.Printf("[%s] Got %d from AniList", a.mangaUpdater.Prefix, len(srcs))
-	log.Printf("[%s] Got %d from Mal", a.mangaUpdater.Prefix, len(tgts))
+	log.Printf("[%s] Got %d from AniList", prefix, len(srcs))
+	log.Printf("[%s] Got %d from Mal", prefix, len(tgts))
 
-	a.mangaUpdater.Update(ctx, srcs, tgts)
-	a.mangaUpdater.Statistics.Print(a.mangaUpdater.Prefix)
-
-	return nil
+	return srcs, tgts, nil
 }
 
-func (a *App) reverseSyncAnime(ctx context.Context) error {
-	log.Printf("[%s] Fetching MAL...", a.reverseAnimeUpdater.Prefix)
+// fetchFromMALToAnilist fetches data for MAL -> AniList sync
+func (a *App) fetchFromMALToAnilist(ctx context.Context, mediaType string, prefix string) ([]Source, []Target, error) {
+	log.Printf("[%s] Fetching MAL...", prefix)
 
-	srcList, err := a.mal.GetUserAnimeList(ctx)
-	if err != nil {
-		return fmt.Errorf("error getting user anime list from mal: %w", err)
+	if mediaType == "anime" {
+		srcList, err := a.mal.GetUserAnimeList(ctx)
+		if err != nil {
+			return nil, nil, fmt.Errorf("error getting user anime list from mal: %w", err)
+		}
+
+		log.Printf("[%s] Fetching AniList...", prefix)
+		tgtList, err := a.anilist.GetUserAnimeList(ctx)
+		if err != nil {
+			return nil, nil, fmt.Errorf("error getting user anime list from anilist: %w", err)
+		}
+
+		srcs := newSourcesFromAnimes(newAnimesFromMalUserAnimes(srcList))
+		tgts := newTargetsFromAnimes(newAnimesFromMediaListGroups(tgtList))
+
+		log.Printf("[%s] Got %d from MAL", prefix, len(srcs))
+		log.Printf("[%s] Got %d from AniList", prefix, len(tgts))
+
+		return srcs, tgts, nil
 	}
 
-	log.Printf("[%s] Fetching AniList...", a.reverseAnimeUpdater.Prefix)
-
-	tgtList, err := a.anilist.GetUserAnimeList(ctx)
-	if err != nil {
-		return fmt.Errorf("error getting user anime list from anilist: %w", err)
-	}
-
-	srcAnimes := newSourcesFromAnimes(newAnimesFromMalUserAnimes(srcList))
-	tgtAnimes := newTargetsFromAnimes(newAnimesFromMediaListGroups(tgtList))
-
-	log.Printf("[%s] Got %d from MAL", a.reverseAnimeUpdater.Prefix, len(srcAnimes))
-	log.Printf("[%s] Got %d from AniList", a.reverseAnimeUpdater.Prefix, len(tgtAnimes))
-
-	a.reverseAnimeUpdater.Update(ctx, srcAnimes, tgtAnimes)
-	a.reverseAnimeUpdater.Statistics.Print(a.reverseAnimeUpdater.Prefix)
-
-	return nil
-}
-
-func (a *App) reverseSyncManga(ctx context.Context) error {
-	log.Printf("[%s] Fetching MAL...", a.reverseMangaUpdater.Prefix)
-
+	// manga
 	srcList, err := a.mal.GetUserMangaList(ctx)
 	if err != nil {
-		return fmt.Errorf("error getting user manga list from mal: %w", err)
+		return nil, nil, fmt.Errorf("error getting user manga list from mal: %w", err)
 	}
 
-	log.Printf("[%s] Fetching AniList...", a.reverseMangaUpdater.Prefix)
-
+	log.Printf("[%s] Fetching AniList...", prefix)
 	tgtList, err := a.anilist.GetUserMangaList(ctx)
 	if err != nil {
-		return fmt.Errorf("error getting user manga list from anilist: %w", err)
+		return nil, nil, fmt.Errorf("error getting user manga list from anilist: %w", err)
 	}
 
 	srcs := newSourcesFromMangas(newMangasFromMalUserMangas(srcList))
 	tgts := newTargetsFromMangas(newMangasFromMediaListGroups(tgtList))
 
-	log.Printf("[%s] Got %d from MAL", a.reverseMangaUpdater.Prefix, len(srcs))
-	log.Printf("[%s] Got %d from AniList", a.reverseMangaUpdater.Prefix, len(tgts))
+	log.Printf("[%s] Got %d from MAL", prefix, len(srcs))
+	log.Printf("[%s] Got %d from AniList", prefix, len(tgts))
 
-	a.reverseMangaUpdater.Update(ctx, srcs, tgts)
-	a.reverseMangaUpdater.Statistics.Print(a.reverseMangaUpdater.Prefix)
+	return srcs, tgts, nil
+}
 
-	return nil
+// fetchNormalSyncData fetches data for AniList -> MAL sync
+func (a *App) fetchNormalSyncData(ctx context.Context, mediaType string, prefix string) ([]Source, []Target, error) {
+	return a.fetchData(ctx, mediaType, true, prefix)
+}
+
+// fetchReverseSyncData fetches data for MAL -> AniList sync
+func (a *App) fetchReverseSyncData(ctx context.Context, mediaType string, prefix string) ([]Source, []Target, error) {
+	return a.fetchData(ctx, mediaType, false, prefix)
 }

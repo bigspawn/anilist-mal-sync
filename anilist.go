@@ -108,7 +108,6 @@ func (c *AnilistClient) GetUserMangaList(ctx context.Context) ([]verniy.MediaLis
 
 func NewAnilistOAuth(ctx context.Context, config Config) (*OAuth, error) {
 	oauthAnilist, err := NewOAuth(
-		ctx,
 		config.Anilist,
 		config.OAuth.RedirectURI,
 		"anilist",
