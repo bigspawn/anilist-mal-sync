@@ -3,3 +3,6 @@
 bin/
 config.yaml
 *tmp.json
+CLAUDE.md
+.claude
+anilist-mal-sync

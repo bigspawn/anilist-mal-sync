@@ -17,7 +17,8 @@ test:
 # Run linter using Docker
 lint:
 	@echo "Running golangci-lint $(LINT_VERSION) in Docker..."
-	$(DOCKER_LINT_CMD) golangci-lint run --new
+	# $(DOCKER_LINT_CMD) golangci-lint run --new
+	golangci-lint run --new
 
 # Clean build artifacts, temporary files and test cache
 clean:

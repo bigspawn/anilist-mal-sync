@@ -157,7 +157,6 @@ func NewMyAnimeListOAuth(ctx context.Context, config Config) (*OAuth, error) {
 	code := url.QueryEscape(randHTTPParamString(randNumb))
 
 	oauthMAL, err := NewOAuth(
-		ctx,
 		config.MyAnimeList,
 		config.OAuth.RedirectURI,
 		"myanimelist",

@@ -28,13 +28,11 @@ type OAuth struct {
 	siteName        string
 	authCodeOptions []oauth2.AuthCodeOption
 	tokenFilePath   string
-	ctx             context.Context
 
 	Config *oauth2.Config
 }
 
 func NewOAuth(
-	ctx context.Context,
 	config SiteConfig,
 	redirectURI string,
 	siteName string,
@@ -62,7 +60,6 @@ func NewOAuth(
 		siteName:        siteName,
 		authCodeOptions: authCodeOptions,
 		tokenFilePath:   tokenFilePath,
-		ctx:             ctx,
 	}
 
 	oauth.loadTokenFromFile()
@@ -90,7 +87,7 @@ func (oauth *OAuth) TokenSource() oauth2.TokenSource {
 func (oauth *OAuth) Token() (*oauth2.Token, error) {
 	log.Printf("Refreshing token for %s", oauth.siteName)
 
-	t, err := oauth.Config.TokenSource(oauth.ctx, oauth.token).Token()
+	t, err := oauth.Config.TokenSource(context.Background(), oauth.token).Token()
 	if err != nil {
 		return nil, fmt.Errorf("error refreshing token: %w", err)
 	}
@@ -138,6 +135,7 @@ func (oauth *OAuth) saveTokenToFile() error {
 }
 
 func readTokenFile(tokenFilePath string) (*TokenFile, error) {
+	// #nosec G304 - Token file path is user's config directory for OAuth tokens
 	file, err := os.Open(tokenFilePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -145,7 +143,11 @@ func readTokenFile(tokenFilePath string) (*TokenFile, error) {
 		}
 		return nil, fmt.Errorf("error opening token file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			log.Printf("Error closing token file: %v", err)
+		}
+	}()
 
 	tokenFile := NewTokenFile()
 	err = json.NewDecoder(file).Decode(tokenFile)
@@ -157,22 +159,28 @@ func readTokenFile(tokenFilePath string) (*TokenFile, error) {
 }
 
 func writeTokenFile(tokenFilePath string, tokenFile *TokenFile) error {
+	// #nosec G304 - Token file path is user's config directory for OAuth tokens
 	file, err := os.Create(tokenFilePath)
 	if err != nil {
 		return fmt.Errorf("error creating token file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			log.Printf("Error closing token file: %v", err)
+		}
+	}()
 
 	return json.NewEncoder(file).Encode(tokenFile)
 }
 
-func shutdownServer(server *http.Server) {
+func shutdownServer(ctx context.Context, server *http.Server) {
 	log.Println("Shutting down server...")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := server.Shutdown(ctx); err != nil {
+	shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		cancel()
 		log.Fatalf("Error shutting down server: %v", err)
 	}
+	cancel()
 	log.Println("Server shut down")
 }
 
@@ -199,6 +207,7 @@ func startServer(ctx context.Context, oauth *OAuth, port string, done chan<- boo
 			w.Header().Set("Content-Type", "text/html")
 			w.WriteHeader(http.StatusOK)
 
+			//nolint:lll //ok
 			_, e := w.Write([]byte(`<html><body>Authorization successful. You can close this window.<br><script>window.close();</script></body></html>`))
 			if e != nil {
 				log.Fatalf("Error writing response: %v", e)
@@ -206,7 +215,7 @@ func startServer(ctx context.Context, oauth *OAuth, port string, done chan<- boo
 
 			done <- true
 
-			go shutdownServer(server)
+			go shutdownServer(ctx, server)
 		} else {
 			http.Error(w, "Token not set", http.StatusInternalServerError)
 			log.Fatalf("Token not set")
@@ -247,7 +256,7 @@ func createDirIfNotExists(path string) error {
 		return nil
 	}
 	if os.IsNotExist(err) {
-		if err = os.MkdirAll(dir, os.ModePerm); err != nil {
+		if err = os.MkdirAll(dir, 0o750); err != nil {
 			return fmt.Errorf("error creating directory: %w", err)
 		}
 	}

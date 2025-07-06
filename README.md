@@ -1,10 +1,11 @@
 # anilist-mal-sync [![Build Status](https://github.com/bigspawn/anilist-mal-sync/workflows/go/badge.svg)](https://github.com/bigspawn/anilist-mal-sync/actions)
 
-Programm to synchronize your AniList and MyAnimeList accounts.
+Program to synchronize your AniList and MyAnimeList accounts.
 
 ## Features
 
-- Sync AniList to MyAnimeList (currently only syncing anime)
+- Sync AniList to MyAnimeList (anime and manga)
+- Sync MyAnimeList to AniList (anime and manga) using `-reverse-direction` flag
 - OAuth2 authentication with AniList and MyAnimeList
 - CLI interface
 - Configurable by environment variables and config file
@@ -72,11 +73,13 @@ Program supports the following command-line options:
 
 - `-c` - Path to the config file. Default is `config.yaml`.
 - `-f` - Force sync (sync all entries, not just the ones that have changed). Default is false.
-- `-d` - Dry run (do not make any changes to MyAnimeList). Default is false.
-- `-h` - Print help message.
+- `-d` - Dry run (do not make any changes). Default is false.
 - `-manga` - Sync manga instead of anime. Default is anime.
 - `-all` - Sync both anime and manga. Default is anime.
 - `-verbose` - Print debug messages. Default is false.
+- `-reverse-direction` - Sync from MyAnimeList to AniList (default is AniList to MyAnimeList). Default is false.
+- `-h` - Print help message.
+
 
 ### How to run
 
@@ -159,11 +162,11 @@ Note: When running in Docker, the browser authentication flow requires that port
 ## Disclaimer
 
 This project is not affiliated with AniList or MyAnimeList. Use at your own risk.
-Both services have rate limits and programm can be looks like freezed or stop by timeout.
+Both services have rate limits and the program can look like it's frozen or stop by timeout.
 Just stop it and wait for a while and run again.
 
 ## TODO
 
 - [ ] Sync favorites
-- [ ] Sync MAL to AniList
+- [x] Sync MAL to AniList
 - [ ] Sync rewatching and rereading

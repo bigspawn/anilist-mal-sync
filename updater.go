@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"strings"
 )
@@ -16,21 +15,22 @@ type Source interface {
 	GetStringDiffWithTarget(Target) string
 	SameProgressWithTarget(Target) bool
 	SameTypeWithTarget(Target) bool
+	SameTitleWithTarget(Target) bool
 	String() string
 }
 
 type Target interface {
 	GetTargetID() TargetID
+	GetTitle() string
 	String() string
 }
 
 type Updater struct {
-	Prefix       string
-	Statistics   *Statistics
-	IgnoreTitles map[string]struct{}
+	Prefix        string
+	Statistics    *Statistics
+	IgnoreTitles  map[string]struct{}
+	StrategyChain *StrategyChain
 
-	GetTargetByIDFunc        func(context.Context, TargetID) (Target, error)
-	GetTargetsByNameFunc     func(context.Context, string) ([]Target, error)
 	UpdateTargetBySourceFunc func(context.Context, TargetID, Source) error
 }
 
@@ -42,7 +42,16 @@ func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target) {
 
 	var statusStr string
 	for _, src := range srcs {
+		// Check for context cancellation
+		select {
+		case <-ctx.Done():
+			log.Printf("[%s] Context cancelled, stopping sync", u.Prefix)
+			return
+		default:
+		}
+
 		if src.GetStatusString() == "" {
+			DPrintf("[%s] Skipping source with empty status: %s", u.Prefix, src.String())
 			continue
 		}
 
@@ -56,7 +65,7 @@ func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target) {
 		DPrintf("[%s] Processing for: %s", u.Prefix, src.String())
 
 		if _, ok := u.IgnoreTitles[strings.ToLower(src.GetTitle())]; ok {
-			log.Printf("[%s] Ignoring anime: %s", u.Prefix, src.GetTitle())
+			log.Printf("[%s] Ignoring entry: %s", u.Prefix, src.GetTitle())
 			u.Statistics.SkippedCount++
 			continue
 		}
@@ -69,15 +78,12 @@ func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts ma
 	tgtID := src.GetTargetID()
 
 	if !(*forceSync) { // filter sources by different progress with targets
-		tgt, ok := tgts[src.GetTargetID()]
-		if !ok {
-			var err error
-			tgt, err = u.findTarget(ctx, src)
-			if err != nil {
-				log.Printf("[%s] Error processing target anime: %v", u.Prefix, err)
-				u.Statistics.SkippedCount++
-				return
-			}
+		// Use strategy chain to find target
+		tgt, err := u.StrategyChain.FindTarget(ctx, src, tgts, u.Prefix)
+		if err != nil {
+			log.Printf("[%s] Error finding target: %v", u.Prefix, err)
+			u.Statistics.SkippedCount++
+			return
 		}
 
 		DPrintf("[%s] Target: %s", u.Prefix, tgt.String())
@@ -87,49 +93,27 @@ func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts ma
 			return
 		}
 
-		log.Printf("[%s] Title: %s", u.Prefix, src.GetTitle())
+		log.Printf("[%s] Src title: %s", u.Prefix, src.GetTitle())
+		log.Printf("[%s] Tgt title: %s", u.Prefix, tgt.GetTitle())
 		log.Printf("[%s] Progress is not same, need to update: %s", u.Prefix, src.GetStringDiffWithTarget(tgt))
 
 		tgtID = tgt.GetTargetID()
 	}
 
 	if *dryRun { // skip update if dry run
-		log.Printf("[%s] Dry run: Skipping update for anime %s", u.Prefix, src.GetTitle())
+		log.Printf("[%s] Dry run: Skipping update for %s", u.Prefix, src.GetTitle())
 		return
 	}
 
+	// Check for context cancellation before update operation
+	select {
+	case <-ctx.Done():
+		log.Printf("[%s] Context cancelled before update", u.Prefix)
+		return
+	default:
+	}
+
 	u.updateTarget(ctx, tgtID, src)
-}
-
-func (u *Updater) findTarget(ctx context.Context, src Source) (Target, error) {
-	tgtID := src.GetTargetID()
-
-	if tgtID > 0 {
-		DPrintf("[%s] Finding target by id: %d", u.Prefix, tgtID)
-
-		tgt, err := u.GetTargetByIDFunc(ctx, tgtID)
-		if err != nil {
-			return nil, fmt.Errorf("error getting mal anime by id: %s: %w", src.GetTitle(), err)
-		}
-		return tgt, nil
-	}
-
-	DPrintf("[%s] Finding target by name: %s", u.Prefix, src.GetTitle())
-
-	tgts, err := u.GetTargetsByNameFunc(ctx, src.GetTitle())
-	if err != nil {
-		return nil, fmt.Errorf("error getting targets by source name: %s: %w", src.GetTitle(), err)
-	}
-
-	for _, tgt := range tgts {
-		if src.SameTypeWithTarget(tgt) {
-			DPrintf("[%s] Found target by name: %s", u.Prefix, src.GetTitle())
-			return tgt, nil
-		}
-		DPrintf("[%s] Ignoring target by name: %s", u.Prefix, tgt.String())
-	}
-
-	return nil, fmt.Errorf("no target found for source: %s", src.GetTitle())
 }
 
 func (u *Updater) updateTarget(ctx context.Context, id TargetID, src Source) {

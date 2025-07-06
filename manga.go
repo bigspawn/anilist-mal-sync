@@ -4,12 +4,15 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/nstratos/go-myanimelist/mal"
 	"github.com/rl404/verniy"
 )
+
+var errMangaStatusUnknown = errors.New("manga status unknown")
 
 type MangaStatus string
 
@@ -34,8 +37,29 @@ func (s MangaStatus) GetMalStatus() (mal.MangaStatus, error) {
 		return mal.MangaStatusDropped, nil
 	case MangaStatusPlanToRead:
 		return mal.MangaStatusPlanToRead, nil
+	case MangaStatusUnknown:
+		return "", errMangaStatusUnknown
 	default:
-		return "", errors.New("unknown status")
+		return "", errMangaStatusUnknown
+	}
+}
+
+func (s MangaStatus) GetAnilistStatus() string {
+	switch s {
+	case MangaStatusReading:
+		return "CURRENT"
+	case MangaStatusCompleted:
+		return "COMPLETED"
+	case MangaStatusOnHold:
+		return "PAUSED"
+	case MangaStatusDropped:
+		return "DROPPED"
+	case MangaStatusPlanToRead:
+		return "PLANNING"
+	case MangaStatusUnknown:
+		return ""
+	default:
+		return ""
 	}
 }
 
@@ -56,6 +80,9 @@ type Manga struct {
 }
 
 func (m Manga) GetTargetID() TargetID {
+	if *reverseDirection {
+		return TargetID(m.IDAnilist)
+	}
 	return TargetID(m.IDMal)
 }
 
@@ -109,22 +136,17 @@ func (m Manga) SameTypeWithTarget(t Target) bool {
 		return false
 	}
 
+	// First check: Compare IDs
 	if m.IDMal == b.IDMal || m.IDAnilist == b.IDAnilist {
 		return true
 	}
 
-	if m.TitleEN != "" && b.TitleEN != "" && strings.EqualFold(m.TitleEN, b.TitleEN) {
+	// Use the comprehensive title matching logic
+	if m.SameTitleWithTarget(t) {
 		return true
 	}
 
-	if m.TitleJP != "" && b.TitleJP != "" && strings.EqualFold(m.TitleJP, b.TitleJP) {
-		return true
-	}
-
-	if m.TitleRomaji != "" && b.TitleRomaji != "" && strings.EqualFold(m.TitleRomaji, b.TitleRomaji) {
-		return true
-	}
-
+	// Fallback: Check if chapters and volumes match
 	if m.Chapters == b.Chapters && m.Volumes == b.Volumes {
 		// NOTE: some mangas are joined in MAL in the same entry in Volumes, but it is separated in Anilist.
 		// Skip it for now.
@@ -132,6 +154,15 @@ func (m Manga) SameTypeWithTarget(t Target) bool {
 	}
 
 	return false
+}
+
+func (m Manga) SameTitleWithTarget(t Target) bool {
+	b, ok := t.(Manga)
+	if !ok {
+		return false
+	}
+
+	return titleMatchingLevels(m.TitleEN, m.TitleJP, m.TitleRomaji, b.TitleEN, b.TitleJP, b.TitleRomaji)
 }
 
 func (m Manga) GetUpdateMyAnimeListStatusOption() []mal.UpdateMyAnimeListStatusOption {
@@ -292,8 +323,14 @@ func newMangaFromMalManga(manga mal.Manga) (Manga, error) {
 		titleJP = manga.AlternativeTitles.Ja
 	}
 
+	// In reverse sync mode, we need to leave AniList ID as 0 so the updater can find it by name
+	anilistID := -1
+	if *reverseDirection {
+		anilistID = 0 // This will trigger name-based search in reverse sync
+	}
+
 	return Manga{
-		IDAnilist:       -1,
+		IDAnilist:       anilistID,
 		IDMal:           manga.ID,
 		Progress:        manga.MyListStatus.NumChaptersRead,
 		ProgressVolumes: manga.MyListStatus.NumVolumesRead,
@@ -372,6 +409,9 @@ func newMangasFromMalUserMangas(mangas []mal.UserManga) []Manga {
 
 		res = append(res, r)
 	}
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].GetStatusString() < res[j].GetStatusString()
+	})
 	return res
 }
 
@@ -403,4 +443,69 @@ func newSourcesFromMangas(mangas []Manga) []Source {
 		res = append(res, manga)
 	}
 	return res
+}
+
+func newMangasFromVerniyMedias(medias []verniy.Media) []Manga {
+	res := make([]Manga, 0, len(medias))
+	for _, media := range medias {
+		m, err := newMangaFromVerniyMedia(media)
+		if err != nil {
+			log.Printf("failed to convert verniy media to manga: %v", err)
+			continue
+		}
+		res = append(res, m)
+	}
+	return res
+}
+
+func newMangaFromVerniyMedia(media verniy.Media) (Manga, error) {
+	if media.ID == 0 {
+		return Manga{}, errors.New("ID is 0")
+	}
+
+	var titleEN string
+	if media.Title != nil && media.Title.English != nil {
+		titleEN = *media.Title.English
+	}
+
+	var titleJP string
+	if media.Title != nil && media.Title.Native != nil {
+		titleJP = *media.Title.Native
+	}
+
+	var romajiTitle string
+	if media.Title != nil && media.Title.Romaji != nil {
+		romajiTitle = *media.Title.Romaji
+	}
+
+	var chapters int
+	if media.Chapters != nil {
+		chapters = *media.Chapters
+	}
+
+	var volumes int
+	if media.Volumes != nil {
+		volumes = *media.Volumes
+	}
+
+	var idMal int
+	if media.IDMAL != nil {
+		idMal = *media.IDMAL
+	}
+
+	return Manga{
+		IDAnilist:       media.ID,
+		IDMal:           idMal,
+		Progress:        0,                  // Will be set from MAL source
+		ProgressVolumes: 0,                  // Will be set from MAL source
+		Score:           0,                  // Will be set from MAL source
+		Status:          MangaStatusUnknown, // Will be set from MAL source
+		TitleEN:         titleEN,
+		TitleJP:         titleJP,
+		TitleRomaji:     romajiTitle,
+		Chapters:        chapters,
+		Volumes:         volumes,
+		StartedAt:       nil, // Will be set from MAL source
+		FinishedAt:      nil, // Will be set from MAL source
+	}, nil
 }
