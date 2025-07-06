@@ -17,6 +17,180 @@ var errStatusUnknown = errors.New("status unknown")
 
 var betweenBraketsRegexp = regexp.MustCompile(`\(.*\)`)
 
+// normalizeTitle normalizes a title for better comparison
+func normalizeTitle(title string) string {
+	// Convert to lowercase
+	normalized := strings.ToLower(title)
+	
+	// Remove content in brackets/parentheses
+	normalized = betweenBraketsRegexp.ReplaceAllString(normalized, "")
+	
+	// Remove common punctuation and special characters
+	normalized = strings.ReplaceAll(normalized, ":", "")
+	normalized = strings.ReplaceAll(normalized, "!", "")
+	normalized = strings.ReplaceAll(normalized, "?", "")
+	normalized = strings.ReplaceAll(normalized, "'", "")
+	normalized = strings.ReplaceAll(normalized, "\"", "")
+	normalized = strings.ReplaceAll(normalized, "-", " ")
+	normalized = strings.ReplaceAll(normalized, "_", " ")
+	normalized = strings.ReplaceAll(normalized, ".", " ")
+	normalized = strings.ReplaceAll(normalized, ",", " ")
+	
+	// Replace multiple spaces with single space
+	normalized = regexp.MustCompile(`\s+`).ReplaceAllString(normalized, " ")
+	
+	// Trim whitespace
+	normalized = strings.TrimSpace(normalized)
+	
+	return normalized
+}
+
+// titleContains checks if one title contains another (bidirectional)
+func titleContains(title1, title2 string) bool {
+	if title1 == "" || title2 == "" {
+		return false
+	}
+	
+	norm1 := normalizeTitle(title1)
+	norm2 := normalizeTitle(title2)
+	
+	if norm1 == norm2 {
+		return true
+	}
+	
+	// Check if shorter title is contained in longer title
+	if len(norm1) < len(norm2) {
+		return strings.Contains(norm2, norm1)
+	}
+	return strings.Contains(norm1, norm2)
+}
+
+// titleSimilarity calculates prefix similarity between two titles
+func titleSimilarity(title1, title2 string) float64 {
+	if title1 == "" || title2 == "" {
+		return 0.0
+	}
+	
+	norm1 := strings.ReplaceAll(normalizeTitle(title1), " ", "")
+	norm2 := strings.ReplaceAll(normalizeTitle(title2), " ", "")
+	
+	if norm1 == norm2 {
+		return 100.0
+	}
+	
+	// Ensure s1 is the longer string
+	if len(norm1) < len(norm2) {
+		norm1, norm2 = norm2, norm1
+	}
+	
+	if len(norm2) == 0 {
+		return 0.0
+	}
+	
+	// Calculate character-by-character prefix match
+	matchCount := 0
+	for i, r := range norm1 {
+		if i >= len(norm2) {
+			break
+		}
+		if r == rune(norm2[i]) {
+			matchCount = i + 1
+		} else {
+			break
+		}
+	}
+	
+	return float64(matchCount) / float64(len(norm1)) * 100.0
+}
+
+// levenshteinDistance calculates the Levenshtein distance between two strings
+func levenshteinDistance(s1, s2 string) int {
+	if len(s1) == 0 {
+		return len(s2)
+	}
+	if len(s2) == 0 {
+		return len(s1)
+	}
+
+	// Create a 2D slice for dynamic programming
+	matrix := make([][]int, len(s1)+1)
+	for i := range matrix {
+		matrix[i] = make([]int, len(s2)+1)
+	}
+
+	// Initialize first row and column
+	for i := 0; i <= len(s1); i++ {
+		matrix[i][0] = i
+	}
+	for j := 0; j <= len(s2); j++ {
+		matrix[0][j] = j
+	}
+
+	// Fill the matrix
+	for i := 1; i <= len(s1); i++ {
+		for j := 1; j <= len(s2); j++ {
+			cost := 0
+			if s1[i-1] != s2[j-1] {
+				cost = 1
+			}
+
+			matrix[i][j] = min(
+				matrix[i-1][j]+1,      // deletion
+				matrix[i][j-1]+1,      // insertion
+				matrix[i-1][j-1]+cost, // substitution
+			)
+		}
+	}
+
+	return matrix[len(s1)][len(s2)]
+}
+
+// min returns the minimum of three integers
+func min(a, b, c int) int {
+	if a < b {
+		if a < c {
+			return a
+		}
+		return c
+	}
+	if b < c {
+		return b
+	}
+	return c
+}
+
+// titleLevenshteinSimilarity calculates similarity based on Levenshtein distance
+func titleLevenshteinSimilarity(title1, title2 string) float64 {
+	if title1 == "" || title2 == "" {
+		return 0.0
+	}
+
+	norm1 := normalizeTitle(title1)
+	norm2 := normalizeTitle(title2)
+	
+	if norm1 == norm2 {
+		return 100.0
+	}
+
+	distance := levenshteinDistance(norm1, norm2)
+	maxLen := len(norm1)
+	if len(norm2) > maxLen {
+		maxLen = len(norm2)
+	}
+
+	if maxLen == 0 {
+		return 100.0
+	}
+
+	// Convert distance to similarity percentage
+	similarity := (1.0 - float64(distance)/float64(maxLen)) * 100.0
+	if similarity < 0 {
+		similarity = 0
+	}
+
+	return similarity
+}
+
 type Status string
 
 const (
@@ -143,68 +317,111 @@ func (a Anime) SameProgressWithTarget(t Target) bool {
 }
 
 func (a Anime) SameTypeWithTarget(t Target) bool {
+	// First check: Compare target IDs
 	if a.GetTargetID() == t.GetTargetID() {
 		return true
 	}
 
+	// Type assertion to ensure we're comparing with another Anime
+	_, ok := t.(Anime)
+	if !ok {
+		return false
+	}
+
+	// Use the comprehensive title matching logic
+	return a.SameTitleWithTarget(t)
+}
+
+func (a Anime) SameTitleWithTarget(t Target) bool {
 	b, ok := t.(Anime)
 	if !ok {
 		return false
 	}
 
-	eq := func(s1, s2 string) bool {
-		if len(s1) < len(s2) {
-			return strings.Contains(strings.ToLower(s2), strings.ToLower(s1))
-		}
-		return strings.Contains(strings.ToLower(s1), strings.ToLower(s2))
-	}
-
-	titlesEq := eq(a.TitleEN, b.TitleEN)
-	if !titlesEq {
-		titlesEq = eq(a.TitleJP, b.TitleJP)
-	}
-
-	if titlesEq {
+	// Level 1: Exact case-insensitive title matching
+	if a.TitleEN != "" && b.TitleEN != "" && strings.EqualFold(a.TitleEN, b.TitleEN) {
 		return true
 	}
 
-	f := func(s1, s2 string) bool {
-		if len(s1) < len(s2) {
-			s1, s2 = s2, s1
-		}
-
-		c := 0
-		for i, r := range s1 {
-			if r == rune(s2[i]) {
-				c = i
-			} else {
-				break
-			}
-		}
-
-		return float64(c)/float64(len(s1))*100 > 80
-	}
-
-	// JP
-	aa := strings.ReplaceAll(a.TitleJP, " ", "")
-	bb := strings.ReplaceAll(b.TitleJP, " ", "")
-
-	if f(aa, bb) {
+	if a.TitleJP != "" && b.TitleJP != "" && strings.EqualFold(a.TitleJP, b.TitleJP) {
 		return true
 	}
 
-	// EN
-	aa = strings.ReplaceAll(a.TitleEN, " ", "")
-	bb = strings.ReplaceAll(b.TitleEN, " ", "")
-
-	if f(aa, bb) {
+	if a.TitleRomaji != "" && b.TitleRomaji != "" && strings.EqualFold(a.TitleRomaji, b.TitleRomaji) {
 		return true
 	}
 
-	aa = betweenBraketsRegexp.ReplaceAllString(aa, "")
-	bb = betweenBraketsRegexp.ReplaceAllString(bb, "")
+	// Level 2: Normalized exact matching (removes punctuation, brackets, etc.)
+	if a.TitleEN != "" && b.TitleEN != "" && normalizeTitle(a.TitleEN) == normalizeTitle(b.TitleEN) {
+		return true
+	}
 
-	return f(aa, bb)
+	if a.TitleJP != "" && b.TitleJP != "" && normalizeTitle(a.TitleJP) == normalizeTitle(b.TitleJP) {
+		return true
+	}
+
+	if a.TitleRomaji != "" && b.TitleRomaji != "" && normalizeTitle(a.TitleRomaji) == normalizeTitle(b.TitleRomaji) {
+		return true
+	}
+
+	// Level 3: Contains matching (one title contained in another)
+	if titleContains(a.TitleEN, b.TitleEN) {
+		return true
+	}
+
+	if titleContains(a.TitleJP, b.TitleJP) {
+		return true
+	}
+
+	if titleContains(a.TitleRomaji, b.TitleRomaji) {
+		return true
+	}
+
+	// Level 4: Cross-language matching (EN vs Romaji, etc.)
+	if titleContains(a.TitleEN, b.TitleRomaji) || titleContains(a.TitleRomaji, b.TitleEN) {
+		return true
+	}
+
+	// Level 5: Fuzzy matching with similarity threshold (85%)
+	const similarityThreshold = 85.0
+	
+	if titleSimilarity(a.TitleEN, b.TitleEN) >= similarityThreshold {
+		return true
+	}
+
+	if titleSimilarity(a.TitleJP, b.TitleJP) >= similarityThreshold {
+		return true
+	}
+
+	if titleSimilarity(a.TitleRomaji, b.TitleRomaji) >= similarityThreshold {
+		return true
+	}
+
+	// Level 6: Levenshtein distance-based matching (80% threshold)
+	const levenshteinThreshold = 80.0
+	
+	if titleLevenshteinSimilarity(a.TitleEN, b.TitleEN) >= levenshteinThreshold {
+		return true
+	}
+
+	if titleLevenshteinSimilarity(a.TitleJP, b.TitleJP) >= levenshteinThreshold {
+		return true
+	}
+
+	if titleLevenshteinSimilarity(a.TitleRomaji, b.TitleRomaji) >= levenshteinThreshold {
+		return true
+	}
+
+	// Cross-language Levenshtein matching
+	if titleLevenshteinSimilarity(a.TitleEN, b.TitleRomaji) >= levenshteinThreshold {
+		return true
+	}
+
+	if titleLevenshteinSimilarity(a.TitleRomaji, b.TitleEN) >= levenshteinThreshold {
+		return true
+	}
+
+	return false
 }
 
 func (a Anime) GetUpdateOptions() []mal.UpdateMyAnimeListStatusOption {

@@ -16,11 +16,13 @@ type Source interface {
 	GetStringDiffWithTarget(Target) string
 	SameProgressWithTarget(Target) bool
 	SameTypeWithTarget(Target) bool
+	SameTitleWithTarget(Target) bool
 	String() string
 }
 
 type Target interface {
 	GetTargetID() TargetID
+	GetTitle() string
 	String() string
 }
 
@@ -79,20 +81,24 @@ func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts ma
 	if !(*forceSync) { // filter sources by different progress with targets
 		tgt, ok := tgts[src.GetTargetID()]
 		if !ok {
-			// Check for context cancellation before potentially long-running search
-			select {
-			case <-ctx.Done():
-				log.Printf("[%s] Context cancelled during target search", u.Prefix)
-				return
-			default:
-			}
+			// First try to find by title comparison with existing targets
+			tgt = u.findTargetByTitle(src, tgts)
+			if tgt == nil {
+				// Check for context cancellation before potentially long-running search
+				select {
+				case <-ctx.Done():
+					log.Printf("[%s] Context cancelled during target search", u.Prefix)
+					return
+				default:
+				}
 
-			var err error
-			tgt, err = u.findTarget(ctx, src)
-			if err != nil {
-				log.Printf("[%s] Error processing target: %v", u.Prefix, err)
-				u.Statistics.SkippedCount++
-				return
+				var err error
+				tgt, err = u.findTarget(ctx, src)
+				if err != nil {
+					log.Printf("[%s] Error processing target: %v", u.Prefix, err)
+					u.Statistics.SkippedCount++
+					return
+				}
 			}
 		}
 
@@ -123,6 +129,20 @@ func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts ma
 	}
 
 	u.updateTarget(ctx, tgtID, src)
+}
+
+func (u *Updater) findTargetByTitle(src Source, tgts map[TargetID]Target) Target {
+	srcTitle := src.GetTitle()
+	
+	for _, tgt := range tgts {
+		if src.SameTitleWithTarget(tgt) && src.SameTypeWithTarget(tgt) {
+			DPrintf("[%s] Found target by title comparison: %s", u.Prefix, srcTitle)
+			return tgt
+		}
+	}
+	
+	DPrintf("[%s] No target found by title comparison: %s", u.Prefix, srcTitle)
+	return nil
 }
 
 func (u *Updater) findTarget(ctx context.Context, src Source) (Target, error) {
