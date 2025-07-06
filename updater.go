@@ -64,7 +64,7 @@ func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target) {
 		DPrintf("[%s] Processing for: %s", u.Prefix, src.String())
 
 		if _, ok := u.IgnoreTitles[strings.ToLower(src.GetTitle())]; ok {
-			log.Printf("[%s] Ignoring anime: %s", u.Prefix, src.GetTitle())
+			log.Printf("[%s] Ignoring entry: %s", u.Prefix, src.GetTitle())
 			u.Statistics.SkippedCount++
 			continue
 		}
@@ -90,7 +90,7 @@ func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts ma
 			var err error
 			tgt, err = u.findTarget(ctx, src)
 			if err != nil {
-				log.Printf("[%s] Error processing target anime: %v", u.Prefix, err)
+				log.Printf("[%s] Error processing target: %v", u.Prefix, err)
 				u.Statistics.SkippedCount++
 				return
 			}
@@ -133,7 +133,7 @@ func (u *Updater) findTarget(ctx context.Context, src Source) (Target, error) {
 
 		tgt, err := u.GetTargetByIDFunc(ctx, tgtID)
 		if err != nil {
-			return nil, fmt.Errorf("error getting mal anime by id: %s: %w", src.GetTitle(), err)
+			return nil, fmt.Errorf("error getting target by id: %s: %w", src.GetTitle(), err)
 		}
 		return tgt, nil
 	}

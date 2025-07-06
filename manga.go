@@ -486,9 +486,9 @@ func newMangaFromVerniyMedia(media verniy.Media) (Manga, error) {
 	return Manga{
 		IDAnilist:       media.ID,
 		IDMal:           idMal,
-		Progress:        0, // Will be set from MAL source
-		ProgressVolumes: 0, // Will be set from MAL source
-		Score:           0, // Will be set from MAL source
+		Progress:        0,                  // Will be set from MAL source
+		ProgressVolumes: 0,                  // Will be set from MAL source
+		Score:           0,                  // Will be set from MAL source
 		Status:          MangaStatusUnknown, // Will be set from MAL source
 		TitleEN:         titleEN,
 		TitleJP:         titleJP,

@@ -42,7 +42,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 	log.Println("Anilist client created")
 
 	animeUpdater := &Updater{
-		Prefix:     "Anime",
+		Prefix:     "AniList to MAL Anime",
 		Statistics: new(Statistics),
 		IgnoreTitles: map[string]struct{}{ // in lowercase, TODO: move to config
 			"scott pilgrim takes off":       {}, // this anime is not in MAL
@@ -82,7 +82,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 	}
 
 	mangaUpdater := &Updater{
-		Prefix:       "Manga",
+		Prefix:       "AniList to MAL Manga",
 		Statistics:   new(Statistics),
 		IgnoreTitles: map[string]struct{}{},
 
@@ -120,12 +120,12 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 
 	// Reverse updaters for MAL -> AniList sync
 	reverseAnimeUpdater := &Updater{
-		Prefix:       "Reverse Anime",
+		Prefix:       "MAL to AniList Anime",
 		Statistics:   new(Statistics),
 		IgnoreTitles: map[string]struct{}{},
 
 		GetTargetByIDFunc: func(ctx context.Context, id TargetID) (Target, error) {
-			resp, err := anilistClient.GetAnimeByID(ctx, int(id))
+			resp, err := anilistClient.GetAnimeByID(ctx, int(id), "MAL to AniList Anime")
 			if err != nil {
 				return nil, fmt.Errorf("error getting anilist anime by id: %w", err)
 			}
@@ -137,7 +137,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		},
 
 		GetTargetsByNameFunc: func(ctx context.Context, name string) ([]Target, error) {
-			resp, err := anilistClient.GetAnimesByName(ctx, name)
+			resp, err := anilistClient.GetAnimesByName(ctx, name, "MAL to AniList Anime")
 			if err != nil {
 				return nil, fmt.Errorf("error getting anilist anime by name: %w", err)
 			}
@@ -150,7 +150,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 				return fmt.Errorf("source is not an anime")
 			}
 			mediaID, status, progress, score := a.GetAnilistUpdateParams()
-			if err := anilistClient.UpdateAnimeEntry(ctx, mediaID, status, progress, score); err != nil {
+			if err := anilistClient.UpdateAnimeEntry(ctx, mediaID, status, progress, score, "MAL to AniList Anime"); err != nil {
 				return fmt.Errorf("error updating anilist anime: %w", err)
 			}
 			return nil
@@ -158,12 +158,12 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 	}
 
 	reverseMangaUpdater := &Updater{
-		Prefix:       "Reverse Manga",
+		Prefix:       "MAL to AniList Manga",
 		Statistics:   new(Statistics),
 		IgnoreTitles: map[string]struct{}{},
 
 		GetTargetByIDFunc: func(ctx context.Context, id TargetID) (Target, error) {
-			resp, err := anilistClient.GetMangaByID(ctx, int(id))
+			resp, err := anilistClient.GetMangaByID(ctx, int(id), "MAL to AniList Manga")
 			if err != nil {
 				return nil, fmt.Errorf("error getting anilist manga by id: %w", err)
 			}
@@ -175,7 +175,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		},
 
 		GetTargetsByNameFunc: func(ctx context.Context, name string) ([]Target, error) {
-			resp, err := anilistClient.GetMangasByName(ctx, name)
+			resp, err := anilistClient.GetMangasByName(ctx, name, "MAL to AniList Manga")
 			if err != nil {
 				return nil, fmt.Errorf("error getting anilist manga by name: %w", err)
 			}
@@ -188,7 +188,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 				return fmt.Errorf("source is not a manga")
 			}
 			mediaID, status, progress, progressVolumes, score := m.GetAnilistUpdateParams()
-			if err := anilistClient.UpdateMangaEntry(ctx, mediaID, status, progress, progressVolumes, score); err != nil {
+			if err := anilistClient.UpdateMangaEntry(ctx, mediaID, status, progress, progressVolumes, score, "MAL to AniList Manga"); err != nil {
 				return fmt.Errorf("error updating anilist manga: %w", err)
 			}
 			return nil

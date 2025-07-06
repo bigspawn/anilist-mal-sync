@@ -125,15 +125,15 @@ func isRateLimitError(err error) bool {
 		return false
 	}
 	errStr := strings.ToLower(err.Error())
-	return strings.Contains(errStr, "too many requests") || 
-		   strings.Contains(errStr, "rate limit") ||
-		   strings.Contains(errStr, "429")
+	return strings.Contains(errStr, "too many requests") ||
+		strings.Contains(errStr, "rate limit") ||
+		strings.Contains(errStr, "429")
 }
 
 // retryWithBackoff wraps an operation with exponential backoff for rate limit handling
-func retryWithBackoff(ctx context.Context, operation func() error, operationName string) error {
+func retryWithBackoff(ctx context.Context, operation func() error, operationName string, prefix ...string) error {
 	b := createBackoffPolicy()
-	
+
 	retryableOperation := func() error {
 		err := operation()
 		if err != nil && !isRateLimitError(err) {
@@ -142,13 +142,17 @@ func retryWithBackoff(ctx context.Context, operation func() error, operationName
 		}
 		return err
 	}
-	
+
 	return backoff.RetryNotify(
 		retryableOperation,
 		backoff.WithContext(b, ctx),
 		func(err error, duration time.Duration) {
 			if isRateLimitError(err) {
-				log.Printf("Rate limit hit for %s, retrying in %v: %v", operationName, duration, err)
+				if len(prefix) > 0 {
+					log.Printf("[%s] Rate limit hit for %s, retrying in %v: %v", prefix[0], operationName, duration, err)
+				} else {
+					log.Printf("Rate limit hit for %s, retrying in %v: %v", operationName, duration, err)
+				}
 			}
 		},
 	)
@@ -167,7 +171,7 @@ type SaveMediaListEntry struct {
 }
 
 // UpdateAnimeEntry updates an anime entry in AniList using GraphQL mutation with retry logic
-func (c *AnilistClient) UpdateAnimeEntry(ctx context.Context, mediaID int, status string, progress int, score int) error {
+func (c *AnilistClient) UpdateAnimeEntry(ctx context.Context, mediaID int, status string, progress int, score int, prefix string) error {
 	return retryWithBackoff(ctx, func() error {
 		mutation := `
 			mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $score: Int) {
@@ -212,11 +216,11 @@ func (c *AnilistClient) UpdateAnimeEntry(ctx context.Context, mediaID int, statu
 		}
 
 		return nil
-	}, fmt.Sprintf("update anime entry: %d", mediaID))
+	}, fmt.Sprintf("AniList update anime entry: %d", mediaID), prefix)
 }
 
 // UpdateMangaEntry updates a manga entry in AniList using GraphQL mutation with retry logic
-func (c *AnilistClient) UpdateMangaEntry(ctx context.Context, mediaID int, status string, progress int, progressVolumes int, score int) error {
+func (c *AnilistClient) UpdateMangaEntry(ctx context.Context, mediaID int, status string, progress int, progressVolumes int, score int, prefix string) error {
 	return retryWithBackoff(ctx, func() error {
 		mutation := `
 			mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $progressVolumes: Int, $score: Int) {
@@ -263,13 +267,13 @@ func (c *AnilistClient) UpdateMangaEntry(ctx context.Context, mediaID int, statu
 		}
 
 		return nil
-	}, fmt.Sprintf("update manga entry: %d", mediaID))
+	}, fmt.Sprintf("AniList update manga entry: %d", mediaID), prefix)
 }
 
 // GetAnimeByID gets an anime from AniList by ID with retry logic
-func (c *AnilistClient) GetAnimeByID(ctx context.Context, id int) (*verniy.Media, error) {
+func (c *AnilistClient) GetAnimeByID(ctx context.Context, id int, prefix string) (*verniy.Media, error) {
 	var result *verniy.Media
-	
+
 	err := retryWithBackoff(ctx, func() error {
 		media, err := c.c.GetAnimeWithContext(ctx, id,
 			verniy.MediaFieldID,
@@ -288,15 +292,15 @@ func (c *AnilistClient) GetAnimeByID(ctx context.Context, id int) (*verniy.Media
 		}
 		result = media
 		return nil
-	}, fmt.Sprintf("get anime by ID: %d", id))
-	
+	}, fmt.Sprintf("AniList get anime by ID: %d", id), prefix)
+
 	return result, err
 }
 
 // GetAnimesByName searches for anime on AniList by name with retry logic
-func (c *AnilistClient) GetAnimesByName(ctx context.Context, name string) ([]verniy.Media, error) {
+func (c *AnilistClient) GetAnimesByName(ctx context.Context, name string, prefix string) ([]verniy.Media, error) {
 	var result []verniy.Media
-	
+
 	err := retryWithBackoff(ctx, func() error {
 		page, err := c.c.SearchAnimeWithContext(ctx, verniy.PageParamMedia{Search: name}, 1, 10,
 			verniy.MediaFieldID,
@@ -315,15 +319,15 @@ func (c *AnilistClient) GetAnimesByName(ctx context.Context, name string) ([]ver
 		}
 		result = page.Media
 		return nil
-	}, fmt.Sprintf("search anime by name: %s", name))
-	
+	}, fmt.Sprintf("AniList search anime by name: %s", name), prefix)
+
 	return result, err
 }
 
 // GetMangaByID gets a manga from AniList by ID with retry logic
-func (c *AnilistClient) GetMangaByID(ctx context.Context, id int) (*verniy.Media, error) {
+func (c *AnilistClient) GetMangaByID(ctx context.Context, id int, prefix string) (*verniy.Media, error) {
 	var result *verniy.Media
-	
+
 	err := retryWithBackoff(ctx, func() error {
 		media, err := c.c.GetMangaWithContext(ctx, id,
 			verniy.MediaFieldID,
@@ -344,15 +348,15 @@ func (c *AnilistClient) GetMangaByID(ctx context.Context, id int) (*verniy.Media
 		}
 		result = media
 		return nil
-	}, fmt.Sprintf("get manga by ID: %d", id))
-	
+	}, fmt.Sprintf("AniList get manga by ID: %d", id), prefix)
+
 	return result, err
 }
 
 // GetMangasByName searches for manga on AniList by name with retry logic
-func (c *AnilistClient) GetMangasByName(ctx context.Context, name string) ([]verniy.Media, error) {
+func (c *AnilistClient) GetMangasByName(ctx context.Context, name string, prefix string) ([]verniy.Media, error) {
 	var result []verniy.Media
-	
+
 	err := retryWithBackoff(ctx, func() error {
 		page, err := c.c.SearchMangaWithContext(ctx, verniy.PageParamMedia{Search: name}, 1, 10,
 			verniy.MediaFieldID,
@@ -373,7 +377,7 @@ func (c *AnilistClient) GetMangasByName(ctx context.Context, name string) ([]ver
 		}
 		result = page.Media
 		return nil
-	}, fmt.Sprintf("search manga by name: %s", name))
-	
+	}, fmt.Sprintf("AniList search manga by name: %s", name), prefix)
+
 	return result, err
 }

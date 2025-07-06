@@ -551,7 +551,7 @@ func newAnimeFromVerniyMedia(media verniy.Media) (Anime, error) {
 		IDAnilist:   media.ID,
 		IDMal:       idMal,
 		Progress:    0, // Will be set from MAL source
-		Score:       0, // Will be set from MAL source  
+		Score:       0, // Will be set from MAL source
 		SeasonYear:  year,
 		Status:      StatusUnknown, // Will be set from MAL source
 		TitleEN:     titleEN,
