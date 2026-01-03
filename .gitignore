@@ -6,3 +6,11 @@ config.yaml
 CLAUDE.md
 .claude
 anilist-mal-sync
+# Ignore token and config files
+config.yaml
+tokens/
+token.json
+*.token.json
+# binaries
+anilist-mal-sync.exe
+anilist-mal-sync

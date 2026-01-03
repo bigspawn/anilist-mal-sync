@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+
+	syncer "github.com/bigspawn/anilist-mal-sync/internal/sync"
 )
 
 type App struct {
@@ -12,16 +14,24 @@ type App struct {
 	mal     *MyAnimeListClient
 	anilist *AnilistClient
 
-	animeUpdater        *Updater
-	mangaUpdater        *Updater
-	reverseAnimeUpdater *Updater
-	reverseMangaUpdater *Updater
+	animeUpdater        *syncer.Updater
+	mangaUpdater        *syncer.Updater
+	reverseAnimeUpdater *syncer.Updater
+	reverseMangaUpdater *syncer.Updater
 }
 
 // NewApp creates a new App instance with configured clients and updaters
 //
 //nolint:funlen //ok
-func NewApp(ctx context.Context, config Config) (*App, error) {
+func NewApp(ctx context.Context, config Config, forceSync bool, dryRun bool, verbose bool) (*App, error) {
+	// Apply config-driven defaults
+	EnableScoreNormalization = *config.ScoreNormalization
+
+	// Wire flags to syncer package
+	syncer.ForceSync = forceSync
+	syncer.DryRun = dryRun
+	syncer.Verbose = verbose
+
 	oauthMAL, err := NewMyAnimeListOAuth(ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating mal oauth: %w", err)
@@ -44,18 +54,18 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 
 	log.Println("Anilist client created")
 
-	animeUpdater := &Updater{
-		Prefix:     "AniList to MAL Anime",
-		Statistics: new(Statistics),
-		IgnoreTitles: map[string]struct{}{ // in lowercase, TODO: move to config
+	animeUpdater := syncer.NewUpdater(
+		"AniList to MAL Anime",
+		new(syncer.Statistics),
+		map[string]struct{}{ // in lowercase, TODO: move to config
 			"scott pilgrim takes off":       {}, // this anime is not in MAL
 			"bocchi the rock! recap part 2": {}, // this anime is not in MAL
 		},
-		StrategyChain: NewStrategyChain(
-			IDStrategy{},
-			TitleStrategy{},
-			APISearchStrategy{
-				GetTargetByIDFunc: func(ctx context.Context, id TargetID) (Target, error) {
+		syncer.NewStrategyChain(
+			syncer.IDStrategy{},
+			syncer.TitleStrategy{},
+			syncer.APISearchStrategy{
+				GetTargetByIDFunc: func(ctx context.Context, id syncer.TargetID) (syncer.Target, error) {
 					resp, err := malClient.GetAnimeByID(ctx, int(id))
 					if err != nil {
 						return nil, fmt.Errorf("error getting anime by id: %w", err)
@@ -64,39 +74,43 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 					if err != nil {
 						return nil, fmt.Errorf("error creating anime from mal anime: %w", err)
 					}
-					return ani, nil
+					return &targetAdapter{t: ani}, nil
 				},
-				GetTargetsByNameFunc: func(ctx context.Context, name string) ([]Target, error) {
+				GetTargetsByNameFunc: func(ctx context.Context, name string) ([]syncer.Target, error) {
 					resp, err := malClient.GetAnimesByName(ctx, name)
 					if err != nil {
 						return nil, fmt.Errorf("error getting anime by name: %w", err)
 					}
-					return newTargetsFromAnimes(newAnimesFromMalAnimes(resp)), nil
+					return wrapTargets(newTargetsFromAnimes(newAnimesFromMalAnimes(resp))), nil
 				},
 			},
 		),
+	)
 
-		UpdateTargetBySourceFunc: func(ctx context.Context, id TargetID, src Source) error {
-			a, ok := src.(Anime)
-			if !ok {
-				return fmt.Errorf("source is not an anime")
-			}
-			if err := malClient.UpdateAnimeByIDAndOptions(ctx, int(id), a.GetUpdateOptions()); err != nil {
-				return fmt.Errorf("error updating anime by id and options: %w", err)
-			}
-			return nil
-		},
+	animeUpdater.UpdateTargetBySourceFunc = func(ctx context.Context, id syncer.TargetID, src syncer.Source) error {
+		sa, ok := src.(*sourceAdapter)
+		if !ok {
+			return fmt.Errorf("source is not an adapter")
+		}
+		a, ok := sa.s.(Anime)
+		if !ok {
+			return fmt.Errorf("source is not an anime")
+		}
+		if err := malClient.UpdateAnimeByIDAndOptions(ctx, int(id), a.GetUpdateOptions()); err != nil {
+			return fmt.Errorf("error updating anime by id and options: %w", err)
+		}
+		return nil
 	}
 
-	mangaUpdater := &Updater{
-		Prefix:       "AniList to MAL Manga",
-		Statistics:   new(Statistics),
-		IgnoreTitles: map[string]struct{}{},
-		StrategyChain: NewStrategyChain(
-			IDStrategy{},
-			TitleStrategy{},
-			APISearchStrategy{
-				GetTargetByIDFunc: func(ctx context.Context, id TargetID) (Target, error) {
+	mangaUpdater := syncer.NewUpdater(
+		"AniList to MAL Manga",
+		new(syncer.Statistics),
+		map[string]struct{}{},
+		syncer.NewStrategyChain(
+			syncer.IDStrategy{},
+			syncer.TitleStrategy{},
+			syncer.APISearchStrategy{
+				GetTargetByIDFunc: func(ctx context.Context, id syncer.TargetID) (syncer.Target, error) {
 					resp, err := malClient.GetMangaByID(ctx, int(id))
 					if err != nil {
 						return nil, fmt.Errorf("error getting manga by id: %w", err)
@@ -105,40 +119,44 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 					if err != nil {
 						return nil, fmt.Errorf("error creating manga from mal manga: %w", err)
 					}
-					return manga, nil
+					return &targetAdapter{t: manga}, nil
 				},
-				GetTargetsByNameFunc: func(ctx context.Context, name string) ([]Target, error) {
+				GetTargetsByNameFunc: func(ctx context.Context, name string) ([]syncer.Target, error) {
 					resp, err := malClient.GetMangasByName(ctx, name)
 					if err != nil {
 						return nil, fmt.Errorf("error getting manga by name: %w", err)
 					}
-					return newTargetsFromMangas(newMangasFromMalMangas(resp)), nil
+					return wrapTargets(newTargetsFromMangas(newMangasFromMalMangas(resp))), nil
 				},
 			},
 		),
+	)
 
-		UpdateTargetBySourceFunc: func(ctx context.Context, id TargetID, src Source) error {
-			m, ok := src.(Manga)
-			if !ok {
-				return fmt.Errorf("source is not an anime")
-			}
-			if err := malClient.UpdateMangaByIDAndOptions(ctx, int(id), m.GetUpdateOptions()); err != nil {
-				return fmt.Errorf("error updating anime by id and options: %w", err)
-			}
-			return nil
-		},
+	mangaUpdater.UpdateTargetBySourceFunc = func(ctx context.Context, id syncer.TargetID, src syncer.Source) error {
+		sa, ok := src.(*sourceAdapter)
+		if !ok {
+			return fmt.Errorf("source is not an adapter")
+		}
+		m, ok := sa.s.(Manga)
+		if !ok {
+			return fmt.Errorf("source is not a manga")
+		}
+		if err := malClient.UpdateMangaByIDAndOptions(ctx, int(id), m.GetUpdateOptions()); err != nil {
+			return fmt.Errorf("error updating manga by id and options: %w", err)
+		}
+		return nil
 	}
 
 	// Reverse updaters for MAL -> AniList sync
-	reverseAnimeUpdater := &Updater{
-		Prefix:       "MAL to AniList Anime",
-		Statistics:   new(Statistics),
-		IgnoreTitles: map[string]struct{}{},
-		StrategyChain: NewStrategyChain(
-			IDStrategy{},
-			TitleStrategy{},
-			APISearchStrategy{
-				GetTargetByIDFunc: func(ctx context.Context, id TargetID) (Target, error) {
+	reverseAnimeUpdater := syncer.NewUpdater(
+		"MAL to AniList Anime",
+		new(syncer.Statistics),
+		map[string]struct{}{},
+		syncer.NewStrategyChain(
+			syncer.IDStrategy{},
+			syncer.TitleStrategy{},
+			syncer.APISearchStrategy{
+				GetTargetByIDFunc: func(ctx context.Context, id syncer.TargetID) (syncer.Target, error) {
 					resp, err := anilistClient.GetAnimeByID(ctx, int(id), "MAL to AniList Anime")
 					if err != nil {
 						return nil, fmt.Errorf("error getting anilist anime by id: %w", err)
@@ -147,45 +165,49 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 					if err != nil {
 						return nil, fmt.Errorf("error creating anime from anilist media: %w", err)
 					}
-					return ani, nil
+					return &targetAdapter{t: ani}, nil
 				},
-				GetTargetsByNameFunc: func(ctx context.Context, name string) ([]Target, error) {
+				GetTargetsByNameFunc: func(ctx context.Context, name string) ([]syncer.Target, error) {
 					resp, err := anilistClient.GetAnimesByName(ctx, name, "MAL to AniList Anime")
 					if err != nil {
 						return nil, fmt.Errorf("error getting anilist anime by name: %w", err)
 					}
-					return newTargetsFromAnimes(newAnimesFromVerniyMedias(resp)), nil
+					return wrapTargets(newTargetsFromAnimes(newAnimesFromVerniyMedias(resp))), nil
 				},
 			},
 		),
+	)
 
-		UpdateTargetBySourceFunc: func(ctx context.Context, id TargetID, src Source) error {
-			a, ok := src.(Anime)
-			if !ok {
-				return fmt.Errorf("source is not an anime")
-			}
-			if err := anilistClient.UpdateAnimeEntry(
-				ctx,
-				int(id),
-				a.Status.GetAnilistStatus(),
-				a.Progress,
-				int(a.Score),
-				"MAL to AniList Anime"); err != nil {
-				return fmt.Errorf("error updating anilist anime: %w", err)
-			}
-			return nil
-		},
+	reverseAnimeUpdater.UpdateTargetBySourceFunc = func(ctx context.Context, id syncer.TargetID, src syncer.Source) error {
+		sa, ok := src.(*sourceAdapter)
+		if !ok {
+			return fmt.Errorf("source is not an adapter")
+		}
+		a, ok := sa.s.(Anime)
+		if !ok {
+			return fmt.Errorf("source is not an anime")
+		}
+		if err := anilistClient.UpdateAnimeEntry(
+			ctx,
+			int(id),
+			a.Status.GetAnilistStatus(),
+			a.Progress,
+			int(a.Score),
+			"MAL to AniList Anime"); err != nil {
+			return fmt.Errorf("error updating anilist anime: %w", err)
+		}
+		return nil
 	}
 
-	reverseMangaUpdater := &Updater{
-		Prefix:       "MAL to AniList Manga",
-		Statistics:   new(Statistics),
-		IgnoreTitles: map[string]struct{}{},
-		StrategyChain: NewStrategyChain(
-			IDStrategy{},
-			TitleStrategy{},
-			APISearchStrategy{
-				GetTargetByIDFunc: func(ctx context.Context, id TargetID) (Target, error) {
+	reverseMangaUpdater := syncer.NewUpdater(
+		"MAL to AniList Manga",
+		new(syncer.Statistics),
+		map[string]struct{}{},
+		syncer.NewStrategyChain(
+			syncer.IDStrategy{},
+			syncer.TitleStrategy{},
+			syncer.APISearchStrategy{
+				GetTargetByIDFunc: func(ctx context.Context, id syncer.TargetID) (syncer.Target, error) {
 					resp, err := anilistClient.GetMangaByID(ctx, int(id), "MAL to AniList Manga")
 					if err != nil {
 						return nil, fmt.Errorf("error getting anilist manga by id: %w", err)
@@ -194,35 +216,39 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 					if err != nil {
 						return nil, fmt.Errorf("error creating manga from anilist media: %w", err)
 					}
-					return manga, nil
+					return &targetAdapter{t: manga}, nil
 				},
-				GetTargetsByNameFunc: func(ctx context.Context, name string) ([]Target, error) {
+				GetTargetsByNameFunc: func(ctx context.Context, name string) ([]syncer.Target, error) {
 					resp, err := anilistClient.GetMangasByName(ctx, name, "MAL to AniList Manga")
 					if err != nil {
 						return nil, fmt.Errorf("error getting anilist manga by name: %w", err)
 					}
-					return newTargetsFromMangas(newMangasFromVerniyMedias(resp)), nil
+					return wrapTargets(newTargetsFromMangas(newMangasFromVerniyMedias(resp))), nil
 				},
 			},
 		),
+	)
 
-		UpdateTargetBySourceFunc: func(ctx context.Context, id TargetID, src Source) error {
-			m, ok := src.(Manga)
-			if !ok {
-				return fmt.Errorf("source is not a manga")
-			}
-			if err := anilistClient.UpdateMangaEntry(
-				ctx,
-				int(id),
-				m.Status.GetAnilistStatus(),
-				m.Progress,
-				m.ProgressVolumes,
-				int(m.Score),
-				"MAL to AniList Manga"); err != nil {
-				return fmt.Errorf("error updating anilist manga: %w", err)
-			}
-			return nil
-		},
+	reverseMangaUpdater.UpdateTargetBySourceFunc = func(ctx context.Context, id syncer.TargetID, src syncer.Source) error {
+		sa, ok := src.(*sourceAdapter)
+		if !ok {
+			return fmt.Errorf("source is not an adapter")
+		}
+		m, ok := sa.s.(Manga)
+		if !ok {
+			return fmt.Errorf("source is not a manga")
+		}
+		if err := anilistClient.UpdateMangaEntry(
+			ctx,
+			int(id),
+			m.Status.GetAnilistStatus(),
+			m.Progress,
+			m.ProgressVolumes,
+			int(m.Score),
+			"MAL to AniList Manga"); err != nil {
+			return fmt.Errorf("error updating anilist manga: %w", err)
+		}
+		return nil
 	}
 
 	return &App{
@@ -296,7 +322,7 @@ func (a *App) reverseSyncManga(ctx context.Context) error {
 }
 
 // performSync is a generic sync function that handles both anime and manga syncing
-func (a *App) performSync(ctx context.Context, mediaType string, reverse bool, updater *Updater) error {
+func (a *App) performSync(ctx context.Context, mediaType string, reverse bool, updater *syncer.Updater) error {
 	var srcs []Source
 	var tgts []Target
 	var err error
@@ -313,7 +339,7 @@ func (a *App) performSync(ctx context.Context, mediaType string, reverse bool, u
 		return err
 	}
 
-	updater.Update(ctx, srcs, tgts)
+	updater.Update(ctx, wrapSources(srcs), wrapTargets(tgts))
 	updater.Statistics.Print(updater.Prefix)
 
 	return nil
@@ -431,4 +457,88 @@ func (a *App) fetchNormalSyncData(ctx context.Context, mediaType string, prefix 
 // fetchReverseSyncData fetches data for MAL -> AniList sync
 func (a *App) fetchReverseSyncData(ctx context.Context, mediaType string, prefix string) ([]Source, []Target, error) {
 	return a.fetchData(ctx, mediaType, false, prefix)
+}
+
+// Adapters to bridge root Source/Target to syncer.Source/syncer.Target
+
+type targetAdapter struct {
+	t Target
+}
+
+func (ta *targetAdapter) GetTargetID() syncer.TargetID {
+	return syncer.TargetID(ta.t.GetTargetID())
+}
+
+func (ta *targetAdapter) GetTitle() string {
+	return ta.t.GetTitle()
+}
+
+func (ta *targetAdapter) String() string {
+	return ta.t.String()
+}
+
+type sourceAdapter struct {
+	s Source
+}
+
+func (sa *sourceAdapter) GetStatusString() string {
+	return sa.s.GetStatusString()
+}
+
+func (sa *sourceAdapter) GetTargetID() syncer.TargetID {
+	return syncer.TargetID(sa.s.GetTargetID())
+}
+
+func (sa *sourceAdapter) GetTitle() string {
+	return sa.s.GetTitle()
+}
+
+func (sa *sourceAdapter) GetStringDiffWithTarget(t syncer.Target) string {
+	// try to unwrap targetAdapter
+	if ta, ok := t.(*targetAdapter); ok {
+		return sa.s.GetStringDiffWithTarget(ta.t)
+	}
+	// fallback: best-effort string compare
+	return sa.s.GetStringDiffWithTarget(nil)
+}
+
+func (sa *sourceAdapter) SameProgressWithTarget(t syncer.Target) bool {
+	if ta, ok := t.(*targetAdapter); ok {
+		return sa.s.SameProgressWithTarget(ta.t)
+	}
+	return false
+}
+
+func (sa *sourceAdapter) SameTypeWithTarget(t syncer.Target) bool {
+	if ta, ok := t.(*targetAdapter); ok {
+		return sa.s.SameTypeWithTarget(ta.t)
+	}
+	return false
+}
+
+func (sa *sourceAdapter) SameTitleWithTarget(t syncer.Target) bool {
+	if ta, ok := t.(*targetAdapter); ok {
+		return sa.s.SameTitleWithTarget(ta.t)
+	}
+	return false
+}
+
+func (sa *sourceAdapter) String() string {
+	return sa.s.String()
+}
+
+func wrapTargets(ts []Target) []syncer.Target {
+	res := make([]syncer.Target, len(ts))
+	for i, t := range ts {
+		res[i] = &targetAdapter{t: t}
+	}
+	return res
+}
+
+func wrapSources(ss []Source) []syncer.Source {
+	res := make([]syncer.Source, len(ss))
+	for i, s := range ss {
+		res[i] = &sourceAdapter{s: s}
+	}
+	return res
 }

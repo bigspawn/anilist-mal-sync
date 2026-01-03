@@ -101,6 +101,23 @@ func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts ma
 	}
 
 	if *dryRun { // skip update if dry run
+		// Show normalized score in dry-run for visibility
+		switch s := src.(type) {
+		case Anime:
+			if EnableScoreNormalization {
+				n := normalizeScoreForMAL(s.Score)
+				log.Printf("[%s] Dry run: would normalize score %v -> %d for %s", u.Prefix, s.Score, n, s.GetTitle())
+			} else {
+				log.Printf("[%s] Dry run: would send score %v for %s (normalization disabled)", u.Prefix, s.Score, s.GetTitle())
+			}
+		case Manga:
+			if EnableScoreNormalization {
+				n := normalizeScoreForMAL(s.Score)
+				log.Printf("[%s] Dry run: would normalize score %v -> %d for %s", u.Prefix, s.Score, n, s.GetTitle())
+			} else {
+				log.Printf("[%s] Dry run: would send score %v for %s (normalization disabled)", u.Prefix, s.Score, s.GetTitle())
+			}
+		}
 		log.Printf("[%s] Dry run: Skipping update for %s", u.Prefix, src.GetTitle())
 		return
 	}

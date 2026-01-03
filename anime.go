@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"reflect"
 	"sort"
 	"strings"
@@ -185,9 +186,16 @@ func (a Anime) GetUpdateOptions() []mal.UpdateMyAnimeListStatusOption {
 		return nil
 	}
 
+	var scoreOption mal.Score
+	if EnableScoreNormalization {
+		scoreOption = normalizeScoreForMAL(a.Score)
+	} else {
+		scoreOption = mal.Score(int(math.Round(a.Score)))
+	}
+
 	opts := []mal.UpdateMyAnimeListStatusOption{
 		st,
-		mal.Score(a.Score),
+		scoreOption,
 		mal.NumEpisodesWatched(a.Progress),
 	}
 

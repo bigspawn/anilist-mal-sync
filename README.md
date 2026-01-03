@@ -159,6 +159,19 @@ docker-compose up
 
 Note: When running in Docker, the browser authentication flow requires that port 18080 is exposed and accessible from your host machine. Also ensure that your token storage directory is mounted as a volume to preserve authentication between runs.
 
+## Vendor
+
+This repository vendors third-party dependencies in the `vendor/` directory so the project can be built in offline or restricted environments (for example, some Unraid setups).
+
+To update vendored dependencies locally:
+
+```bash
+go mod tidy
+go mod vendor
+```
+
+If you update dependencies, commit the `vendor/` changes. CI validates that `vendor/` is in sync with `go.mod`.
+
 ## Disclaimer
 
 This project is not affiliated with AniList or MyAnimeList. Use at your own risk.

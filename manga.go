@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -205,9 +206,16 @@ func (m Manga) GetUpdateOptions() []mal.UpdateMyMangaListStatusOption {
 		return nil
 	}
 
+	var scoreOption mal.Score
+	if EnableScoreNormalization {
+		scoreOption = normalizeScoreForMAL(m.Score)
+	} else {
+		scoreOption = mal.Score(int(math.Round(m.Score)))
+	}
+
 	opts := []mal.UpdateMyMangaListStatusOption{
 		st,
-		mal.Score(m.Score),
+		scoreOption,
 		mal.NumChaptersRead(m.Progress),
 		mal.NumVolumesRead(m.ProgressVolumes),
 	}

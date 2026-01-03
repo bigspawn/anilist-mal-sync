@@ -4,7 +4,12 @@ import (
 	"math"
 	"regexp"
 	"strings"
+
+	"github.com/nstratos/go-myanimelist/mal"
 )
+
+// EnableScoreNormalization controls whether AniList scores are normalized to MAL scale.
+var EnableScoreNormalization = true
 
 // levenshteinDistance calculates the Levenshtein distance between two strings
 func levenshteinDistance(s1, s2 string) int {
@@ -145,6 +150,31 @@ func titleLevenshteinSimilarity(title1, title2 string) float64 {
 	}
 
 	return similarity
+}
+
+// normalizeScoreForMAL converts AniList scores to MAL 0-10 integer scores.
+// - If score <= 0 -> 0
+// - If score > 10 (e.g. 100-point scale) -> divide by 10 and round
+// - Otherwise round to nearest integer
+func normalizeScoreForMAL(score float64) mal.Score {
+	if score <= 0 {
+		return mal.Score(0)
+	}
+
+	s := score
+	if s > 10 {
+		s /= 10.0
+	}
+
+	// Clamp to 0..10 then round
+	if s < 0 {
+		s = 0
+	}
+	if s > 10 {
+		s = 10
+	}
+
+	return mal.Score(int(math.Round(s)))
 }
 
 // titleMatchingLevels performs multi-level title matching

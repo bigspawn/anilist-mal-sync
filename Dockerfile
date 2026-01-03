@@ -1,3 +1,22 @@
+FROM golang:1.22-alpine AS build
+WORKDIR /src
+
+# install git for `go get` if needed and ca-certificates
+RUN apk add --no-cache git ca-certificates
+
+COPY go.mod go.sum ./
+RUN go env -w GOPROXY=https://proxy.golang.org,direct
+RUN go mod download
+
+COPY . .
+
+RUN CGO_ENABLED=0 GOOS=linux go build -o /out/anilist-mal-sync ./...
+
+FROM alpine:3.18
+RUN apk add --no-cache ca-certificates
+COPY --from=build /out/anilist-mal-sync /usr/local/bin/anilist-mal-sync
+USER 65532:65532
+ENTRYPOINT ["/usr/local/bin/anilist-mal-sync"]
 FROM golang:1.23-alpine AS builder
 
 RUN apk --no-cache add ca-certificates tzdata git

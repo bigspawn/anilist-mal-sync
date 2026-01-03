@@ -1,0 +1,38 @@
+name: Vendor Check
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  vendor-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
+
+      - name: Ensure modules tidy
+        run: |
+          go mod tidy
+
+      - name: Regenerate vendor
+        run: |
+          go mod vendor
+
+      - name: Check for vendor changes
+        run: |
+          if [ -n "$(git status --porcelain vendor)" ]; then
+            echo "vendor/ is out of sync with go.mod; run 'go mod vendor' and commit the changes.";
+            git --no-pager diff -- vendor || true
+            exit 1
+          fi
+        shell: bash

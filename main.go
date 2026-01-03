@@ -33,7 +33,7 @@ func main() {
 		log.Fatalf("error: %v", err)
 	}
 
-	app, err := NewApp(ctx, config)
+	app, err := NewApp(ctx, config, *forceSync, *dryRun, *verbose)
 	if err != nil {
 		cancel()
 		log.Fatalf("create app: %v", err)
