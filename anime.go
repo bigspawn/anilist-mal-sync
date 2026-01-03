@@ -70,18 +70,18 @@ func (s Status) GetAnilistStatus() string {
 }
 
 type Anime struct {
-	NumEpisodes     int
-	IDAnilist       int
-	IDMal           int
-	Progress        int
-	Score           float64
-	SeasonYear      int
-	Status          Status
-	TitleEN         string
-	TitleJP         string
-	TitleRomaji     string
-	StartedAt       *time.Time
-	FinishedAt      *time.Time
+	NumEpisodes      int
+	IDAnilist        int
+	IDMal            int
+	Progress         int
+	Score            float64
+	SeasonYear       int
+	Status           Status
+	TitleEN          string
+	TitleJP          string
+	TitleRomaji      string
+	StartedAt        *time.Time
+	FinishedAt       *time.Time
 	reverseDirection bool // true when syncing MAL -> AniList
 }
 

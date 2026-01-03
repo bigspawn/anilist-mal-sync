@@ -12,12 +12,11 @@ func isNil(v any) bool {
 		return true
 	}
 	rv := reflect.ValueOf(v)
-	switch rv.Kind() {
-	case reflect.Ptr, reflect.Interface, reflect.Slice, reflect.Map, reflect.Chan, reflect.Func:
+	k := rv.Kind()
+	if k == reflect.Ptr || k == reflect.Interface || k == reflect.Slice || k == reflect.Map || k == reflect.Chan || k == reflect.Func {
 		return rv.IsNil()
-	default:
-		return false
 	}
+	return false
 }
 
 // safeUnwrapSourceAdapter safely unwraps a sourceAdapter, returning the underlying Source and true if successful.

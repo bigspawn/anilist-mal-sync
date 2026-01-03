@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"golang.org/x/oauth2"
 )
@@ -143,7 +144,26 @@ func (oauth *OAuth) saveTokenToFile() error {
 }
 
 func readTokenFile(tokenFilePath string) (*TokenFile, error) {
-	file, err := os.Open(tokenFilePath)
+	// Clean and resolve the path before opening to avoid potential path-injection issues.
+	cleaned := filepath.Clean(tokenFilePath)
+	abs, err := filepath.Abs(cleaned)
+	if err != nil {
+		return nil, fmt.Errorf("invalid token file path: %w", err)
+	}
+
+	// Ensure token file resides under the user's config directory. Use
+	// cleaned absolute prefixes to make the check explicit for static
+	// analysis tools.
+	if uconf, uerr := os.UserConfigDir(); uerr == nil {
+		uconfClean := filepath.Clean(uconf)
+		absClean := filepath.Clean(abs)
+		sep := string(os.PathSeparator)
+		if absClean != uconfClean && !strings.HasPrefix(absClean, uconfClean+sep) {
+			return nil, fmt.Errorf("token file path %s is outside the user config directory %s", abs, uconf)
+		}
+	}
+
+	file, err := os.Open(abs)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return NewTokenFile(), nil
@@ -167,7 +187,26 @@ func readTokenFile(tokenFilePath string) (*TokenFile, error) {
 
 func writeTokenFile(tokenFilePath string, tokenFile *TokenFile) error {
 	// create file with restrictive permissions (0600) where possible
-	file, err := os.OpenFile(tokenFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, TokenFilePerms)
+	// Clean and resolve the path before creating/writing to avoid potential path-injection issues.
+	cleaned := filepath.Clean(tokenFilePath)
+	abs, err := filepath.Abs(cleaned)
+	if err != nil {
+		return fmt.Errorf("invalid token file path: %w", err)
+	}
+
+	// Ensure token file resides under the user's config directory. Use
+	// cleaned absolute prefixes to make the check explicit for static
+	// analysis tools.
+	if uconf, uerr := os.UserConfigDir(); uerr == nil {
+		uconfClean := filepath.Clean(uconf)
+		absClean := filepath.Clean(abs)
+		sep := string(os.PathSeparator)
+		if absClean != uconfClean && !strings.HasPrefix(absClean, uconfClean+sep) {
+			return fmt.Errorf("token file path %s is outside the user config directory %s", abs, uconf)
+		}
+	}
+
+	file, err := os.OpenFile(abs, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, TokenFilePerms)
 	if err != nil {
 		return fmt.Errorf("error creating token file: %w", err)
 	}
@@ -199,7 +238,9 @@ func startServer(ctx context.Context, oauth *OAuth, port string, done chan<- boo
 	mux := http.NewServeMux()
 	mux.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
 		// Use request context with timeout for request-scoped operations
-		reqCtx, cancel := context.WithTimeout(r.Context(), RequestTimeout)
+		// Derive a request-scoped context from the server's context so
+		// the handler's work is bounded by `startServer`'s lifecycle.
+		reqCtx, cancel := context.WithTimeout(ctx, RequestTimeout)
 		defer cancel()
 
 		// Validate state parameter for CSRF protection

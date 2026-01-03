@@ -1,3 +1,6 @@
+// Package main provides the command-line application to sync AniList and
+// MyAnimeList user lists. It contains clients, synchronization logic and
+// the CLI entrypoint.
 package main
 
 import (

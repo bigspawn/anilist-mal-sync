@@ -29,7 +29,6 @@ const (
 	DefaultOAuthPort          = "18080"
 	DefaultOAuthRedirectURI   = "http://localhost:18080/callback"
 	DefaultScoreNormalization = true
-	DefaultTokenFilePath      = "$HOME/.config/anilist-mal-sync/token.json"
 )
 
 // SyncDirection represents the direction of synchronization
@@ -75,11 +74,12 @@ func NewSyncOptions(
 ) SyncOptions {
 	// Determine media type
 	var mediaType MediaTypeOption
-	if allSync {
+	switch {
+	case allSync:
 		mediaType = MediaTypeBoth
-	} else if mangaSync {
+	case mangaSync:
 		mediaType = MediaTypeMangaOnly
-	} else {
+	default:
 		mediaType = MediaTypeAnimeOnly
 	}
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"strings"
 
 	"github.com/nstratos/go-myanimelist/mal"
 	"github.com/rl404/verniy"
@@ -51,8 +50,8 @@ func NewApp(ctx context.Context, config Config, forceSync bool, dryRun bool, ver
 
 	log.Println("Anilist client created")
 
-	ignoreAnimeTitles := buildIgnoreTitlesMap(config.GetIgnoreAnimeTitlesMap(), DefaultIgnoreAnimeTitles)
-	ignoreMangaTitles := buildIgnoreTitlesMap(config.GetIgnoreMangaTitlesMap(), DefaultIgnoreMangaTitles)
+	ignoreAnimeTitles := buildIgnoreTitlesMap(config.GetIgnoreAnimeTitlesMap())
+	ignoreMangaTitles := buildIgnoreTitlesMap(config.GetIgnoreMangaTitlesMap())
 
 	animeUpdater := NewUpdater(
 		UpdaterPrefixAnilistToMALAnime,
@@ -559,19 +558,13 @@ func (a *App) fetchMediaSyncData(ctx context.Context, prefix string, fromAnilist
 	return srcs, tgts, nil
 }
 
-// buildIgnoreTitlesMap builds an ignore titles map from config and defaults
-func buildIgnoreTitlesMap(configMap map[string]struct{}, defaults []string) map[string]struct{} {
+// buildIgnoreTitlesMap builds an ignore titles map from config
+func buildIgnoreTitlesMap(configMap map[string]struct{}) map[string]struct{} {
 	if len(configMap) > 0 {
 		return configMap
 	}
-	if len(defaults) == 0 {
-		return configMap
-	}
-	ignoreMap := make(map[string]struct{}, len(defaults))
-	for _, title := range defaults {
-		ignoreMap[strings.ToLower(title)] = struct{}{}
-	}
-	return ignoreMap
+	// No defaults anymore — return an empty map instead of using defaults
+	return map[string]struct{}{}
 }
 
 // Adapters bridge Source/Target interfaces for the sync system

@@ -40,7 +40,7 @@ func levenshteinDistance(s1, s2 string) int {
 			}
 
 			matrix[i][j] = min(
-				matrix[i-1][j]+1,      // deletion
+				matrix[i-1][j]+1, // deletion
 				min(
 					matrix[i][j-1]+1,      // insertion
 					matrix[i-1][j-1]+cost, // substitution

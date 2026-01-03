@@ -242,7 +242,7 @@ type IDStrategy struct{}
 
 func (s IDStrategy) Name() string { return "IDStrategy" }
 
-func (s IDStrategy) FindTarget(_ context.Context, src Source, existingTargets map[TargetID]Target, prefix string) (Target, bool, error) {
+func (s IDStrategy) FindTarget(_ context.Context, src Source, existingTargets map[TargetID]Target, _ string) (Target, bool, error) {
 	target, found := existingTargets[src.GetTargetID()]
 	// Only return found=true if target is not nil
 	return target, found && !isNil(target), nil
@@ -310,7 +310,7 @@ type APISearchStrategy struct {
 
 func (s APISearchStrategy) Name() string { return "APISearchStrategy" }
 
-func (s APISearchStrategy) FindTarget(ctx context.Context, src Source, existingTargets map[TargetID]Target, prefix string) (Target, bool, error) {
+func (s APISearchStrategy) FindTarget(ctx context.Context, src Source, existingTargets map[TargetID]Target, _ string) (Target, bool, error) {
 	select {
 	case <-ctx.Done():
 		return nil, false, fmt.Errorf("context cancelled during API search")
