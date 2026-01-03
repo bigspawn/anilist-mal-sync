@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
@@ -34,23 +35,23 @@ type Config struct {
 func Load(filename string) (Config, error) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
-		return Config{}, err
+		return Config{}, fmt.Errorf("failed to read config file %q: %w", filename, err)
 	}
 
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return Config{}, err
+		return Config{}, fmt.Errorf("failed to parse config file %q: %w", filename, err)
 	}
 
-	if port := os.Getenv("PORT"); port != "" {
+	if port := os.Getenv(EnvVarPort); port != "" {
 		cfg.OAuth.Port = port
 	}
 
-	if clientSecret := os.Getenv("CLIENT_SECRET_ANILIST"); clientSecret != "" {
+	if clientSecret := os.Getenv(EnvVarClientSecretAnilist); clientSecret != "" {
 		cfg.Anilist.ClientSecret = clientSecret
 	}
 
-	if clientSecret := os.Getenv("CLIENT_SECRET_MYANIMELIST"); clientSecret != "" {
+	if clientSecret := os.Getenv(EnvVarClientSecretMyAnimeList); clientSecret != "" {
 		cfg.MyAnimeList.ClientSecret = clientSecret
 	}
 

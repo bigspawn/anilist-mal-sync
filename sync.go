@@ -26,8 +26,14 @@ func (s *Statistics) Reset() {
 	s.TotalCount = 0
 }
 
+// Print prints statistics with the given prefix for logging context
 func (s Statistics) Print(prefix string) {
-	log.Printf("[%s] Updated %d out of %d", prefix, s.UpdatedCount, s.TotalCount)
+	if s.TotalCount > 0 {
+		updatedPct := float64(s.UpdatedCount) / float64(s.TotalCount) * PercentMultiplier
+		log.Printf("[%s] Updated %d out of %d (%.1f%%)", prefix, s.UpdatedCount, s.TotalCount, updatedPct)
+	} else {
+		log.Printf("[%s] Updated %d out of %d", prefix, s.UpdatedCount, s.TotalCount)
+	}
 	log.Printf("[%s] Skipped %d (already in sync)", prefix, s.SkippedCount)
 	if s.NotFoundCount > 0 {
 		log.Printf("[%s] Not found %d (could not match in target service)", prefix, s.NotFoundCount)
@@ -80,7 +86,16 @@ func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target) {
 
 	tgtsByID := make(map[TargetID]Target, len(tgts))
 	for _, tgt := range tgts {
-		tgtsByID[tgt.GetTargetID()] = tgt
+		if isNil(tgt) {
+			u.DPrintf("[%s] Warning: Skipping nil target", u.Prefix)
+			continue
+		}
+		tgtID := tgt.GetTargetID()
+		if existing, exists := tgtsByID[tgtID]; exists {
+			// Log warning if duplicate IDs detected (shouldn't happen in practice)
+			u.DPrintf("[%s] Warning: Duplicate target ID %d detected. Overwriting: %s -> %s", u.Prefix, tgtID, existing.GetTitle(), tgt.GetTitle())
+		}
+		tgtsByID[tgtID] = tgt
 	}
 
 	var statusStr string
@@ -90,6 +105,11 @@ func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target) {
 			log.Printf("[%s] Context cancelled, stopping sync", u.Prefix)
 			return
 		default:
+		}
+
+		if isNil(src) {
+			u.DPrintf("[%s] Warning: Skipping nil source", u.Prefix)
+			continue
 		}
 
 		if src.GetStatusString() == "" {
@@ -106,12 +126,11 @@ func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target) {
 
 		u.DPrintf("[%s] Processing for: %s", u.Prefix, src.String())
 
-		if u.IgnoreTitles != nil {
-			if _, ok := u.IgnoreTitles[strings.ToLower(src.GetTitle())]; ok {
-				log.Printf("[%s] Ignoring entry: %s", u.Prefix, src.GetTitle())
-				u.Statistics.SkippedCount++
-				continue
-			}
+		// Check if title should be ignored (nil map check is unnecessary - map access returns zero value)
+		if _, ok := u.IgnoreTitles[strings.ToLower(src.GetTitle())]; ok {
+			log.Printf("[%s] Ignoring entry: %s", u.Prefix, src.GetTitle())
+			u.Statistics.SkippedCount++
+			continue
 		}
 
 		u.updateSourceByTargets(ctx, src, tgtsByID)
@@ -130,6 +149,12 @@ func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts ma
 		tgt, err := u.StrategyChain.FindTarget(ctx, src, tgts, u.Prefix)
 		if err != nil {
 			log.Printf("[%s] Error finding target: %v", u.Prefix, err)
+			u.Statistics.NotFoundCount++
+			return
+		}
+
+		if isNil(tgt) {
+			log.Printf("[%s] Error: FindTarget returned nil target for source: %s", u.Prefix, src.GetTitle())
 			u.Statistics.NotFoundCount++
 			return
 		}
@@ -205,7 +230,7 @@ func (sc *StrategyChain) FindTarget(ctx context.Context, src Source, existingTar
 		if err != nil {
 			return nil, fmt.Errorf("strategy %s failed: %w", strategy.Name(), err)
 		}
-		if found {
+		if found && !isNil(target) {
 			return target, nil
 		}
 	}
@@ -219,7 +244,8 @@ func (s IDStrategy) Name() string { return "IDStrategy" }
 
 func (s IDStrategy) FindTarget(_ context.Context, src Source, existingTargets map[TargetID]Target, prefix string) (Target, bool, error) {
 	target, found := existingTargets[src.GetTargetID()]
-	return target, found, nil
+	// Only return found=true if target is not nil
+	return target, found && !isNil(target), nil
 }
 
 // TitleStrategy finds targets by matching titles
@@ -229,19 +255,37 @@ func (s TitleStrategy) Name() string { return "TitleStrategy" }
 
 func (s TitleStrategy) FindTarget(_ context.Context, src Source, existingTargets map[TargetID]Target, prefix string) (Target, bool, error) {
 	srcTitle := src.GetTitle()
+	if srcTitle == "" {
+		// Early return if source title is empty - no point searching
+		return nil, false, nil
+	}
 
 	targetSlice := make([]Target, 0, len(existingTargets))
 	for _, target := range existingTargets {
-		targetSlice = append(targetSlice, target)
+		if !isNil(target) {
+			targetSlice = append(targetSlice, target)
+		}
+	}
+
+	if len(targetSlice) == 0 {
+		return nil, false, nil
 	}
 
 	sort.Slice(targetSlice, func(i, j int) bool {
 		return targetSlice[i].GetTitle() < targetSlice[j].GetTitle()
 	})
 
-	byTitle := map[string]Target{}
+	// Pre-allocate map with capacity estimate to reduce reallocations
+	byTitle := make(map[string]Target, len(targetSlice))
 	for _, target := range targetSlice {
-		byTitle[target.GetTitle()] = target
+		title := target.GetTitle()
+		if existing, exists := byTitle[title]; exists {
+			// Log warning if duplicate titles detected (will fall back to fuzzy matching)
+			// This is less critical than duplicate IDs since we have fallback logic
+			// Note: Using log.Printf instead of DPrintf since TitleStrategy doesn't have access to Updater
+			log.Printf("[%s] Warning: Duplicate title '%s' detected. Exact match may be ambiguous: %s -> %s", prefix, title, existing.GetTitle(), target.GetTitle())
+		}
+		byTitle[title] = target
 	}
 
 	if target, ok := byTitle[srcTitle]; ok {
@@ -282,6 +326,11 @@ func (s APISearchStrategy) FindTarget(ctx context.Context, src Source, existingT
 			return nil, false, fmt.Errorf("error getting target by ID %d: %w", tgtID, err)
 		}
 
+		if isNil(target) {
+			// Function returned nil target - treat as not found
+			return nil, false, nil
+		}
+
 		if existingTarget, exists := existingTargets[tgtID]; exists {
 			return existingTarget, true, nil
 		}
@@ -297,12 +346,12 @@ func (s APISearchStrategy) FindTarget(ctx context.Context, src Source, existingT
 			if err == nil && len(targets) > 0 {
 				// Match by title to ensure correctness
 				for _, target := range targets {
-					if src.SameTitleWithTarget(target) && src.SameTypeWithTarget(target) {
+					if !isNil(target) && src.SameTitleWithTarget(target) && src.SameTypeWithTarget(target) {
 						return target, true, nil
 					}
 				}
 				// Single result from MAL ID search is usually reliable
-				if len(targets) == 1 {
+				if len(targets) == 1 && !isNil(targets[0]) {
 					return targets[0], true, nil
 				}
 			}
@@ -313,9 +362,14 @@ func (s APISearchStrategy) FindTarget(ctx context.Context, src Source, existingT
 	if s.GetTargetsByNameFunc == nil {
 		return nil, false, fmt.Errorf("GetTargetsByNameFunc is not set")
 	}
-	targets, err := s.GetTargetsByNameFunc(ctx, src.GetTitle())
+	srcTitle := src.GetTitle()
+	if srcTitle == "" {
+		// Skip search if title is empty - would be wasteful and unlikely to find matches
+		return nil, false, nil
+	}
+	targets, err := s.GetTargetsByNameFunc(ctx, srcTitle)
 	if err != nil {
-		return nil, false, fmt.Errorf("error searching targets by name '%s': %w", src.GetTitle(), err)
+		return nil, false, fmt.Errorf("error searching targets by name '%s': %w", srcTitle, err)
 	}
 
 	if len(targets) == 0 {
@@ -323,6 +377,11 @@ func (s APISearchStrategy) FindTarget(ctx context.Context, src Source, existingT
 	}
 
 	for _, tgt := range targets {
+		if isNil(tgt) {
+			continue
+		}
+
+		// Prefer existing target if available (has more complete data)
 		if existingTarget, exists := existingTargets[tgt.GetTargetID()]; exists {
 			tgt = existingTarget
 		}
@@ -337,11 +396,11 @@ func (s APISearchStrategy) FindTarget(ctx context.Context, src Source, existingT
 
 // extractMALIDFromSource extracts the MAL ID from a Source for reverse sync
 func extractMALIDFromSource(src Source) int {
-	if sa, ok := src.(*sourceAdapter); ok {
-		if anime, ok := sa.s.(Anime); ok {
+	if unwrapped, ok := safeUnwrapSourceAdapter(src); ok {
+		if anime, ok := unwrapped.(Anime); ok {
 			return anime.IDMal
 		}
-		if manga, ok := sa.s.(Manga); ok {
+		if manga, ok := unwrapped.(Manga); ok {
 			return manga.IDMal
 		}
 	}

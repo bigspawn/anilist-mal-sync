@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"time"
 
 	"golang.org/x/oauth2"
 )
@@ -88,7 +87,7 @@ func (oauth *OAuth) ExchangeToken(ctx context.Context, code string) error {
 }
 
 func (oauth *OAuth) TokenSource() oauth2.TokenSource {
-	return oauth2.ReuseTokenSourceWithExpiry(oauth.token, oauth, 24*time.Hour)
+	return oauth2.ReuseTokenSourceWithExpiry(oauth.token, oauth, TokenExpiryDuration)
 }
 
 // Token refreshes the OAuth token. Called by oauth2.ReuseTokenSource which doesn't
@@ -157,13 +156,13 @@ func readTokenFile(tokenFilePath string) (*TokenFile, error) {
 		}
 	}()
 
-	tokenFile := NewTokenFile()
-	err = json.NewDecoder(file).Decode(tokenFile)
+	var tokenFile TokenFile
+	err = json.NewDecoder(file).Decode(&tokenFile)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding token file: %w", err)
 	}
 
-	return tokenFile, nil
+	return &tokenFile, nil
 }
 
 func writeTokenFile(tokenFilePath string, tokenFile *TokenFile) error {
@@ -183,25 +182,24 @@ func writeTokenFile(tokenFilePath string, tokenFile *TokenFile) error {
 
 func shutdownServer(ctx context.Context, server *http.Server) {
 	log.Println("Shutting down server...")
-	shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(ctx, ServerShutdownTimeout)
+	defer cancel() // Always cancel the context when function returns
 	if err := server.Shutdown(shutdownCtx); err != nil {
-		cancel()
 		log.Printf("Error shutting down server: %v", err)
 	}
-	cancel()
 	log.Println("Server shut down")
 }
 
 func startServer(ctx context.Context, oauth *OAuth, port string, done chan<- bool) {
 	server := &http.Server{
 		Addr:              ":" + port,
-		ReadHeaderTimeout: 10 * time.Second,
+		ReadHeaderTimeout: ReadHeaderTimeout,
 	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
 		// Use request context with timeout for request-scoped operations
-		reqCtx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		reqCtx, cancel := context.WithTimeout(r.Context(), RequestTimeout)
 		defer cancel()
 
 		// Validate state parameter for CSRF protection
@@ -230,9 +228,9 @@ func startServer(ctx context.Context, oauth *OAuth, port string, done chan<- boo
 			w.Header().Set("Content-Type", "text/html")
 			w.WriteHeader(http.StatusOK)
 
-			_, e := w.Write([]byte(`<html><body>Authorization successful. You can close this window.<br><script>window.close();</script></body></html>`))
-			if e != nil {
-				log.Printf("Error writing response: %v", e)
+			_, err := w.Write([]byte(`<html><body>Authorization successful. You can close this window.<br><script>window.close();</script></body></html>`))
+			if err != nil {
+				log.Printf("Error writing response: %v", err)
 			}
 
 			done <- true

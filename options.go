@@ -21,7 +21,7 @@ const (
 	DefaultMangaSync  = false
 	DefaultAllSync    = false
 	DefaultVerbose    = false
-	DefaultDirection  = "anilist-to-mal"
+	DefaultDirection  = DirectionAnilistToMAL
 )
 
 // Default values for config file options
@@ -85,14 +85,14 @@ func NewSyncOptions(
 
 	var direction SyncDirection
 	switch directionFlag {
-	case "mal-to-anilist":
+	case DirectionMALToAnilist:
 		direction = SyncDirectionMALToAnilist
-	case "both":
+	case DirectionBoth:
 		direction = SyncDirectionBidirectional
-	case "anilist-to-mal", "":
+	case DirectionAnilistToMAL, "":
 		direction = SyncDirectionAnilistToMAL
 	default:
-		log.Printf("Warning: Invalid direction '%s', defaulting to 'anilist-to-mal'. Valid options: 'anilist-to-mal', 'mal-to-anilist', 'both'", directionFlag)
+		log.Printf("Warning: Invalid direction '%s', defaulting to '%s'. Valid options: '%s', '%s', '%s'", directionFlag, DirectionAnilistToMAL, DirectionAnilistToMAL, DirectionMALToAnilist, DirectionBoth)
 		direction = SyncDirectionAnilistToMAL
 	}
 

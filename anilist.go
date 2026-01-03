@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"strings"
 	"time"
 
@@ -13,6 +14,41 @@ import (
 	"golang.org/x/oauth2"
 )
 
+const (
+	// GraphQL mutation for updating anime entries
+	animeUpdateMutation = `
+            mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $score: Float) {
+                SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, score: $score) {
+                    id
+                    status
+                    progress
+                    score
+                }
+            }
+        `
+	// GraphQL mutation for updating manga entries
+	mangaUpdateMutation = `
+            mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $progressVolumes: Int, $score: Float) {
+                SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, progressVolumes: $progressVolumes, score: $score) {
+                    id
+                    status
+                    progress
+                    progressVolumes
+                    score
+                }
+            }
+        `
+)
+
+// graphQLResponse represents a GraphQL API response structure
+type graphQLResponse struct {
+	Data   json.RawMessage `json:"data"`
+	Errors []struct {
+		Message string `json:"message"`
+		Status  int    `json:"status"`
+	} `json:"errors"`
+}
+
 type AnilistClient struct {
 	c *verniy.Client
 
@@ -20,8 +56,13 @@ type AnilistClient struct {
 }
 
 func NewAnilistClient(ctx context.Context, oauth *OAuth, username string) *AnilistClient {
+	if oauth == nil {
+		// Defensive check - should never happen in normal flow
+		log.Printf("Warning: NewAnilistClient called with nil oauth")
+		return &AnilistClient{c: verniy.New(), username: username}
+	}
 	httpClient := oauth2.NewClient(ctx, oauth.TokenSource())
-	httpClient.Timeout = 10 * time.Minute
+	httpClient.Timeout = HTTPClientTimeout
 
 	v := verniy.New()
 	v.Http = *httpClient
@@ -110,17 +151,6 @@ func (c *AnilistClient) UpdateAnimeEntry(
 	ctx context.Context, mediaID int, status string, progress int, score int, prefix string,
 ) error {
 	return retryWithBackoff(ctx, func() error {
-		mutation := `
-            mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $score: Float) {
-                SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, score: $score) {
-                    id
-                    status
-                    progress
-                    score
-                }
-            }
-        `
-
 		variables := map[string]any{
 			"mediaId":  mediaID,
 			"status":   status,
@@ -129,7 +159,7 @@ func (c *AnilistClient) UpdateAnimeEntry(
 		}
 
 		requestBody := map[string]any{
-			"query":     mutation,
+			"query":     animeUpdateMutation,
 			"variables": variables,
 		}
 
@@ -143,17 +173,11 @@ func (c *AnilistClient) UpdateAnimeEntry(
 			return fmt.Errorf("failed to make HTTP request to AniList API: %w", err)
 		}
 
-		if code != 200 {
-			return fmt.Errorf("AniList API returned non-200 status code %d for anime update: %s", code, string(responseBody))
+		if code != http.StatusOK {
+			return fmt.Errorf("AniList API returned non-OK status code %d for anime update: %s", code, string(responseBody))
 		}
 
-		var graphqlResp struct {
-			Data   json.RawMessage `json:"data"`
-			Errors []struct {
-				Message string `json:"message"`
-				Status  int    `json:"status"`
-			} `json:"errors"`
-		}
+		var graphqlResp graphQLResponse
 		if err := json.Unmarshal(responseBody, &graphqlResp); err != nil {
 			return fmt.Errorf("failed to unmarshal GraphQL response from AniList API for anime update: %w", err)
 		}
@@ -176,18 +200,6 @@ func (c *AnilistClient) UpdateMangaEntry(
 	prefix string,
 ) error {
 	return retryWithBackoff(ctx, func() error {
-		mutation := `
-            mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $progressVolumes: Int, $score: Float) {
-                SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, progressVolumes: $progressVolumes, score: $score) {
-                    id
-                    status
-                    progress
-                    progressVolumes
-                    score
-                }
-            }
-        `
-
 		variables := map[string]any{
 			"mediaId":         mediaID,
 			"status":          status,
@@ -197,7 +209,7 @@ func (c *AnilistClient) UpdateMangaEntry(
 		}
 
 		requestBody := map[string]any{
-			"query":     mutation,
+			"query":     mangaUpdateMutation,
 			"variables": variables,
 		}
 
@@ -211,17 +223,11 @@ func (c *AnilistClient) UpdateMangaEntry(
 			return fmt.Errorf("failed to make HTTP request to AniList API: %w", err)
 		}
 
-		if code != 200 {
-			return fmt.Errorf("AniList API returned non-200 status code %d for manga update: %s", code, string(responseBody))
+		if code != http.StatusOK {
+			return fmt.Errorf("AniList API returned non-OK status code %d for manga update: %s", code, string(responseBody))
 		}
 
-		var graphqlResp struct {
-			Data   json.RawMessage `json:"data"`
-			Errors []struct {
-				Message string `json:"message"`
-				Status  int    `json:"status"`
-			} `json:"errors"`
-		}
+		var graphqlResp graphQLResponse
 		if err := json.Unmarshal(responseBody, &graphqlResp); err != nil {
 			return fmt.Errorf("failed to unmarshal GraphQL response from AniList API for manga update: %w", err)
 		}
@@ -398,11 +404,11 @@ func (c *AnilistClient) GetMangasByName(ctx context.Context, name string, prefix
 // createBackoffPolicy creates a configured exponential backoff policy for rate limiting
 func createBackoffPolicy() *backoff.ExponentialBackOff {
 	b := backoff.NewExponentialBackOff()
-	b.InitialInterval = 1 * time.Second
-	b.MaxInterval = 30 * time.Second
-	b.MaxElapsedTime = 2 * time.Minute
-	b.Multiplier = 2.0
-	b.RandomizationFactor = 0.1 // Add jitter
+	b.InitialInterval = BackoffInitialInterval
+	b.MaxInterval = BackoffMaxInterval
+	b.MaxElapsedTime = BackoffMaxElapsedTime
+	b.Multiplier = BackoffMultiplier
+	b.RandomizationFactor = BackoffRandomizationFactor
 	return b
 }
 
@@ -414,7 +420,8 @@ func isRateLimitError(err error) bool {
 	errStr := strings.ToLower(err.Error())
 	return strings.Contains(errStr, "too many requests") ||
 		strings.Contains(errStr, "rate limit") ||
-		strings.Contains(errStr, "429")
+		strings.Contains(errStr, "429") ||
+		strings.Contains(errStr, "rate_limit")
 }
 
 // retryWithBackoff wraps an operation with exponential backoff for rate limit handling
@@ -449,7 +456,7 @@ func NewAnilistOAuth(ctx context.Context, config Config) (*OAuth, error) {
 	oauthAnilist, err := NewOAuth(
 		config.Anilist,
 		config.OAuth.RedirectURI,
-		"anilist",
+		SiteNameAnilist,
 		[]oauth2.AuthCodeOption{},
 		config.TokenFilePath,
 	)

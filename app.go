@@ -51,24 +51,11 @@ func NewApp(ctx context.Context, config Config, forceSync bool, dryRun bool, ver
 
 	log.Println("Anilist client created")
 
-	ignoreAnimeTitles := config.GetIgnoreAnimeTitlesMap()
-	if len(ignoreAnimeTitles) == 0 {
-		ignoreAnimeTitles = make(map[string]struct{}, len(DefaultIgnoreAnimeTitles))
-		for _, title := range DefaultIgnoreAnimeTitles {
-			ignoreAnimeTitles[strings.ToLower(title)] = struct{}{}
-		}
-	}
-
-	ignoreMangaTitles := config.GetIgnoreMangaTitlesMap()
-	if len(ignoreMangaTitles) == 0 {
-		ignoreMangaTitles = make(map[string]struct{}, len(DefaultIgnoreMangaTitles))
-		for _, title := range DefaultIgnoreMangaTitles {
-			ignoreMangaTitles[strings.ToLower(title)] = struct{}{}
-		}
-	}
+	ignoreAnimeTitles := buildIgnoreTitlesMap(config.GetIgnoreAnimeTitlesMap(), DefaultIgnoreAnimeTitles)
+	ignoreMangaTitles := buildIgnoreTitlesMap(config.GetIgnoreMangaTitlesMap(), DefaultIgnoreMangaTitles)
 
 	animeUpdater := NewUpdater(
-		"AniList to MAL Anime",
+		UpdaterPrefixAnilistToMALAnime,
 		new(Statistics),
 		ignoreAnimeTitles,
 		NewStrategyChain(
@@ -80,7 +67,11 @@ func NewApp(ctx context.Context, config Config, forceSync bool, dryRun bool, ver
 					if err != nil {
 						return nil, fmt.Errorf("failed to get anime by ID %d from MAL: %w", id, err)
 					}
-					ani, err := newAnimeFromMalAnime(*resp, false)
+					malAnime, ok := safeDerefPtr(resp)
+					if !ok {
+						return nil, fmt.Errorf("GetAnimeByID returned nil for ID %d", id)
+					}
+					ani, err := newAnimeFromMalAnime(malAnime, false)
 					if err != nil {
 						return nil, fmt.Errorf("failed to convert MAL anime (ID: %d) to internal format: %w", id, err)
 					}
@@ -101,13 +92,13 @@ func NewApp(ctx context.Context, config Config, forceSync bool, dryRun bool, ver
 	)
 
 	animeUpdater.UpdateTargetBySourceFunc = func(ctx context.Context, id TargetID, src Source) error {
-		sa, ok := src.(*sourceAdapter)
+		unwrapped, ok := safeUnwrapSourceAdapter(src)
 		if !ok {
-			return fmt.Errorf("internal error: source is not a sourceAdapter (type: %T)", src)
+			return fmt.Errorf("internal error: failed to unwrap sourceAdapter (type: %T)", src)
 		}
-		a, ok := sa.s.(Anime)
+		a, ok := unwrapped.(Anime)
 		if !ok {
-			return fmt.Errorf("internal error: source is not an Anime (type: %T)", sa.s)
+			return fmt.Errorf("internal error: source is not an Anime (type: %T)", unwrapped)
 		}
 		if err := malClient.UpdateAnimeByIDAndOptions(ctx, int(id), a.GetUpdateOptions()); err != nil {
 			return fmt.Errorf("failed to update anime (MAL ID: %d, title: %s): %w", id, a.GetTitle(), err)
@@ -116,7 +107,7 @@ func NewApp(ctx context.Context, config Config, forceSync bool, dryRun bool, ver
 	}
 
 	mangaUpdater := NewUpdater(
-		"AniList to MAL Manga",
+		UpdaterPrefixAnilistToMALManga,
 		new(Statistics),
 		ignoreMangaTitles,
 		NewStrategyChain(
@@ -128,7 +119,11 @@ func NewApp(ctx context.Context, config Config, forceSync bool, dryRun bool, ver
 					if err != nil {
 						return nil, fmt.Errorf("failed to get manga by ID %d from MAL: %w", id, err)
 					}
-					manga, err := newMangaFromMalManga(*resp, false)
+					malManga, ok := safeDerefPtr(resp)
+					if !ok {
+						return nil, fmt.Errorf("GetMangaByID returned nil for ID %d", id)
+					}
+					manga, err := newMangaFromMalManga(malManga, false)
 					if err != nil {
 						return nil, fmt.Errorf("failed to convert MAL manga (ID: %d) to internal format: %w", id, err)
 					}
@@ -149,13 +144,13 @@ func NewApp(ctx context.Context, config Config, forceSync bool, dryRun bool, ver
 	)
 
 	mangaUpdater.UpdateTargetBySourceFunc = func(ctx context.Context, id TargetID, src Source) error {
-		sa, ok := src.(*sourceAdapter)
+		unwrapped, ok := safeUnwrapSourceAdapter(src)
 		if !ok {
-			return fmt.Errorf("internal error: source is not a sourceAdapter (type: %T)", src)
+			return fmt.Errorf("internal error: failed to unwrap sourceAdapter (type: %T)", src)
 		}
-		m, ok := sa.s.(Manga)
+		m, ok := unwrapped.(Manga)
 		if !ok {
-			return fmt.Errorf("internal error: source is not a Manga (type: %T)", sa.s)
+			return fmt.Errorf("internal error: source is not a Manga (type: %T)", unwrapped)
 		}
 		if err := malClient.UpdateMangaByIDAndOptions(ctx, int(id), m.GetUpdateOptions()); err != nil {
 			return fmt.Errorf("failed to update manga (MAL ID: %d, title: %s): %w", id, m.GetTitle(), err)
@@ -165,7 +160,7 @@ func NewApp(ctx context.Context, config Config, forceSync bool, dryRun bool, ver
 
 	// Reverse updaters for MAL -> AniList sync
 	reverseAnimeUpdater := NewUpdater(
-		"MAL to AniList Anime",
+		UpdaterPrefixMALToAnilistAnime,
 		new(Statistics),
 		ignoreAnimeTitles,
 		NewStrategyChain(
@@ -173,25 +168,29 @@ func NewApp(ctx context.Context, config Config, forceSync bool, dryRun bool, ver
 			TitleStrategy{},
 			APISearchStrategy{
 				GetTargetByIDFunc: func(ctx context.Context, id TargetID) (Target, error) {
-					resp, err := anilistClient.GetAnimeByID(ctx, int(id), "MAL to AniList Anime")
+					resp, err := anilistClient.GetAnimeByID(ctx, int(id), UpdaterPrefixMALToAnilistAnime)
 					if err != nil {
 						return nil, fmt.Errorf("failed to get anime by ID %d from AniList: %w", id, err)
 					}
-					ani, err := newAnimeFromVerniyMedia(*resp, false)
+					verniyMedia, ok := safeDerefPtr(resp)
+					if !ok {
+						return nil, fmt.Errorf("GetAnimeByID returned nil for ID %d", id)
+					}
+					ani, err := newAnimeFromVerniyMedia(verniyMedia, false)
 					if err != nil {
 						return nil, fmt.Errorf("failed to convert AniList anime (ID: %d) to internal format: %w", id, err)
 					}
 					return &targetAdapter{t: ani}, nil
 				},
 				GetTargetsByMALIDFunc: func(ctx context.Context, malID int) ([]Target, error) {
-					resp, err := anilistClient.GetAnimesByMALID(ctx, malID, "MAL to AniList Anime")
+					resp, err := anilistClient.GetAnimesByMALID(ctx, malID, UpdaterPrefixMALToAnilistAnime)
 					if err != nil {
 						return nil, fmt.Errorf("failed to search anime by MAL ID %d in AniList: %w", malID, err)
 					}
 					return wrapTargets(newTargetsFromAnimes(newAnimesFromVerniyMedias(resp, false))), nil
 				},
 				GetTargetsByNameFunc: func(ctx context.Context, name string) ([]Target, error) {
-					resp, err := anilistClient.GetAnimesByName(ctx, name, "MAL to AniList Anime")
+					resp, err := anilistClient.GetAnimesByName(ctx, name, UpdaterPrefixMALToAnilistAnime)
 					if err != nil {
 						return nil, fmt.Errorf("failed to search anime by name '%s' in AniList: %w", name, err)
 					}
@@ -205,13 +204,13 @@ func NewApp(ctx context.Context, config Config, forceSync bool, dryRun bool, ver
 	)
 
 	reverseAnimeUpdater.UpdateTargetBySourceFunc = func(ctx context.Context, id TargetID, src Source) error {
-		sa, ok := src.(*sourceAdapter)
+		unwrapped, ok := safeUnwrapSourceAdapter(src)
 		if !ok {
-			return fmt.Errorf("internal error: source is not a sourceAdapter (type: %T)", src)
+			return fmt.Errorf("internal error: failed to unwrap sourceAdapter (type: %T)", src)
 		}
-		a, ok := sa.s.(Anime)
+		a, ok := unwrapped.(Anime)
 		if !ok {
-			return fmt.Errorf("internal error: source is not an Anime (type: %T)", sa.s)
+			return fmt.Errorf("internal error: source is not an Anime (type: %T)", unwrapped)
 		}
 		if err := anilistClient.UpdateAnimeEntry(
 			ctx,
@@ -219,14 +218,14 @@ func NewApp(ctx context.Context, config Config, forceSync bool, dryRun bool, ver
 			a.Status.GetAnilistStatus(),
 			a.Progress,
 			int(a.Score),
-			"MAL to AniList Anime"); err != nil {
+			UpdaterPrefixMALToAnilistAnime); err != nil {
 			return fmt.Errorf("failed to update anime (AniList ID: %d, title: %s): %w", id, a.GetTitle(), err)
 		}
 		return nil
 	}
 
 	reverseMangaUpdater := NewUpdater(
-		"MAL to AniList Manga",
+		UpdaterPrefixMALToAnilistManga,
 		new(Statistics),
 		ignoreMangaTitles,
 		NewStrategyChain(
@@ -234,25 +233,29 @@ func NewApp(ctx context.Context, config Config, forceSync bool, dryRun bool, ver
 			TitleStrategy{},
 			APISearchStrategy{
 				GetTargetByIDFunc: func(ctx context.Context, id TargetID) (Target, error) {
-					resp, err := anilistClient.GetMangaByID(ctx, int(id), "MAL to AniList Manga")
+					resp, err := anilistClient.GetMangaByID(ctx, int(id), UpdaterPrefixMALToAnilistManga)
 					if err != nil {
 						return nil, fmt.Errorf("failed to get manga by ID %d from AniList: %w", id, err)
 					}
-					manga, err := newMangaFromVerniyMedia(*resp, false)
+					verniyMedia, ok := safeDerefPtr(resp)
+					if !ok {
+						return nil, fmt.Errorf("GetMangaByID returned nil for ID %d", id)
+					}
+					manga, err := newMangaFromVerniyMedia(verniyMedia, false)
 					if err != nil {
 						return nil, fmt.Errorf("failed to convert AniList manga (ID: %d) to internal format: %w", id, err)
 					}
 					return &targetAdapter{t: manga}, nil
 				},
 				GetTargetsByMALIDFunc: func(ctx context.Context, malID int) ([]Target, error) {
-					resp, err := anilistClient.GetMangasByMALID(ctx, malID, "MAL to AniList Manga")
+					resp, err := anilistClient.GetMangasByMALID(ctx, malID, UpdaterPrefixMALToAnilistManga)
 					if err != nil {
 						return nil, fmt.Errorf("failed to search manga by MAL ID %d in AniList: %w", malID, err)
 					}
 					return wrapTargets(newTargetsFromMangas(newMangasFromVerniyMedias(resp, false))), nil
 				},
 				GetTargetsByNameFunc: func(ctx context.Context, name string) ([]Target, error) {
-					resp, err := anilistClient.GetMangasByName(ctx, name, "MAL to AniList Manga")
+					resp, err := anilistClient.GetMangasByName(ctx, name, UpdaterPrefixMALToAnilistManga)
 					if err != nil {
 						return nil, fmt.Errorf("failed to search manga by name '%s' in AniList: %w", name, err)
 					}
@@ -266,13 +269,13 @@ func NewApp(ctx context.Context, config Config, forceSync bool, dryRun bool, ver
 	)
 
 	reverseMangaUpdater.UpdateTargetBySourceFunc = func(ctx context.Context, id TargetID, src Source) error {
-		sa, ok := src.(*sourceAdapter)
+		unwrapped, ok := safeUnwrapSourceAdapter(src)
 		if !ok {
-			return fmt.Errorf("internal error: source is not a sourceAdapter (type: %T)", src)
+			return fmt.Errorf("internal error: failed to unwrap sourceAdapter (type: %T)", src)
 		}
-		m, ok := sa.s.(Manga)
+		m, ok := unwrapped.(Manga)
 		if !ok {
-			return fmt.Errorf("internal error: source is not a Manga (type: %T)", sa.s)
+			return fmt.Errorf("internal error: source is not a Manga (type: %T)", unwrapped)
 		}
 		if err := anilistClient.UpdateMangaEntry(
 			ctx,
@@ -281,7 +284,7 @@ func NewApp(ctx context.Context, config Config, forceSync bool, dryRun bool, ver
 			m.Progress,
 			m.ProgressVolumes,
 			int(m.Score),
-			"MAL to AniList Manga"); err != nil {
+			UpdaterPrefixMALToAnilistManga); err != nil {
 			return fmt.Errorf("failed to update manga (AniList ID: %d, title: %s): %w", id, m.GetTitle(), err)
 		}
 		return nil
@@ -379,6 +382,9 @@ func (a *App) reverseSyncManga(ctx context.Context) error {
 
 // performSync handles syncing for a given media type and direction
 func (a *App) performSync(ctx context.Context, mediaType string, reverse bool, updater *Updater) error {
+	if updater == nil {
+		return fmt.Errorf("updater is nil")
+	}
 	if updater.Statistics == nil {
 		return fmt.Errorf("Statistics is not set for updater: %s", updater.Prefix)
 	}
@@ -432,18 +438,38 @@ func (a *App) fetchSyncData(ctx context.Context, mediaType string, prefix string
 				return a.mal.GetUserAnimeList(ctx)
 			},
 			convertAnilistToSources: func(data interface{}, _ bool) []Source {
-				return newSourcesFromAnimes(newAnimesFromMediaListGroups(data.([]verniy.MediaListGroup), false))
+				groups, ok := data.([]verniy.MediaListGroup)
+				if !ok {
+					log.Printf("Warning: unexpected type for AniList anime data: %T", data)
+					return nil
+				}
+				return newSourcesFromAnimes(newAnimesFromMediaListGroups(groups, false))
 			},
 			convertMALToSources: func(data interface{}, reverse bool) []Source {
-				return newSourcesFromAnimes(newAnimesFromMalUserAnimes(data.([]mal.UserAnime), reverse))
+				animes, ok := data.([]mal.UserAnime)
+				if !ok {
+					log.Printf("Warning: unexpected type for MAL anime data: %T", data)
+					return nil
+				}
+				return newSourcesFromAnimes(newAnimesFromMalUserAnimes(animes, reverse))
 			},
 			convertAnilistToTargets: func(data interface{}, _ bool) []Target {
-				return newTargetsFromAnimes(newAnimesFromMediaListGroups(data.([]verniy.MediaListGroup), false))
+				groups, ok := data.([]verniy.MediaListGroup)
+				if !ok {
+					log.Printf("Warning: unexpected type for AniList anime targets: %T", data)
+					return nil
+				}
+				return newTargetsFromAnimes(newAnimesFromMediaListGroups(groups, false))
 			},
 			convertMALToTargets: func(data interface{}, _ bool) []Target {
-				return newTargetsFromAnimes(newAnimesFromMalUserAnimes(data.([]mal.UserAnime), false))
+				animes, ok := data.([]mal.UserAnime)
+				if !ok {
+					log.Printf("Warning: unexpected type for MAL anime targets: %T", data)
+					return nil
+				}
+				return newTargetsFromAnimes(newAnimesFromMalUserAnimes(animes, false))
 			},
-			mediaTypeName: "anime",
+			mediaTypeName: MediaTypeAnime,
 		}
 	} else {
 		fetchers = mediaFetchers{
@@ -454,18 +480,38 @@ func (a *App) fetchSyncData(ctx context.Context, mediaType string, prefix string
 				return a.mal.GetUserMangaList(ctx)
 			},
 			convertAnilistToSources: func(data interface{}, _ bool) []Source {
-				return newSourcesFromMangas(newMangasFromMediaListGroups(data.([]verniy.MediaListGroup), false))
+				groups, ok := data.([]verniy.MediaListGroup)
+				if !ok {
+					log.Printf("Warning: unexpected type for AniList manga data: %T", data)
+					return nil
+				}
+				return newSourcesFromMangas(newMangasFromMediaListGroups(groups, false))
 			},
 			convertMALToSources: func(data interface{}, reverse bool) []Source {
-				return newSourcesFromMangas(newMangasFromMalUserMangas(data.([]mal.UserManga), reverse))
+				mangas, ok := data.([]mal.UserManga)
+				if !ok {
+					log.Printf("Warning: unexpected type for MAL manga data: %T", data)
+					return nil
+				}
+				return newSourcesFromMangas(newMangasFromMalUserMangas(mangas, reverse))
 			},
 			convertAnilistToTargets: func(data interface{}, _ bool) []Target {
-				return newTargetsFromMangas(newMangasFromMediaListGroups(data.([]verniy.MediaListGroup), false))
+				groups, ok := data.([]verniy.MediaListGroup)
+				if !ok {
+					log.Printf("Warning: unexpected type for AniList manga targets: %T", data)
+					return nil
+				}
+				return newTargetsFromMangas(newMangasFromMediaListGroups(groups, false))
 			},
 			convertMALToTargets: func(data interface{}, _ bool) []Target {
-				return newTargetsFromMangas(newMangasFromMalUserMangas(data.([]mal.UserManga), false))
+				mangas, ok := data.([]mal.UserManga)
+				if !ok {
+					log.Printf("Warning: unexpected type for MAL manga targets: %T", data)
+					return nil
+				}
+				return newTargetsFromMangas(newMangasFromMalUserMangas(mangas, false))
 			},
-			mediaTypeName: "manga",
+			mediaTypeName: MediaTypeManga,
 		}
 	}
 
@@ -513,6 +559,21 @@ func (a *App) fetchMediaSyncData(ctx context.Context, prefix string, fromAnilist
 	return srcs, tgts, nil
 }
 
+// buildIgnoreTitlesMap builds an ignore titles map from config and defaults
+func buildIgnoreTitlesMap(configMap map[string]struct{}, defaults []string) map[string]struct{} {
+	if len(configMap) > 0 {
+		return configMap
+	}
+	if len(defaults) == 0 {
+		return configMap
+	}
+	ignoreMap := make(map[string]struct{}, len(defaults))
+	for _, title := range defaults {
+		ignoreMap[strings.ToLower(title)] = struct{}{}
+	}
+	return ignoreMap
+}
+
 // Adapters bridge Source/Target interfaces for the sync system
 
 type targetAdapter struct {
@@ -520,14 +581,23 @@ type targetAdapter struct {
 }
 
 func (ta *targetAdapter) GetTargetID() TargetID {
-	return TargetID(ta.t.GetTargetID())
+	if isNil(ta.t) {
+		return TargetID(0)
+	}
+	return ta.t.GetTargetID()
 }
 
 func (ta *targetAdapter) GetTitle() string {
+	if isNil(ta.t) {
+		return ""
+	}
 	return ta.t.GetTitle()
 }
 
 func (ta *targetAdapter) String() string {
+	if isNil(ta.t) {
+		return "targetAdapter{nil}"
+	}
 	return ta.t.String()
 }
 
@@ -536,63 +606,91 @@ type sourceAdapter struct {
 }
 
 func (sa *sourceAdapter) GetStatusString() string {
+	if isNil(sa.s) {
+		return ""
+	}
 	return sa.s.GetStatusString()
 }
 
 func (sa *sourceAdapter) GetTargetID() TargetID {
-	return TargetID(sa.s.GetTargetID())
+	if isNil(sa.s) {
+		return TargetID(0)
+	}
+	return sa.s.GetTargetID()
 }
 
 func (sa *sourceAdapter) GetTitle() string {
+	if isNil(sa.s) {
+		return ""
+	}
 	return sa.s.GetTitle()
 }
 
 func (sa *sourceAdapter) GetStringDiffWithTarget(t Target) string {
-	// try to unwrap targetAdapter
-	if ta, ok := t.(*targetAdapter); ok {
-		return sa.s.GetStringDiffWithTarget(ta.t)
+	if isNil(sa.s) {
+		return "Diff{sourceAdapter has nil source}"
 	}
-	// fallback: best-effort string compare
-	return sa.s.GetStringDiffWithTarget(nil)
+	// Try to unwrap targetAdapter using safe helper
+	if unwrapped, ok := safeUnwrapTargetAdapter(t); ok {
+		return sa.s.GetStringDiffWithTarget(unwrapped)
+	}
+	// Fallback: pass target directly (will return "Diff{undefined}" if type doesn't match)
+	return sa.s.GetStringDiffWithTarget(t)
 }
 
 func (sa *sourceAdapter) SameProgressWithTarget(t Target) bool {
-	if ta, ok := t.(*targetAdapter); ok {
-		return sa.s.SameProgressWithTarget(ta.t)
+	if isNil(sa.s) {
+		return false
+	}
+	if unwrapped, ok := safeUnwrapTargetAdapter(t); ok {
+		return sa.s.SameProgressWithTarget(unwrapped)
 	}
 	return false
 }
 
 func (sa *sourceAdapter) SameTypeWithTarget(t Target) bool {
-	if ta, ok := t.(*targetAdapter); ok {
-		return sa.s.SameTypeWithTarget(ta.t)
+	if isNil(sa.s) {
+		return false
+	}
+	if unwrapped, ok := safeUnwrapTargetAdapter(t); ok {
+		return sa.s.SameTypeWithTarget(unwrapped)
 	}
 	return false
 }
 
 func (sa *sourceAdapter) SameTitleWithTarget(t Target) bool {
-	if ta, ok := t.(*targetAdapter); ok {
-		return sa.s.SameTitleWithTarget(ta.t)
+	if isNil(sa.s) {
+		return false
+	}
+	if unwrapped, ok := safeUnwrapTargetAdapter(t); ok {
+		return sa.s.SameTitleWithTarget(unwrapped)
 	}
 	return false
 }
 
 func (sa *sourceAdapter) String() string {
+	if isNil(sa.s) {
+		return "sourceAdapter{nil}"
+	}
 	return sa.s.String()
 }
 
 func wrapTargets(ts []Target) []Target {
-	res := make([]Target, len(ts))
-	for i, t := range ts {
-		res[i] = &targetAdapter{t: t}
+	res := make([]Target, 0, len(ts))
+	for _, t := range ts {
+		if !isNil(t) {
+			res = append(res, &targetAdapter{t: t})
+		}
 	}
 	return res
 }
 
 func wrapSources(ss []Source) []Source {
-	res := make([]Source, len(ss))
-	for i, s := range ss {
-		res[i] = &sourceAdapter{s: s}
+	res := make([]Source, 0, len(ss))
+	for _, s := range ss {
+		if !isNil(s) {
+			res = append(res, &sourceAdapter{s: s})
+		}
 	}
 	return res
 }

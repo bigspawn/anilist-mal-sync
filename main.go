@@ -25,23 +25,19 @@ var (
 func main() {
 	flag.Parse()
 
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	ctx, _ := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 
 	config, err := Load(*configFile)
 	if err != nil {
-		cancel()
-		log.Fatalf("error: %v", err)
+		log.Fatalf("error loading config: %v", err)
 	}
 
 	app, err := NewApp(ctx, config, *forceSync, *dryRun, *verbose, *mangaSync, *allSync, *direction)
 	if err != nil {
-		cancel()
-		log.Fatalf("create app: %v", err)
+		log.Fatalf("error creating app: %v", err)
 	}
 
 	if err := app.Run(ctx); err != nil {
-		cancel()
-		log.Fatalf("run app: %v", err)
+		log.Fatalf("error running app: %v", err)
 	}
-	cancel()
 }

@@ -50,17 +50,17 @@ func (s MangaStatus) GetMalStatus() (mal.MangaStatus, error) {
 func (s MangaStatus) GetAnilistStatus() string {
 	switch s {
 	case MangaStatusReading:
-		return "CURRENT"
+		return AnilistStatusCurrent
 	case MangaStatusCompleted:
-		return "COMPLETED"
+		return AnilistStatusCompleted
 	case MangaStatusOnHold:
-		return "PAUSED"
+		return AnilistStatusPaused
 	case MangaStatusDropped:
-		return "DROPPED"
+		return AnilistStatusDropped
 	case MangaStatusPlanToRead:
-		return "PLANNING"
+		return AnilistStatusPlanning
 	case MangaStatusRepeating:
-		return "REPEATING"
+		return AnilistStatusRepeating
 	case MangaStatusUnknown:
 		return ""
 	default:
@@ -133,14 +133,15 @@ func (m Manga) SameProgressWithTarget(t Target) bool {
 }
 
 func (m Manga) SameTypeWithTarget(t Target) bool {
+	// First check: Compare target IDs (respects reverseDirection)
+	if m.GetTargetID() == t.GetTargetID() {
+		return true
+	}
+
+	// Type assertion to ensure we're comparing with another Manga
 	b, ok := t.(Manga)
 	if !ok {
 		return false
-	}
-
-	// First check: Compare IDs
-	if m.IDMal == b.IDMal || m.IDAnilist == b.IDAnilist {
-		return true
 	}
 
 	// Use the comprehensive title matching logic
@@ -167,6 +168,8 @@ func (m Manga) SameTitleWithTarget(t Target) bool {
 	return titleMatchingLevels(m.TitleEN, m.TitleJP, m.TitleRomaji, b.TitleEN, b.TitleJP, b.TitleRomaji)
 }
 
+// GetTitle returns the best available title, preferring English, then Japanese, then Romaji.
+// Returns an empty string if all title fields are empty.
 func (m Manga) GetTitle() string {
 	if m.TitleEN != "" {
 		return m.TitleEN
@@ -180,18 +183,18 @@ func (m Manga) GetTitle() string {
 func (m Manga) String() string {
 	sb := strings.Builder{}
 	sb.WriteString("Manga{")
-	sb.WriteString(fmt.Sprintf("IDAnilist: %d, ", m.IDAnilist))
-	sb.WriteString(fmt.Sprintf("IDMal: %d, ", m.IDMal))
-	sb.WriteString(fmt.Sprintf("TitleEN: %s, ", m.TitleEN))
-	sb.WriteString(fmt.Sprintf("TitleJP: %s, ", m.TitleJP))
-	sb.WriteString(fmt.Sprintf("Status: %s, ", m.Status))
-	sb.WriteString(fmt.Sprintf("Score: %f, ", m.Score))
-	sb.WriteString(fmt.Sprintf("Progress: %d, ", m.Progress))
-	sb.WriteString(fmt.Sprintf("ProgressVolumes: %d, ", m.ProgressVolumes))
-	sb.WriteString(fmt.Sprintf("Chapters: %d, ", m.Chapters))
-	sb.WriteString(fmt.Sprintf("Volumes: %d, ", m.Volumes))
-	sb.WriteString(fmt.Sprintf("StartedAt: %s, ", m.StartedAt))
-	sb.WriteString(fmt.Sprintf("FinishedAt: %s", m.FinishedAt))
+	fmt.Fprintf(&sb, "IDAnilist: %d, ", m.IDAnilist)
+	fmt.Fprintf(&sb, "IDMal: %d, ", m.IDMal)
+	fmt.Fprintf(&sb, "TitleEN: %s, ", m.TitleEN)
+	fmt.Fprintf(&sb, "TitleJP: %s, ", m.TitleJP)
+	fmt.Fprintf(&sb, "Status: %s, ", m.Status)
+	fmt.Fprintf(&sb, "Score: %f, ", m.Score)
+	fmt.Fprintf(&sb, "Progress: %d, ", m.Progress)
+	fmt.Fprintf(&sb, "ProgressVolumes: %d, ", m.ProgressVolumes)
+	fmt.Fprintf(&sb, "Chapters: %d, ", m.Chapters)
+	fmt.Fprintf(&sb, "Volumes: %d, ", m.Volumes)
+	fmt.Fprintf(&sb, "StartedAt: %s, ", m.StartedAt)
+	fmt.Fprintf(&sb, "FinishedAt: %s", m.FinishedAt)
 	sb.WriteString("}")
 	return sb.String()
 }
@@ -214,12 +217,12 @@ func (m Manga) GetUpdateOptions() []mal.UpdateMyMangaListStatusOption {
 		scoreOption = mal.Score(0)
 	}
 
-	opts := []mal.UpdateMyMangaListStatusOption{
-		st,
-		scoreOption,
-		mal.NumChaptersRead(m.Progress),
-		mal.NumVolumesRead(m.ProgressVolumes),
-	}
+	// Pre-allocate with capacity 6 (base 4 + start date + finish date)
+	opts := make([]mal.UpdateMyMangaListStatusOption, 4, 6)
+	opts[0] = st
+	opts[1] = scoreOption
+	opts[2] = mal.NumChaptersRead(m.Progress)
+	opts[3] = mal.NumVolumesRead(m.ProgressVolumes)
 
 	if m.StartedAt != nil {
 		opts = append(opts, mal.StartDate(*m.StartedAt))

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net/url"
-	"time"
 
 	"github.com/nstratos/go-myanimelist/mal"
 	"golang.org/x/oauth2"
@@ -36,8 +35,13 @@ type MyAnimeListClient struct {
 }
 
 func NewMyAnimeListClient(ctx context.Context, oauth *OAuth, username string) *MyAnimeListClient {
+	if oauth == nil {
+		// Defensive check - should never happen in normal flow
+		log.Printf("Warning: NewMyAnimeListClient called with nil oauth")
+		return &MyAnimeListClient{c: mal.NewClient(nil), username: username}
+	}
 	httpClient := oauth2.NewClient(ctx, oauth.TokenSource())
-	httpClient.Timeout = 10 * time.Minute
+	httpClient.Timeout = HTTPClientTimeout
 
 	client := mal.NewClient(httpClient)
 
@@ -162,7 +166,7 @@ func NewMyAnimeListOAuth(ctx context.Context, config Config) (*OAuth, error) {
 	oauthMAL, err := NewOAuth(
 		config.MyAnimeList,
 		config.OAuth.RedirectURI,
-		"myanimelist",
+		SiteNameMyAnimeList,
 		[]oauth2.AuthCodeOption{
 			oauth2.SetAuthURLParam("code_challenge", code),
 			oauth2.SetAuthURLParam("code_verifier", code),
