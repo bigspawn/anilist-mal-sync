@@ -8,7 +8,7 @@ DOCKER_LINT_CMD=docker run --rm -v $(PWD):/app -w /app golangci/golangci-lint:$(
 
 # Build the application
 build:
-	go build -o $(BINARY_NAME) ./cmd/main.go
+	go build -o $(BINARY_NAME) .
 
 # Run tests
 test:

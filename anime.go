@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"math"
 	"reflect"
 	"sort"
 	"strings"
@@ -24,6 +23,7 @@ const (
 	StatusOnHold      Status = "on_hold"
 	StatusDropped     Status = "dropped"
 	StatusPlanToWatch Status = "plan_to_watch"
+	StatusRepeating   Status = "repeating" // AniList-specific: rewatching
 	StatusUnknown     Status = "unknown"
 )
 
@@ -39,6 +39,8 @@ func (s Status) GetMalStatus() (mal.AnimeStatus, error) {
 		return mal.AnimeStatusDropped, nil
 	case StatusPlanToWatch:
 		return mal.AnimeStatusPlanToWatch, nil
+	case StatusRepeating:
+		return mal.AnimeStatusWatching, nil
 	case StatusUnknown:
 		return "", errStatusUnknown
 	default:
@@ -58,6 +60,8 @@ func (s Status) GetAnilistStatus() string {
 		return "DROPPED"
 	case StatusPlanToWatch:
 		return "PLANNING"
+	case StatusRepeating:
+		return "REPEATING"
 	case StatusUnknown:
 		return ""
 	default:
@@ -66,22 +70,23 @@ func (s Status) GetAnilistStatus() string {
 }
 
 type Anime struct {
-	NumEpisodes int
-	IDAnilist   int
-	IDMal       int
-	Progress    int
-	Score       float64
-	SeasonYear  int
-	Status      Status
-	TitleEN     string
-	TitleJP     string
-	TitleRomaji string
-	StartedAt   *time.Time
-	FinishedAt  *time.Time
+	NumEpisodes     int
+	IDAnilist       int
+	IDMal           int
+	Progress        int
+	Score           float64
+	SeasonYear      int
+	Status          Status
+	TitleEN         string
+	TitleJP         string
+	TitleRomaji     string
+	StartedAt       *time.Time
+	FinishedAt      *time.Time
+	reverseDirection bool // true when syncing MAL -> AniList
 }
 
 func (a Anime) GetTargetID() TargetID {
-	if *reverseDirection {
+	if a.reverseDirection {
 		return TargetID(a.IDAnilist)
 	}
 	return TargetID(a.IDMal)
@@ -115,50 +120,24 @@ func (a Anime) SameProgressWithTarget(t Target) bool {
 	}
 
 	if a.Status != b.Status {
-		if *verbose {
-			log.Printf("Status: %s != %s", a.Status, b.Status)
-		}
 		return false
 	}
 	if a.Score != b.Score {
-		if *verbose {
-			log.Printf("Score: %f != %f", a.Score, b.Score)
-		}
 		return false
 	}
 	progress := a.Progress == b.Progress
 	if a.NumEpisodes == b.NumEpisodes {
-		if *verbose {
-			log.Printf("Equal number of episodes: %d == %d", a.NumEpisodes, b.NumEpisodes)
-			log.Printf("Progress: %t", progress)
-		}
 		return progress
 	}
 	if a.NumEpisodes == 0 || b.NumEpisodes == 0 {
-		if *verbose {
-			log.Printf("One of the anime has 0 episodes: %d, %d", a.NumEpisodes, b.NumEpisodes)
-			log.Printf("Progress: %t", progress)
-		}
 		return progress
 	}
 	if progress && (a.NumEpisodes-b.NumEpisodes != 0) {
-		if *verbose {
-			log.Printf(
-				"Both anime have 0 progress but different number of episodes: %d, %d",
-				a.NumEpisodes, b.NumEpisodes,
-			)
-		}
 		return true
 	}
 
 	aa := (a.NumEpisodes - a.Progress)
 	bb := (b.NumEpisodes - b.Progress)
-
-	if *verbose {
-		log.Printf("Number of episodes: %d, %d", a.NumEpisodes, b.NumEpisodes)
-		log.Printf("Progress: %d, %d", a.Progress, b.Progress)
-		log.Printf("Progress: %d == %d", aa, bb)
-	}
 
 	return aa == bb
 }
@@ -194,15 +173,19 @@ func (a Anime) SameTitleWithTarget(t Target) bool {
 func (a Anime) GetUpdateOptions() []mal.UpdateMyAnimeListStatusOption {
 	st, err := a.Status.GetMalStatus()
 	if err != nil {
-		log.Printf("Error getting MAL status: %v", err)
-		return nil
+		log.Printf("Error getting MAL status for anime '%s' (status: %s): %v", a.GetTitle(), a.Status, err)
+		// Return empty slice instead of nil to prevent issues, but log the error
+		// The update will be skipped by the caller if opts is empty
+		return []mal.UpdateMyAnimeListStatusOption{}
 	}
 
+	// Always normalize scores for MAL (MAL only accepts 0-10 integer scores)
+	// If score is 0, don't send it (MAL treats 0 as "no score")
 	var scoreOption mal.Score
-	if EnableScoreNormalization {
+	if a.Score > 0 {
 		scoreOption = normalizeScoreForMAL(a.Score)
 	} else {
-		scoreOption = mal.Score(int(math.Round(a.Score)))
+		scoreOption = mal.Score(0)
 	}
 
 	opts := []mal.UpdateMyAnimeListStatusOption{
@@ -254,11 +237,11 @@ func (a Anime) String() string {
 	return sb.String()
 }
 
-func newAnimesFromMediaListGroups(groups []verniy.MediaListGroup) []Anime {
+func newAnimesFromMediaListGroups(groups []verniy.MediaListGroup, reverseDirection bool) []Anime {
 	res := make([]Anime, 0, len(groups))
 	for _, group := range groups {
 		for _, mediaList := range group.Entries {
-			a, err := newAnimeFromMediaListEntry(mediaList)
+			a, err := newAnimeFromMediaListEntry(mediaList, reverseDirection)
 			if err != nil {
 				log.Printf("Error creating anime from media list entry: %v", err)
 				continue
@@ -270,7 +253,7 @@ func newAnimesFromMediaListGroups(groups []verniy.MediaListGroup) []Anime {
 	return res
 }
 
-func newAnimeFromMediaListEntry(mediaList verniy.MediaList) (Anime, error) {
+func newAnimeFromMediaListEntry(mediaList verniy.MediaList, reverseDirection bool) (Anime, error) {
 	if mediaList.Media == nil {
 		return Anime{}, errors.New("media is nil")
 	}
@@ -327,25 +310,26 @@ func newAnimeFromMediaListEntry(mediaList verniy.MediaList) (Anime, error) {
 	finishedAt := convertFuzzyDateToTimeOrNow(mediaList.CompletedAt)
 
 	return Anime{
-		NumEpisodes: episodeNumber,
-		IDAnilist:   mediaList.Media.ID,
-		IDMal:       idMal,
-		Progress:    progress,
-		Score:       score,
-		SeasonYear:  year,
-		Status:      mapVerniyStatusToStatus(*mediaList.Status),
-		TitleEN:     titleEN,
-		TitleJP:     titleJP,
-		TitleRomaji: romajiTitle,
-		StartedAt:   startedAt,
-		FinishedAt:  finishedAt,
+		NumEpisodes:      episodeNumber,
+		IDAnilist:        mediaList.Media.ID,
+		IDMal:            idMal,
+		Progress:         progress,
+		Score:            score,
+		SeasonYear:       year,
+		Status:           mapVerniyStatusToStatus(*mediaList.Status),
+		TitleEN:          titleEN,
+		TitleJP:          titleJP,
+		TitleRomaji:      romajiTitle,
+		StartedAt:        startedAt,
+		FinishedAt:       finishedAt,
+		reverseDirection: reverseDirection,
 	}, nil
 }
 
-func newAnimesFromMalAnimes(malAnimes []mal.Anime) []Anime {
+func newAnimesFromMalAnimes(malAnimes []mal.Anime, reverseDirection bool) []Anime {
 	res := make([]Anime, 0, len(malAnimes))
 	for _, malAnime := range malAnimes {
-		a, err := newAnimeFromMalAnime(malAnime)
+		a, err := newAnimeFromMalAnime(malAnime, reverseDirection)
 		if err != nil {
 			log.Printf("failed to convert mal anime to anime: %v", err)
 			continue
@@ -355,10 +339,10 @@ func newAnimesFromMalAnimes(malAnimes []mal.Anime) []Anime {
 	return res
 }
 
-func newAnimesFromMalUserAnimes(malAnimes []mal.UserAnime) []Anime {
+func newAnimesFromMalUserAnimes(malAnimes []mal.UserAnime, reverseDirection bool) []Anime {
 	res := make([]Anime, 0, len(malAnimes))
 	for _, malAnime := range malAnimes {
-		a, err := newAnimeFromMalAnime(malAnime.Anime)
+		a, err := newAnimeFromMalAnime(malAnime.Anime, reverseDirection)
 		if err != nil {
 			log.Printf("failed to convert mal anime to anime: %v", err)
 			continue
@@ -372,9 +356,9 @@ func newAnimesFromMalUserAnimes(malAnimes []mal.UserAnime) []Anime {
 	return res
 }
 
-func newAnimeFromMalAnime(malAnime mal.Anime) (Anime, error) {
+func newAnimeFromMalAnime(malAnime mal.Anime, reverseDirection bool) (Anime, error) {
 	if malAnime.ID == 0 {
-		return Anime{}, errors.New("ID is nil")
+		return Anime{}, errors.New("ID is 0")
 	}
 
 	startedAt := parseDateOrNow(malAnime.MyListStatus.StartDate)
@@ -392,22 +376,23 @@ func newAnimeFromMalAnime(malAnime mal.Anime) (Anime, error) {
 
 	// In reverse sync mode, we need to leave AniList ID as 0 so the updater can find it by name
 	anilistID := -1
-	if *reverseDirection {
+	if reverseDirection {
 		anilistID = 0 // This will trigger name-based search in reverse sync
 	}
 
 	return Anime{
-		NumEpisodes: malAnime.NumEpisodes,
-		IDAnilist:   anilistID,
-		IDMal:       malAnime.ID,
-		Progress:    malAnime.MyListStatus.NumEpisodesWatched,
-		Score:       float64(malAnime.MyListStatus.Score),
-		SeasonYear:  malAnime.StartSeason.Year,
-		Status:      mapMalAnimeStatusToStatus(malAnime.MyListStatus.Status),
-		TitleEN:     titleEN,
-		TitleJP:     titleJP,
-		StartedAt:   startedAt,
-		FinishedAt:  finishedAt,
+		NumEpisodes:      malAnime.NumEpisodes,
+		IDAnilist:        anilistID,
+		IDMal:            malAnime.ID,
+		Progress:         malAnime.MyListStatus.NumEpisodesWatched,
+		Score:            float64(malAnime.MyListStatus.Score),
+		SeasonYear:       malAnime.StartSeason.Year,
+		Status:           mapMalAnimeStatusToStatus(malAnime.MyListStatus.Status),
+		TitleEN:          titleEN,
+		TitleJP:          titleJP,
+		StartedAt:        startedAt,
+		FinishedAt:       finishedAt,
+		reverseDirection: reverseDirection,
 	}, nil
 }
 
@@ -424,7 +409,7 @@ func mapVerniyStatusToStatus(s verniy.MediaListStatus) Status {
 	case verniy.MediaListStatusPlanning:
 		return StatusPlanToWatch
 	case verniy.MediaListStatusRepeating:
-		return StatusWatching // TODO: handle repeating correctly
+		return StatusRepeating
 	default:
 		return StatusUnknown
 	}
@@ -489,10 +474,10 @@ func newSourcesFromAnimes(animes []Anime) []Source {
 	return res
 }
 
-func newAnimesFromVerniyMedias(medias []verniy.Media) []Anime {
+func newAnimesFromVerniyMedias(medias []verniy.Media, reverseDirection bool) []Anime {
 	res := make([]Anime, 0, len(medias))
 	for _, media := range medias {
-		a, err := newAnimeFromVerniyMedia(media)
+		a, err := newAnimeFromVerniyMedia(media, reverseDirection)
 		if err != nil {
 			log.Printf("failed to convert verniy media to anime: %v", err)
 			continue
@@ -502,7 +487,7 @@ func newAnimesFromVerniyMedias(medias []verniy.Media) []Anime {
 	return res
 }
 
-func newAnimeFromVerniyMedia(media verniy.Media) (Anime, error) {
+func newAnimeFromVerniyMedia(media verniy.Media, reverseDirection bool) (Anime, error) {
 	if media.ID == 0 {
 		return Anime{}, errors.New("ID is 0")
 	}
@@ -538,18 +523,19 @@ func newAnimeFromVerniyMedia(media verniy.Media) (Anime, error) {
 	}
 
 	return Anime{
-		NumEpisodes: episodeNumber,
-		IDAnilist:   media.ID,
-		IDMal:       idMal,
-		Progress:    0, // Will be set from MAL source
-		Score:       0, // Will be set from MAL source
-		SeasonYear:  year,
-		Status:      StatusUnknown, // Will be set from MAL source
-		TitleEN:     titleEN,
-		TitleJP:     titleJP,
-		TitleRomaji: romajiTitle,
-		StartedAt:   nil, // Will be set from MAL source
-		FinishedAt:  nil, // Will be set from MAL source
+		NumEpisodes:      episodeNumber,
+		IDAnilist:        media.ID,
+		IDMal:            idMal,
+		Progress:         0, // Will be set from MAL source
+		Score:            0, // Will be set from MAL source
+		SeasonYear:       year,
+		Status:           StatusUnknown, // Will be set from MAL source
+		TitleEN:          titleEN,
+		TitleJP:          titleJP,
+		TitleRomaji:      romajiTitle,
+		StartedAt:        nil, // Will be set from MAL source
+		FinishedAt:       nil, // Will be set from MAL source
+		reverseDirection: reverseDirection,
 	}, nil
 }
 

@@ -1,5 +1,4 @@
-// Package syncer implements the core sync logic including updaters, strategies, and statistics.
-package syncer
+package main
 
 import (
 	"context"
@@ -7,73 +6,78 @@ import (
 	"log"
 	"sort"
 	"strings"
-	"time"
-
-	"github.com/cenkalti/backoff/v4"
 )
 
-// Package-level flags controlled by NewUpdater
-var (
-	Verbose   = false
-	DryRun    = false
-	ForceSync = false
-)
-
-type TargetID int
-
-type Source interface {
-	GetStatusString() string
-	GetTargetID() TargetID
-	GetTitle() string
-	GetStringDiffWithTarget(Target) string
-	SameProgressWithTarget(Target) bool
-	SameTypeWithTarget(Target) bool
-	SameTitleWithTarget(Target) bool
-	String() string
-}
-
-type Target interface {
-	GetTargetID() TargetID
-	GetTitle() string
-	String() string
-}
-
+// Statistics tracks sync operation results
 type Statistics struct {
-	UpdatedCount int
-	SkippedCount int
-	TotalCount   int
+	UpdatedCount  int // Successfully updated
+	SkippedCount  int // Already in sync (no update needed)
+	NotFoundCount int // Could not match in target service
+	ErrorCount    int // Failed to update due to errors
+	TotalCount    int
+}
+
+// Reset resets all statistics counters to zero
+func (s *Statistics) Reset() {
+	s.UpdatedCount = 0
+	s.SkippedCount = 0
+	s.NotFoundCount = 0
+	s.ErrorCount = 0
+	s.TotalCount = 0
 }
 
 func (s Statistics) Print(prefix string) {
-	log.Printf("[%s] Updated %d out of %d\n", prefix, s.UpdatedCount, s.TotalCount)
-	log.Printf("[%s] Skipped %d\n", prefix, s.SkippedCount)
-}
-
-func DPrintf(format string, v ...any) {
-	if !Verbose {
-		return
+	log.Printf("[%s] Updated %d out of %d", prefix, s.UpdatedCount, s.TotalCount)
+	log.Printf("[%s] Skipped %d (already in sync)", prefix, s.SkippedCount)
+	if s.NotFoundCount > 0 {
+		log.Printf("[%s] Not found %d (could not match in target service)", prefix, s.NotFoundCount)
 	}
-	log.Printf(format, v...)
+	if s.ErrorCount > 0 {
+		log.Printf("[%s] Errors %d (failed to update)", prefix, s.ErrorCount)
+	}
 }
 
+// Updater handles syncing sources to targets using a strategy chain
 type Updater struct {
 	Prefix        string
 	Statistics    *Statistics
 	IgnoreTitles  map[string]struct{}
 	StrategyChain *StrategyChain
 
+	Verbose   bool
+	DryRun    bool
+	ForceSync bool
+
 	UpdateTargetBySourceFunc func(context.Context, TargetID, Source) error
 }
 
-func NewUpdater(prefix string, stats *Statistics, ignore map[string]struct{}, sc *StrategyChain, opts ...func()) *Updater {
-	// apply options
-	for _, o := range opts {
-		o()
+// NewUpdater creates a new Updater with the specified configuration
+func NewUpdater(prefix string, stats *Statistics, ignore map[string]struct{}, sc *StrategyChain, verbose, dryRun, forceSync bool) *Updater {
+	return &Updater{
+		Prefix:        prefix,
+		Statistics:    stats,
+		IgnoreTitles:  ignore,
+		StrategyChain: sc,
+		Verbose:       verbose,
+		DryRun:        dryRun,
+		ForceSync:     forceSync,
 	}
-	return &Updater{Prefix: prefix, Statistics: stats, IgnoreTitles: ignore, StrategyChain: sc}
+}
+
+// DPrintf prints a debug message only if verbose mode is enabled
+func (u *Updater) DPrintf(format string, v ...any) {
+	if !u.Verbose {
+		return
+	}
+	log.Printf(format, v...)
 }
 
 func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target) {
+	if u.Statistics == nil {
+		log.Printf("[%s] Error: Statistics is not set for updater", u.Prefix)
+		return
+	}
+
 	tgtsByID := make(map[TargetID]Target, len(tgts))
 	for _, tgt := range tgts {
 		tgtsByID[tgt.GetTargetID()] = tgt
@@ -89,7 +93,7 @@ func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target) {
 		}
 
 		if src.GetStatusString() == "" {
-			DPrintf("[%s] Skipping source with empty status: %s", u.Prefix, src.String())
+			u.DPrintf("[%s] Skipping source with empty status: %s", u.Prefix, src.String())
 			continue
 		}
 
@@ -100,12 +104,14 @@ func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target) {
 			log.Printf("[%s] Processing for status: %s", u.Prefix, statusStr)
 		}
 
-		DPrintf("[%s] Processing for: %s", u.Prefix, src.String())
+		u.DPrintf("[%s] Processing for: %s", u.Prefix, src.String())
 
-		if _, ok := u.IgnoreTitles[strings.ToLower(src.GetTitle())]; ok {
-			log.Printf("[%s] Ignoring entry: %s", u.Prefix, src.GetTitle())
-			u.Statistics.SkippedCount++
-			continue
+		if u.IgnoreTitles != nil {
+			if _, ok := u.IgnoreTitles[strings.ToLower(src.GetTitle())]; ok {
+				log.Printf("[%s] Ignoring entry: %s", u.Prefix, src.GetTitle())
+				u.Statistics.SkippedCount++
+				continue
+			}
 		}
 
 		u.updateSourceByTargets(ctx, src, tgtsByID)
@@ -115,15 +121,20 @@ func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target) {
 func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts map[TargetID]Target) {
 	tgtID := src.GetTargetID()
 
-	if !ForceSync {
+	if !u.ForceSync {
+		if u.StrategyChain == nil {
+			log.Printf("[%s] Error: StrategyChain is not set for updater", u.Prefix)
+			u.Statistics.ErrorCount++
+			return
+		}
 		tgt, err := u.StrategyChain.FindTarget(ctx, src, tgts, u.Prefix)
 		if err != nil {
 			log.Printf("[%s] Error finding target: %v", u.Prefix, err)
-			u.Statistics.SkippedCount++
+			u.Statistics.NotFoundCount++
 			return
 		}
 
-		DPrintf("[%s] Target: %s", u.Prefix, tgt.String())
+		u.DPrintf("[%s] Target: %s", u.Prefix, tgt.String())
 
 		if src.SameProgressWithTarget(tgt) {
 			u.Statistics.SkippedCount++
@@ -137,7 +148,7 @@ func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts ma
 		tgtID = tgt.GetTargetID()
 	}
 
-	if DryRun {
+	if u.DryRun {
 		log.Printf("[%s] Dry run: Skipping update for %s", u.Prefix, src.GetTitle())
 		u.Statistics.SkippedCount++
 		return
@@ -154,10 +165,17 @@ func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts ma
 }
 
 func (u *Updater) updateTarget(ctx context.Context, id TargetID, src Source) {
-	DPrintf("[%s] Updating %s", u.Prefix, src.GetTitle())
+	u.DPrintf("[%s] Updating %s", u.Prefix, src.GetTitle())
+
+	if u.UpdateTargetBySourceFunc == nil {
+		log.Printf("[%s] Error: UpdateTargetBySourceFunc is not set for updater", u.Prefix)
+		u.Statistics.ErrorCount++
+		return
+	}
 
 	if err := u.UpdateTargetBySourceFunc(ctx, id, src); err != nil {
 		log.Printf("[%s] Error updating target: %s: %v", u.Prefix, src.GetTitle(), err)
+		u.Statistics.ErrorCount++
 		return
 	}
 
@@ -166,12 +184,13 @@ func (u *Updater) updateTarget(ctx context.Context, id TargetID, src Source) {
 	u.Statistics.UpdatedCount++
 }
 
-// StrategyChain and strategies
+// TargetFindStrategy defines a strategy for finding matching targets
 type TargetFindStrategy interface {
 	FindTarget(ctx context.Context, src Source, existingTargets map[TargetID]Target, prefix string) (Target, bool, error)
 	Name() string
 }
 
+// StrategyChain tries multiple strategies in order until one succeeds
 type StrategyChain struct {
 	strategies []TargetFindStrategy
 }
@@ -187,25 +206,23 @@ func (sc *StrategyChain) FindTarget(ctx context.Context, src Source, existingTar
 			return nil, fmt.Errorf("strategy %s failed: %w", strategy.Name(), err)
 		}
 		if found {
-			DPrintf("[%s] Found target using strategy: %s", prefix, strategy.Name())
 			return target, nil
 		}
 	}
 	return nil, fmt.Errorf("no target found for source: %s", src.GetTitle())
 }
 
+// IDStrategy finds targets by matching IDs
 type IDStrategy struct{}
 
 func (s IDStrategy) Name() string { return "IDStrategy" }
 
 func (s IDStrategy) FindTarget(_ context.Context, src Source, existingTargets map[TargetID]Target, prefix string) (Target, bool, error) {
 	target, found := existingTargets[src.GetTargetID()]
-	if found {
-		DPrintf("[%s] Found target by ID: %d", prefix, src.GetTargetID())
-	}
 	return target, found, nil
 }
 
+// TitleStrategy finds targets by matching titles
 type TitleStrategy struct{}
 
 func (s TitleStrategy) Name() string { return "TitleStrategy" }
@@ -228,24 +245,23 @@ func (s TitleStrategy) FindTarget(_ context.Context, src Source, existingTargets
 	}
 
 	if target, ok := byTitle[srcTitle]; ok {
-		DPrintf("[%s] Found target by title: %s", prefix, srcTitle)
 		return target, true, nil
 	}
 
 	for _, target := range targetSlice {
 		if src.SameTitleWithTarget(target) && src.SameTypeWithTarget(target) {
-			DPrintf("[%s] Found target by title comparison: %s", prefix, srcTitle)
 			return target, true, nil
 		}
 	}
 
-	DPrintf("[%s] No target found by title comparison: %s", prefix, srcTitle)
 	return nil, false, nil
 }
 
+// APISearchStrategy finds targets by querying the target service API
 type APISearchStrategy struct {
-	GetTargetByIDFunc    func(context.Context, TargetID) (Target, error)
-	GetTargetsByNameFunc func(context.Context, string) ([]Target, error)
+	GetTargetByIDFunc     func(context.Context, TargetID) (Target, error)
+	GetTargetsByNameFunc  func(context.Context, string) ([]Target, error)
+	GetTargetsByMALIDFunc func(context.Context, int) ([]Target, error) // Optional: for reverse sync
 }
 
 func (s APISearchStrategy) Name() string { return "APISearchStrategy" }
@@ -259,81 +275,75 @@ func (s APISearchStrategy) FindTarget(ctx context.Context, src Source, existingT
 
 	tgtID := src.GetTargetID()
 
-	if tgtID > 0 {
-		DPrintf("[%s] Finding target by API ID: %d", prefix, tgtID)
+	// Try 1: Direct ID lookup
+	if tgtID > 0 && s.GetTargetByIDFunc != nil {
 		target, err := s.GetTargetByIDFunc(ctx, tgtID)
 		if err != nil {
 			return nil, false, fmt.Errorf("error getting target by ID %d: %w", tgtID, err)
 		}
 
 		if existingTarget, exists := existingTargets[tgtID]; exists {
-			DPrintf("[%s] Found existing user target by ID: %d", prefix, tgtID)
 			return existingTarget, true, nil
 		}
 
-		DPrintf("[%s] Found target by API ID: %d", prefix, tgtID)
 		return target, true, nil
 	}
 
-	DPrintf("[%s] Finding target by API name: %s", prefix, src.GetTitle())
-	targets, err := s.GetTargetsByNameFunc(ctx, src.GetTitle())
-	if err != nil {
-		return nil, false, fmt.Errorf("error getting targets by name %s: %w", src.GetTitle(), err)
+	// Try 2: Search by MAL ID (for reverse sync: MAL -> AniList)
+	// Forward sync already uses MAL IDs via GetTargetID() above
+	if s.GetTargetsByMALIDFunc != nil {
+		if malID := extractMALIDFromSource(src); malID > 0 {
+			targets, err := s.GetTargetsByMALIDFunc(ctx, malID)
+			if err == nil && len(targets) > 0 {
+				// Match by title to ensure correctness
+				for _, target := range targets {
+					if src.SameTitleWithTarget(target) && src.SameTypeWithTarget(target) {
+						return target, true, nil
+					}
+				}
+				// Single result from MAL ID search is usually reliable
+				if len(targets) == 1 {
+					return targets[0], true, nil
+				}
+			}
+		}
 	}
 
-	for i, tgt := range targets {
+	// Try 3: Search by name (fallback)
+	if s.GetTargetsByNameFunc == nil {
+		return nil, false, fmt.Errorf("GetTargetsByNameFunc is not set")
+	}
+	targets, err := s.GetTargetsByNameFunc(ctx, src.GetTitle())
+	if err != nil {
+		return nil, false, fmt.Errorf("error searching targets by name '%s': %w", src.GetTitle(), err)
+	}
+
+	if len(targets) == 0 {
+		return nil, false, nil
+	}
+
+	for _, tgt := range targets {
 		if existingTarget, exists := existingTargets[tgt.GetTargetID()]; exists {
-			DPrintf("[%s] Found existing user target by API name: %s: %d", prefix, tgt.GetTitle(), i+1)
 			tgt = existingTarget
 		}
 
-		if src.SameTypeWithTarget(tgt) {
-			DPrintf("[%s] Found target by API name: %s: %d", prefix, tgt.String(), i+1)
+		if src.SameTitleWithTarget(tgt) && src.SameTypeWithTarget(tgt) {
 			return tgt, true, nil
 		}
-		DPrintf("[%s] Ignoring target by API name: %s: %d (type mismatch)", prefix, tgt.GetTitle(), i+1)
 	}
 
 	return nil, false, nil
 }
 
-// Backoff helper
-func createBackoffPolicy() *backoff.ExponentialBackOff {
-	b := backoff.NewExponentialBackOff()
-	b.InitialInterval = 1 * time.Second
-	b.MaxInterval = 30 * time.Second
-	b.MaxElapsedTime = 2 * time.Minute
-	b.Multiplier = 2.0
-	b.RandomizationFactor = 0.1
-	return b
-}
-
-func isRateLimitError(err error) bool {
-	if err == nil {
-		return false
-	}
-	errStr := strings.ToLower(err.Error())
-	return strings.Contains(errStr, "too many requests") || strings.Contains(errStr, "rate limit") || strings.Contains(errStr, "429")
-}
-
-func retryWithBackoff(ctx context.Context, operation func() error, operationName string, prefix ...string) error {
-	b := createBackoffPolicy()
-
-	retryableOperation := func() error {
-		err := operation()
-		if err != nil && !isRateLimitError(err) {
-			return backoff.Permanent(err)
+// extractMALIDFromSource extracts the MAL ID from a Source for reverse sync
+func extractMALIDFromSource(src Source) int {
+	if sa, ok := src.(*sourceAdapter); ok {
+		if anime, ok := sa.s.(Anime); ok {
+			return anime.IDMal
 		}
-		return err
-	}
-
-	return backoff.RetryNotify(retryableOperation, backoff.WithContext(b, ctx), func(err error, duration time.Duration) {
-		if isRateLimitError(err) {
-			if len(prefix) > 0 {
-				log.Printf("[%s] Rate limit hit for %s, retrying in %v: %v", prefix[0], operationName, duration, err)
-			} else {
-				log.Printf("Rate limit hit for %s, retrying in %v: %v", operationName, duration, err)
-			}
+		if manga, ok := sa.s.(Manga); ok {
+			return manga.IDMal
 		}
-	})
+	}
+	return 0
 }
