@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"math"
 	"regexp"
 	"strings"
@@ -181,17 +182,23 @@ func normalizeScoreForMAL(score float64) mal.Score {
 func titleMatchingLevels(titleEN1, titleJP1, titleRomaji1, titleEN2, titleJP2, titleRomaji2 string) bool {
 	// Level 1: Exact case-insensitive title matching
 	if titleEN1 != "" && titleEN2 != "" && strings.EqualFold(titleEN1, titleEN2) {
-		DPrintf("Exact match found TitleEN: %s == %s", titleEN1, titleEN2)
+		if *verbose {
+			log.Printf("Exact match found TitleEN: %s == %s", titleEN1, titleEN2)
+		}
 		return true
 	}
 
 	if titleJP1 != "" && titleJP2 != "" && strings.EqualFold(titleJP1, titleJP2) {
-		DPrintf("Exact match found TitleJP: %s == %s", titleJP1, titleJP2)
+		if *verbose {
+			log.Printf("Exact match found TitleJP: %s == %s", titleJP1, titleJP2)
+		}
 		return true
 	}
 
 	if titleRomaji1 != "" && titleRomaji2 != "" && strings.EqualFold(titleRomaji1, titleRomaji2) {
-		DPrintf("Exact match found TitleRomaji: %s == %s", titleRomaji1, titleRomaji2)
+		if *verbose {
+			log.Printf("Exact match found TitleRomaji: %s == %s", titleRomaji1, titleRomaji2)
+		}
 		return true
 	}
 
@@ -200,8 +207,10 @@ func titleMatchingLevels(titleEN1, titleJP1, titleRomaji1, titleEN2, titleJP2, t
 		normalizedA := normalizeTitle(titleEN1)
 		normalizedB := normalizeTitle(titleEN2)
 		if normalizedA == normalizedB {
-			DPrintf("Normalized match found TitleEN: '%s' == '%s' (original: '%s' vs '%s')", normalizedA,
-				normalizedB, titleEN1, titleEN2)
+			if *verbose {
+				log.Printf("Normalized match found TitleEN: '%s' == '%s' (original: '%s' vs '%s')", normalizedA,
+					normalizedB, titleEN1, titleEN2)
+			}
 			return true
 		}
 	}
@@ -210,8 +219,10 @@ func titleMatchingLevels(titleEN1, titleJP1, titleRomaji1, titleEN2, titleJP2, t
 		normalizedA := normalizeTitle(titleJP1)
 		normalizedB := normalizeTitle(titleJP2)
 		if normalizedA == normalizedB {
-			DPrintf("Normalized match found TitleJP: '%s' == '%s' (original: '%s' vs '%s')",
-				normalizedA, normalizedB, titleJP1, titleJP2)
+			if *verbose {
+				log.Printf("Normalized match found TitleJP: '%s' == '%s' (original: '%s' vs '%s')",
+					normalizedA, normalizedB, titleJP1, titleJP2)
+			}
 			return true
 		}
 	}
@@ -220,8 +231,10 @@ func titleMatchingLevels(titleEN1, titleJP1, titleRomaji1, titleEN2, titleJP2, t
 		normalizedA := normalizeTitle(titleRomaji1)
 		normalizedB := normalizeTitle(titleRomaji2)
 		if normalizedA == normalizedB {
-			DPrintf("Normalized match found TitleRomaji: '%s' == '%s' (original: '%s' vs '%s')",
-				normalizedA, normalizedB, titleRomaji1, titleRomaji2)
+			if *verbose {
+				log.Printf("Normalized match found TitleRomaji: '%s' == '%s' (original: '%s' vs '%s')",
+					normalizedA, normalizedB, titleRomaji1, titleRomaji2)
+			}
 			return true
 		}
 	}
@@ -231,7 +244,9 @@ func titleMatchingLevels(titleEN1, titleJP1, titleRomaji1, titleEN2, titleJP2, t
 	if titleEN1 != "" && titleEN2 != "" {
 		similarity := titleSimilarity(titleEN1, titleEN2)
 		if similarity >= similarityThreshold {
-			DPrintf("Fuzzy match found TitleEN: '%s' ~= '%s' (similarity: %.2f)", titleEN1, titleEN2, similarity)
+			if *verbose {
+				log.Printf("Fuzzy match found TitleEN: '%s' ~= '%s' (similarity: %.2f)", titleEN1, titleEN2, similarity)
+			}
 			return true
 		}
 	}
@@ -239,7 +254,9 @@ func titleMatchingLevels(titleEN1, titleJP1, titleRomaji1, titleEN2, titleJP2, t
 	if titleJP1 != "" && titleJP2 != "" {
 		similarity := titleSimilarity(titleJP1, titleJP2)
 		if similarity >= similarityThreshold {
-			DPrintf("Fuzzy match found TitleJP: '%s' ~= '%s' (similarity: %.2f)", titleJP1, titleJP2, similarity)
+			if *verbose {
+				log.Printf("Fuzzy match found TitleJP: '%s' ~= '%s' (similarity: %.2f)", titleJP1, titleJP2, similarity)
+			}
 			return true
 		}
 	}
@@ -247,8 +264,10 @@ func titleMatchingLevels(titleEN1, titleJP1, titleRomaji1, titleEN2, titleJP2, t
 	if titleRomaji1 != "" && titleRomaji2 != "" {
 		similarity := titleSimilarity(titleRomaji1, titleRomaji2)
 		if similarity >= similarityThreshold {
-			DPrintf("Fuzzy match found TitleRomaji: '%s' ~= '%s' (similarity: %.2f)", titleRomaji1,
-				titleRomaji2, similarity)
+			if *verbose {
+				log.Printf("Fuzzy match found TitleRomaji: '%s' ~= '%s' (similarity: %.2f)", titleRomaji1,
+					titleRomaji2, similarity)
+			}
 			return true
 		}
 	}
@@ -258,7 +277,9 @@ func titleMatchingLevels(titleEN1, titleJP1, titleRomaji1, titleEN2, titleJP2, t
 	if titleEN1 != "" && titleEN2 != "" {
 		similarity := titleLevenshteinSimilarity(titleEN1, titleEN2)
 		if similarity >= levenshteinThreshold {
-			DPrintf("Levenshtein match found TitleEN: '%s' ~= '%s' (similarity: %.2f)", titleEN1, titleEN2, similarity)
+			if *verbose {
+				log.Printf("Levenshtein match found TitleEN: '%s' ~= '%s' (similarity: %.2f)", titleEN1, titleEN2, similarity)
+			}
 			return true
 		}
 	}
@@ -266,7 +287,9 @@ func titleMatchingLevels(titleEN1, titleJP1, titleRomaji1, titleEN2, titleJP2, t
 	if titleJP1 != "" && titleJP2 != "" {
 		similarity := titleLevenshteinSimilarity(titleJP1, titleJP2)
 		if similarity >= levenshteinThreshold {
-			DPrintf("Levenshtein match found TitleJP: '%s' ~= '%s' (similarity: %.2f)", titleJP1, titleJP2, similarity)
+			if *verbose {
+				log.Printf("Levenshtein match found TitleJP: '%s' ~= '%s' (similarity: %.2f)", titleJP1, titleJP2, similarity)
+			}
 			return true
 		}
 	}
@@ -274,8 +297,10 @@ func titleMatchingLevels(titleEN1, titleJP1, titleRomaji1, titleEN2, titleJP2, t
 	if titleRomaji1 != "" && titleRomaji2 != "" {
 		similarity := titleLevenshteinSimilarity(titleRomaji1, titleRomaji2)
 		if similarity >= levenshteinThreshold {
-			DPrintf("Levenshtein match found TitleRomaji: '%s' ~= '%s' (similarity: %.2f)", titleRomaji1,
-				titleRomaji2, similarity)
+			if *verbose {
+				log.Printf("Levenshtein match found TitleRomaji: '%s' ~= '%s' (similarity: %.2f)", titleRomaji1,
+					titleRomaji2, similarity)
+			}
 			return true
 		}
 	}

@@ -115,38 +115,50 @@ func (a Anime) SameProgressWithTarget(t Target) bool {
 	}
 
 	if a.Status != b.Status {
-		DPrintf("Status: %s != %s", a.Status, b.Status)
+		if *verbose {
+			log.Printf("Status: %s != %s", a.Status, b.Status)
+		}
 		return false
 	}
 	if a.Score != b.Score {
-		DPrintf("Score: %f != %f", a.Score, b.Score)
+		if *verbose {
+			log.Printf("Score: %f != %f", a.Score, b.Score)
+		}
 		return false
 	}
 	progress := a.Progress == b.Progress
 	if a.NumEpisodes == b.NumEpisodes {
-		DPrintf("Equal number of episodes: %d == %d", a.NumEpisodes, b.NumEpisodes)
-		DPrintf("Progress: %t", progress)
+		if *verbose {
+			log.Printf("Equal number of episodes: %d == %d", a.NumEpisodes, b.NumEpisodes)
+			log.Printf("Progress: %t", progress)
+		}
 		return progress
 	}
 	if a.NumEpisodes == 0 || b.NumEpisodes == 0 {
-		DPrintf("One of the anime has 0 episodes: %d, %d", a.NumEpisodes, b.NumEpisodes)
-		DPrintf("Progress: %t", progress)
+		if *verbose {
+			log.Printf("One of the anime has 0 episodes: %d, %d", a.NumEpisodes, b.NumEpisodes)
+			log.Printf("Progress: %t", progress)
+		}
 		return progress
 	}
 	if progress && (a.NumEpisodes-b.NumEpisodes != 0) {
-		DPrintf(
-			"Both anime have 0 progress but different number of episodes: %d, %d",
-			a.NumEpisodes, b.NumEpisodes,
-		)
+		if *verbose {
+			log.Printf(
+				"Both anime have 0 progress but different number of episodes: %d, %d",
+				a.NumEpisodes, b.NumEpisodes,
+			)
+		}
 		return true
 	}
 
 	aa := (a.NumEpisodes - a.Progress)
 	bb := (b.NumEpisodes - b.Progress)
 
-	DPrintf("Number of episodes: %d, %d", a.NumEpisodes, b.NumEpisodes)
-	DPrintf("Progress: %d, %d", a.Progress, b.Progress)
-	DPrintf("Progress: %d == %d", aa, bb)
+	if *verbose {
+		log.Printf("Number of episodes: %d, %d", a.NumEpisodes, b.NumEpisodes)
+		log.Printf("Progress: %d, %d", a.Progress, b.Progress)
+		log.Printf("Progress: %d == %d", aa, bb)
+	}
 
 	return aa == bb
 }

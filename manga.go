@@ -112,19 +112,27 @@ func (m Manga) SameProgressWithTarget(t Target) bool {
 	}
 
 	if m.Status != b.Status {
-		DPrintf("Status: %s != %s", m.Status, b.Status)
+		if *verbose {
+			log.Printf("Status: %s != %s", m.Status, b.Status)
+		}
 		return false
 	}
 	if m.Score != b.Score {
-		DPrintf("Score: %f != %f", m.Score, b.Score)
+		if *verbose {
+			log.Printf("Score: %f != %f", m.Score, b.Score)
+		}
 		return false
 	}
 	if m.Progress != b.Progress {
-		DPrintf("Progress: %d != %d", m.Progress, b.Progress)
+		if *verbose {
+			log.Printf("Progress: %d != %d", m.Progress, b.Progress)
+		}
 		return false
 	}
 	if m.ProgressVolumes != b.ProgressVolumes {
-		DPrintf("ProgressVolumes: %d != %d", m.ProgressVolumes, b.ProgressVolumes)
+		if *verbose {
+			log.Printf("ProgressVolumes: %d != %d", m.ProgressVolumes, b.ProgressVolumes)
+		}
 		return false
 	}
 
