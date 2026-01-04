@@ -3,15 +3,13 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/url"
-	"time"
 
 	"github.com/nstratos/go-myanimelist/mal"
 	"golang.org/x/oauth2"
 )
-
-const randNumb = 43
 
 var errEmptyMalID = errors.New("mal id is empty")
 
@@ -37,8 +35,13 @@ type MyAnimeListClient struct {
 }
 
 func NewMyAnimeListClient(ctx context.Context, oauth *OAuth, username string) *MyAnimeListClient {
+	if oauth == nil {
+		// Defensive check - should never happen in normal flow
+		log.Printf("Warning: NewMyAnimeListClient called with nil oauth")
+		return &MyAnimeListClient{c: mal.NewClient(nil), username: username}
+	}
 	httpClient := oauth2.NewClient(ctx, oauth.TokenSource())
-	httpClient.Timeout = 10 * time.Minute
+	httpClient.Timeout = HTTPClientTimeout
 
 	client := mal.NewClient(httpClient)
 
@@ -49,7 +52,7 @@ func (c *MyAnimeListClient) GetUserAnimeList(ctx context.Context) ([]mal.UserAni
 	var userAnimeList []mal.UserAnime
 	var offset int
 	for {
-		list, resp, err := c.c.User.AnimeList(ctx, c.username, animeFields, mal.Offset(offset), mal.Limit(100))
+		list, resp, err := c.c.User.AnimeList(ctx, c.username, animeFields, mal.Offset(offset), mal.Limit(MALListLimit))
 		if err != nil {
 			return nil, err
 		}
@@ -66,7 +69,7 @@ func (c *MyAnimeListClient) GetUserAnimeList(ctx context.Context) ([]mal.UserAni
 }
 
 func (c *MyAnimeListClient) GetAnimesByName(ctx context.Context, name string) ([]mal.Anime, error) {
-	animeList, _, err := c.c.Anime.List(ctx, name, animeFields, mal.Limit(3))
+	animeList, _, err := c.c.Anime.List(ctx, name, animeFields, mal.Limit(MALSearchLimit))
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +106,7 @@ func (c *MyAnimeListClient) GetUserMangaList(ctx context.Context) ([]mal.UserMan
 	var userMangaList []mal.UserManga
 	var offset int
 	for {
-		list, resp, err := c.c.User.MangaList(ctx, c.username, mangaFields, mal.Offset(offset), mal.Limit(100))
+		list, resp, err := c.c.User.MangaList(ctx, c.username, mangaFields, mal.Offset(offset), mal.Limit(MALListLimit))
 		if err != nil {
 			return nil, err
 		}
@@ -120,7 +123,7 @@ func (c *MyAnimeListClient) GetUserMangaList(ctx context.Context) ([]mal.UserMan
 }
 
 func (c *MyAnimeListClient) GetMangasByName(ctx context.Context, name string) ([]mal.Manga, error) {
-	l, _, err := c.c.Manga.List(ctx, name, mangaFields, mal.Limit(10))
+	l, _, err := c.c.Manga.List(ctx, name, mangaFields, mal.Limit(MALSearchLimit))
 	if err != nil {
 		return nil, err
 	}
@@ -154,12 +157,16 @@ func (c *MyAnimeListClient) UpdateMangaByIDAndOptions(ctx context.Context, id in
 }
 
 func NewMyAnimeListOAuth(ctx context.Context, config Config) (*OAuth, error) {
-	code := url.QueryEscape(randHTTPParamString(randNumb))
+	codeStr, err := randHTTPParamString(MALOAuthCodeLength)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate OAuth code challenge: %w", err)
+	}
+	code := url.QueryEscape(codeStr)
 
 	oauthMAL, err := NewOAuth(
 		config.MyAnimeList,
 		config.OAuth.RedirectURI,
-		"myanimelist",
+		SiteNameMyAnimeList,
 		[]oauth2.AuthCodeOption{
 			oauth2.SetAuthURLParam("code_challenge", code),
 			oauth2.SetAuthURLParam("code_verifier", code),

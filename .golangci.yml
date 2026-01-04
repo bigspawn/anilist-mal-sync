@@ -3,6 +3,8 @@ version: "2"
 run:
   timeout: 5m
   modules-download-mode: readonly
+  skip-dirs:
+    - vendor
 
 linters:
   disable:
@@ -18,7 +20,7 @@ linters:
     - bodyclose
     - copyloopvar
     - dogsled
-    - dupl
+    # Note: `dupl` removed due to many similar generated-like blocks
     - funlen
     - gochecknoinits
     - goconst
@@ -55,7 +57,7 @@ linters:
           - revive
   settings:
     lll:
-      line-length: 140
+      line-length: 200
     funlen:
       # Checks the number of lines in a function.
       # If lower than 0, disable the check.

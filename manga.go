@@ -22,6 +22,7 @@ const (
 	MangaStatusOnHold     MangaStatus = "on_hold"
 	MangaStatusDropped    MangaStatus = "dropped"
 	MangaStatusPlanToRead MangaStatus = "plan_to_read"
+	MangaStatusRepeating  MangaStatus = "repeating" // AniList-specific: rereading
 	MangaStatusUnknown    MangaStatus = "unknown"
 )
 
@@ -37,6 +38,8 @@ func (s MangaStatus) GetMalStatus() (mal.MangaStatus, error) {
 		return mal.MangaStatusDropped, nil
 	case MangaStatusPlanToRead:
 		return mal.MangaStatusPlanToRead, nil
+	case MangaStatusRepeating:
+		return mal.MangaStatusReading, nil
 	case MangaStatusUnknown:
 		return "", errMangaStatusUnknown
 	default:
@@ -47,15 +50,17 @@ func (s MangaStatus) GetMalStatus() (mal.MangaStatus, error) {
 func (s MangaStatus) GetAnilistStatus() string {
 	switch s {
 	case MangaStatusReading:
-		return "CURRENT"
+		return AnilistStatusCurrent
 	case MangaStatusCompleted:
-		return "COMPLETED"
+		return AnilistStatusCompleted
 	case MangaStatusOnHold:
-		return "PAUSED"
+		return AnilistStatusPaused
 	case MangaStatusDropped:
-		return "DROPPED"
+		return AnilistStatusDropped
 	case MangaStatusPlanToRead:
-		return "PLANNING"
+		return AnilistStatusPlanning
+	case MangaStatusRepeating:
+		return AnilistStatusRepeating
 	case MangaStatusUnknown:
 		return ""
 	default:
@@ -64,23 +69,24 @@ func (s MangaStatus) GetAnilistStatus() string {
 }
 
 type Manga struct {
-	IDAnilist       int
-	IDMal           int
-	Progress        int
-	ProgressVolumes int
-	Score           float64
-	Status          MangaStatus
-	TitleEN         string
-	TitleJP         string
-	TitleRomaji     string
-	Chapters        int
-	Volumes         int
-	StartedAt       *time.Time
-	FinishedAt      *time.Time
+	IDAnilist        int
+	IDMal            int
+	Progress         int
+	ProgressVolumes  int
+	Score            float64
+	Status           MangaStatus
+	TitleEN          string
+	TitleJP          string
+	TitleRomaji      string
+	Chapters         int
+	Volumes          int
+	StartedAt        *time.Time
+	FinishedAt       *time.Time
+	reverseDirection bool // true when syncing MAL -> AniList
 }
 
 func (m Manga) GetTargetID() TargetID {
-	if *reverseDirection {
+	if m.reverseDirection {
 		return TargetID(m.IDAnilist)
 	}
 	return TargetID(m.IDMal)
@@ -111,19 +117,15 @@ func (m Manga) SameProgressWithTarget(t Target) bool {
 	}
 
 	if m.Status != b.Status {
-		DPrintf("Status: %s != %s", m.Status, b.Status)
 		return false
 	}
 	if m.Score != b.Score {
-		DPrintf("Score: %f != %f", m.Score, b.Score)
 		return false
 	}
 	if m.Progress != b.Progress {
-		DPrintf("Progress: %d != %d", m.Progress, b.Progress)
 		return false
 	}
 	if m.ProgressVolumes != b.ProgressVolumes {
-		DPrintf("ProgressVolumes: %d != %d", m.ProgressVolumes, b.ProgressVolumes)
 		return false
 	}
 
@@ -131,14 +133,15 @@ func (m Manga) SameProgressWithTarget(t Target) bool {
 }
 
 func (m Manga) SameTypeWithTarget(t Target) bool {
+	// First check: Compare target IDs (respects reverseDirection)
+	if m.GetTargetID() == t.GetTargetID() {
+		return true
+	}
+
+	// Type assertion to ensure we're comparing with another Manga
 	b, ok := t.(Manga)
 	if !ok {
 		return false
-	}
-
-	// First check: Compare IDs
-	if m.IDMal == b.IDMal || m.IDAnilist == b.IDAnilist {
-		return true
 	}
 
 	// Use the comprehensive title matching logic
@@ -165,10 +168,8 @@ func (m Manga) SameTitleWithTarget(t Target) bool {
 	return titleMatchingLevels(m.TitleEN, m.TitleJP, m.TitleRomaji, b.TitleEN, b.TitleJP, b.TitleRomaji)
 }
 
-func (m Manga) GetUpdateMyAnimeListStatusOption() []mal.UpdateMyAnimeListStatusOption {
-	return nil
-}
-
+// GetTitle returns the best available title, preferring English, then Japanese, then Romaji.
+// Returns an empty string if all title fields are empty.
 func (m Manga) GetTitle() string {
 	if m.TitleEN != "" {
 		return m.TitleEN
@@ -182,18 +183,18 @@ func (m Manga) GetTitle() string {
 func (m Manga) String() string {
 	sb := strings.Builder{}
 	sb.WriteString("Manga{")
-	sb.WriteString(fmt.Sprintf("IDAnilist: %d, ", m.IDAnilist))
-	sb.WriteString(fmt.Sprintf("IDMal: %d, ", m.IDMal))
-	sb.WriteString(fmt.Sprintf("TitleEN: %s, ", m.TitleEN))
-	sb.WriteString(fmt.Sprintf("TitleJP: %s, ", m.TitleJP))
-	sb.WriteString(fmt.Sprintf("Status: %s, ", m.Status))
-	sb.WriteString(fmt.Sprintf("Score: %f, ", m.Score))
-	sb.WriteString(fmt.Sprintf("Progress: %d, ", m.Progress))
-	sb.WriteString(fmt.Sprintf("ProgressVolumes: %d, ", m.ProgressVolumes))
-	sb.WriteString(fmt.Sprintf("Chapters: %d, ", m.Chapters))
-	sb.WriteString(fmt.Sprintf("Volumes: %d, ", m.Volumes))
-	sb.WriteString(fmt.Sprintf("StartedAt: %s, ", m.StartedAt))
-	sb.WriteString(fmt.Sprintf("FinishedAt: %s", m.FinishedAt))
+	fmt.Fprintf(&sb, "IDAnilist: %d, ", m.IDAnilist)
+	fmt.Fprintf(&sb, "IDMal: %d, ", m.IDMal)
+	fmt.Fprintf(&sb, "TitleEN: %s, ", m.TitleEN)
+	fmt.Fprintf(&sb, "TitleJP: %s, ", m.TitleJP)
+	fmt.Fprintf(&sb, "Status: %s, ", m.Status)
+	fmt.Fprintf(&sb, "Score: %f, ", m.Score)
+	fmt.Fprintf(&sb, "Progress: %d, ", m.Progress)
+	fmt.Fprintf(&sb, "ProgressVolumes: %d, ", m.ProgressVolumes)
+	fmt.Fprintf(&sb, "Chapters: %d, ", m.Chapters)
+	fmt.Fprintf(&sb, "Volumes: %d, ", m.Volumes)
+	fmt.Fprintf(&sb, "StartedAt: %s, ", m.StartedAt)
+	fmt.Fprintf(&sb, "FinishedAt: %s", m.FinishedAt)
 	sb.WriteString("}")
 	return sb.String()
 }
@@ -201,16 +202,27 @@ func (m Manga) String() string {
 func (m Manga) GetUpdateOptions() []mal.UpdateMyMangaListStatusOption {
 	st, err := m.Status.GetMalStatus()
 	if err != nil {
-		log.Printf("Error getting MAL status: %v", err)
-		return nil
+		log.Printf("Error getting MAL status for manga '%s' (status: %s): %v", m.GetTitle(), m.Status, err)
+		// Return empty slice instead of nil to prevent issues, but log the error
+		// The update will be skipped by the caller if opts is empty
+		return []mal.UpdateMyMangaListStatusOption{}
 	}
 
-	opts := []mal.UpdateMyMangaListStatusOption{
-		st,
-		mal.Score(m.Score),
-		mal.NumChaptersRead(m.Progress),
-		mal.NumVolumesRead(m.ProgressVolumes),
+	// Always normalize scores for MAL (MAL only accepts 0-10 integer scores)
+	// If score is 0, don't send it (MAL treats 0 as "no score")
+	var scoreOption mal.Score
+	if m.Score > 0 {
+		scoreOption = normalizeScoreForMAL(m.Score)
+	} else {
+		scoreOption = mal.Score(0)
 	}
+
+	// Pre-allocate with capacity 6 (base 4 + start date + finish date)
+	opts := make([]mal.UpdateMyMangaListStatusOption, 4, 6)
+	opts[0] = st
+	opts[1] = scoreOption
+	opts[2] = mal.NumChaptersRead(m.Progress)
+	opts[3] = mal.NumVolumesRead(m.ProgressVolumes)
 
 	if m.StartedAt != nil {
 		opts = append(opts, mal.StartDate(*m.StartedAt))
@@ -227,7 +239,7 @@ func (m Manga) GetUpdateOptions() []mal.UpdateMyMangaListStatusOption {
 	return opts
 }
 
-func newMangaFromMediaListEntry(mediaList verniy.MediaList) (Manga, error) {
+func newMangaFromMediaListEntry(mediaList verniy.MediaList, reverseDirection bool) (Manga, error) {
 	if mediaList.Media == nil {
 		return Manga{}, errors.New("media is nil")
 	}
@@ -289,25 +301,26 @@ func newMangaFromMediaListEntry(mediaList verniy.MediaList) (Manga, error) {
 	finishedAt := convertFuzzyDateToTimeOrNow(mediaList.CompletedAt)
 
 	return Manga{
-		IDAnilist:       mediaList.Media.ID,
-		IDMal:           idMal,
-		Progress:        progress,
-		ProgressVolumes: progressVolumes,
-		Score:           score,
-		Status:          mapAnilistMangaStatustToStatus(*mediaList.Status),
-		TitleEN:         titleEN,
-		TitleJP:         titleJP,
-		TitleRomaji:     romajiTitle,
-		Chapters:        chapters,
-		Volumes:         volumes,
-		StartedAt:       startedAt,
-		FinishedAt:      finishedAt,
+		IDAnilist:        mediaList.Media.ID,
+		IDMal:            idMal,
+		Progress:         progress,
+		ProgressVolumes:  progressVolumes,
+		Score:            score,
+		Status:           mapAnilistMangaStatusToStatus(*mediaList.Status),
+		TitleEN:          titleEN,
+		TitleJP:          titleJP,
+		TitleRomaji:      romajiTitle,
+		Chapters:         chapters,
+		Volumes:          volumes,
+		StartedAt:        startedAt,
+		FinishedAt:       finishedAt,
+		reverseDirection: reverseDirection,
 	}, nil
 }
 
-func newMangaFromMalManga(manga mal.Manga) (Manga, error) {
+func newMangaFromMalManga(manga mal.Manga, reverseDirection bool) (Manga, error) {
 	if manga.ID == 0 {
-		return Manga{}, errors.New("ID is nil")
+		return Manga{}, errors.New("ID is 0")
 	}
 
 	startedAt := parseDateOrNow(manga.MyListStatus.StartDate)
@@ -325,24 +338,25 @@ func newMangaFromMalManga(manga mal.Manga) (Manga, error) {
 
 	// In reverse sync mode, we need to leave AniList ID as 0 so the updater can find it by name
 	anilistID := -1
-	if *reverseDirection {
+	if reverseDirection {
 		anilistID = 0 // This will trigger name-based search in reverse sync
 	}
 
 	return Manga{
-		IDAnilist:       anilistID,
-		IDMal:           manga.ID,
-		Progress:        manga.MyListStatus.NumChaptersRead,
-		ProgressVolumes: manga.MyListStatus.NumVolumesRead,
-		Score:           float64(manga.MyListStatus.Score),
-		Status:          mapMalMangaStatusToStatus(manga.MyListStatus.Status),
-		TitleEN:         titleEN,
-		TitleJP:         titleJP,
-		TitleRomaji:     "",
-		Chapters:        manga.NumChapters,
-		Volumes:         manga.NumVolumes,
-		StartedAt:       startedAt,
-		FinishedAt:      finishedAt,
+		IDAnilist:        anilistID,
+		IDMal:            manga.ID,
+		Progress:         manga.MyListStatus.NumChaptersRead,
+		ProgressVolumes:  manga.MyListStatus.NumVolumesRead,
+		Score:            float64(manga.MyListStatus.Score),
+		Status:           mapMalMangaStatusToStatus(manga.MyListStatus.Status),
+		TitleEN:          titleEN,
+		TitleJP:          titleJP,
+		TitleRomaji:      "",
+		Chapters:         manga.NumChapters,
+		Volumes:          manga.NumVolumes,
+		StartedAt:        startedAt,
+		FinishedAt:       finishedAt,
+		reverseDirection: reverseDirection,
 	}, nil
 }
 
@@ -363,7 +377,7 @@ func mapMalMangaStatusToStatus(s mal.MangaStatus) MangaStatus {
 	}
 }
 
-func mapAnilistMangaStatustToStatus(s verniy.MediaListStatus) MangaStatus {
+func mapAnilistMangaStatusToStatus(s verniy.MediaListStatus) MangaStatus {
 	switch s {
 	case verniy.MediaListStatusCurrent:
 		return MangaStatusReading
@@ -376,17 +390,17 @@ func mapAnilistMangaStatustToStatus(s verniy.MediaListStatus) MangaStatus {
 	case verniy.MediaListStatusPlanning:
 		return MangaStatusPlanToRead
 	case verniy.MediaListStatusRepeating:
-		return MangaStatusReading // TODO: handle repeating correctly
+		return MangaStatusRepeating
 	default:
 		return MangaStatusUnknown
 	}
 }
 
-func newMangasFromMediaListGroups(groups []verniy.MediaListGroup) []Manga {
+func newMangasFromMediaListGroups(groups []verniy.MediaListGroup, reverseDirection bool) []Manga {
 	res := make([]Manga, 0, len(groups))
 	for _, group := range groups {
 		for _, mediaList := range group.Entries {
-			r, err := newMangaFromMediaListEntry(mediaList)
+			r, err := newMangaFromMediaListEntry(mediaList, reverseDirection)
 			if err != nil {
 				log.Printf("Error creating manga from media list entry: %v", err)
 				continue
@@ -398,10 +412,10 @@ func newMangasFromMediaListGroups(groups []verniy.MediaListGroup) []Manga {
 	return res
 }
 
-func newMangasFromMalUserMangas(mangas []mal.UserManga) []Manga {
+func newMangasFromMalUserMangas(mangas []mal.UserManga, reverseDirection bool) []Manga {
 	res := make([]Manga, 0, len(mangas))
 	for _, manga := range mangas {
-		r, err := newMangaFromMalManga(manga.Manga)
+		r, err := newMangaFromMalManga(manga.Manga, reverseDirection)
 		if err != nil {
 			log.Printf("Error creating manga from mal user manga: %v", err)
 			continue
@@ -415,10 +429,10 @@ func newMangasFromMalUserMangas(mangas []mal.UserManga) []Manga {
 	return res
 }
 
-func newMangasFromMalMangas(mangas []mal.Manga) []Manga {
+func newMangasFromMalMangas(mangas []mal.Manga, reverseDirection bool) []Manga {
 	res := make([]Manga, 0, len(mangas))
 	for _, manga := range mangas {
-		r, err := newMangaFromMalManga(manga)
+		r, err := newMangaFromMalManga(manga, reverseDirection)
 		if err != nil {
 			log.Printf("Error creating manga from mal manga: %v", err)
 			continue
@@ -445,10 +459,10 @@ func newSourcesFromMangas(mangas []Manga) []Source {
 	return res
 }
 
-func newMangasFromVerniyMedias(medias []verniy.Media) []Manga {
+func newMangasFromVerniyMedias(medias []verniy.Media, reverseDirection bool) []Manga {
 	res := make([]Manga, 0, len(medias))
 	for _, media := range medias {
-		m, err := newMangaFromVerniyMedia(media)
+		m, err := newMangaFromVerniyMedia(media, reverseDirection)
 		if err != nil {
 			log.Printf("failed to convert verniy media to manga: %v", err)
 			continue
@@ -458,7 +472,7 @@ func newMangasFromVerniyMedias(medias []verniy.Media) []Manga {
 	return res
 }
 
-func newMangaFromVerniyMedia(media verniy.Media) (Manga, error) {
+func newMangaFromVerniyMedia(media verniy.Media, reverseDirection bool) (Manga, error) {
 	if media.ID == 0 {
 		return Manga{}, errors.New("ID is 0")
 	}
@@ -494,18 +508,19 @@ func newMangaFromVerniyMedia(media verniy.Media) (Manga, error) {
 	}
 
 	return Manga{
-		IDAnilist:       media.ID,
-		IDMal:           idMal,
-		Progress:        0,                  // Will be set from MAL source
-		ProgressVolumes: 0,                  // Will be set from MAL source
-		Score:           0,                  // Will be set from MAL source
-		Status:          MangaStatusUnknown, // Will be set from MAL source
-		TitleEN:         titleEN,
-		TitleJP:         titleJP,
-		TitleRomaji:     romajiTitle,
-		Chapters:        chapters,
-		Volumes:         volumes,
-		StartedAt:       nil, // Will be set from MAL source
-		FinishedAt:      nil, // Will be set from MAL source
+		IDAnilist:        media.ID,
+		IDMal:            idMal,
+		Progress:         0,                  // Will be set from MAL source
+		ProgressVolumes:  0,                  // Will be set from MAL source
+		Score:            0,                  // Will be set from MAL source
+		Status:           MangaStatusUnknown, // Will be set from MAL source
+		TitleEN:          titleEN,
+		TitleJP:          titleJP,
+		TitleRomaji:      romajiTitle,
+		Chapters:         chapters,
+		Volumes:          volumes,
+		StartedAt:        nil, // Will be set from MAL source
+		FinishedAt:       nil, // Will be set from MAL source
+		reverseDirection: reverseDirection,
 	}, nil
 }

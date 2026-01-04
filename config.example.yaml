@@ -14,3 +14,6 @@ myanimelist:
   token_url: "https://myanimelist.net/v1/oauth2/token"
   username: "username" # Your MyAnimeList username.
 token_file_path: "" # Absolute path to token file, empty string use default path.
+score_normalization: true # Enable score normalization (AniList 100-point -> MAL 10-point scale)
+ignore_anime_titles: [] # List of anime titles to skip during sync (case-insensitive). Example: ["scott pilgrim takes off", "bocchi the rock! recap part 2"]
+ignore_manga_titles: [] # List of manga titles to skip during sync (case-insensitive)

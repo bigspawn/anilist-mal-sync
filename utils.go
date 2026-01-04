@@ -4,6 +4,8 @@ import (
 	"math"
 	"regexp"
 	"strings"
+
+	"github.com/nstratos/go-myanimelist/mal"
 )
 
 // levenshteinDistance calculates the Levenshtein distance between two strings
@@ -37,10 +39,12 @@ func levenshteinDistance(s1, s2 string) int {
 				cost = 1
 			}
 
-			matrix[i][j] = min3(
-				matrix[i-1][j]+1,      // deletion
-				matrix[i][j-1]+1,      // insertion
-				matrix[i-1][j-1]+cost, // substitution
+			matrix[i][j] = min(
+				matrix[i-1][j]+1, // deletion
+				min(
+					matrix[i][j-1]+1,      // insertion
+					matrix[i-1][j-1]+cost, // substitution
+				),
 			)
 		}
 	}
@@ -48,36 +52,19 @@ func levenshteinDistance(s1, s2 string) int {
 	return matrix[len(s1)][len(s2)]
 }
 
-// min3 returns the minimum of three integers
-func min3(a, b, c int) int {
-	return int(math.Min(math.Min(float64(a), float64(b)), float64(c)))
-}
+var (
+	betweenBracketsRegexp = regexp.MustCompile(`\(.*\)`)
+	titleReplacer         = strings.NewReplacer(
+		":", "", "!", "", "?", "", ".", "",
+		"-", " ", "_", " ", "  ", " ",
+	)
+)
 
-var betweenBraketsRegexp = regexp.MustCompile(`\(.*\)`)
-
-// normalizeTitle normalizes a title for better comparison
+// normalizeTitle normalizes a title for comparison by removing punctuation and brackets
 func normalizeTitle(title string) string {
-	// Convert to lowercase
 	normalized := strings.ToLower(title)
-
-	// Remove content in brackets/parentheses
-	normalized = betweenBraketsRegexp.ReplaceAllString(normalized, "")
-
-	// Remove common punctuation and extra spaces
-	replacements := []string{
-		":", "",
-		"!", "",
-		"?", "",
-		".", "",
-		"-", " ",
-		"_", " ",
-		"  ", " ",
-	}
-	replacer := strings.NewReplacer(replacements...)
-	normalized = replacer.Replace(normalized)
-
-	// Trim spaces
-	normalized = strings.TrimSpace(normalized)
+	normalized = betweenBracketsRegexp.ReplaceAllString(normalized, "")
+	normalized = strings.TrimSpace(titleReplacer.Replace(normalized))
 
 	return normalized
 }
@@ -88,7 +75,7 @@ func titleSimilarity(title1, title2 string) float64 {
 	normalized2 := normalizeTitle(title2)
 
 	if normalized1 == normalized2 {
-		return 100.0
+		return PerfectMatchThreshold
 	}
 
 	// Calculate similarity based on common words
@@ -96,26 +83,26 @@ func titleSimilarity(title1, title2 string) float64 {
 	words2 := strings.Fields(normalized2)
 
 	if len(words1) == 0 || len(words2) == 0 {
-		return 0.0
+		return NoMatchThreshold
+	}
+
+	// Use a map for O(n+m) complexity instead of O(n*m)
+	words2Set := make(map[string]struct{}, len(words2))
+	for _, word2 := range words2 {
+		words2Set[word2] = struct{}{}
 	}
 
 	commonWords := 0
 	for _, word1 := range words1 {
-		for _, word2 := range words2 {
-			if word1 == word2 {
-				commonWords++
-				break
-			}
+		if _, exists := words2Set[word1]; exists {
+			commonWords++
 		}
 	}
 
 	// Calculate similarity percentage
+	// Note: totalWords cannot be 0 here since we already checked for empty word slices above
 	totalWords := len(words1) + len(words2)
-	if totalWords == 0 {
-		return 0.0
-	}
-
-	similarity := (float64(commonWords*2) / float64(totalWords)) * 100.0
+	similarity := (float64(commonWords*2) / float64(totalWords)) * PercentMultiplier
 
 	return similarity
 }
@@ -126,128 +113,100 @@ func titleLevenshteinSimilarity(title1, title2 string) float64 {
 	normalized2 := normalizeTitle(title2)
 
 	if normalized1 == normalized2 {
-		return 100.0
+		return PerfectMatchThreshold
 	}
 
 	distance := levenshteinDistance(normalized1, normalized2)
-	maxLen := len(normalized1)
-	if len(normalized2) > maxLen {
-		maxLen = len(normalized2)
-	}
+	maxLen := max(len(normalized1), len(normalized2))
 
 	if maxLen == 0 {
-		return 100.0
+		return PerfectMatchThreshold
 	}
 
-	similarity := (1.0 - float64(distance)/float64(maxLen)) * 100.0
-	if similarity < 0 {
-		similarity = 0
-	}
+	similarity := (1.0 - float64(distance)/float64(maxLen)) * PercentMultiplier
+	similarity = max(similarity, NoMatchThreshold)
 
 	return similarity
 }
 
-// titleMatchingLevels performs multi-level title matching
+const (
+	// MALScoreMax is the maximum score value accepted by MAL (0-10)
+	MALScoreMax = 10
+	// MALScoreScaleDivisor is used to convert 100-point scale to 10-point scale
+	MALScoreScaleDivisor = 10.0
+)
+
+// normalizeScoreForMAL converts AniList scores to MAL 0-10 integer scores.
+// MAL only accepts integer scores from 0-10, so this function ensures
+// all scores are properly normalized regardless of AniList's scoring system.
+//
+// Normalization rules:
+// - If score <= 0 -> 0 (MAL treats 0 as "no score")
+// - If score > 10 (e.g. 100-point scale) -> divide by 10 and round
+// - Otherwise round to nearest integer (0-10)
+func normalizeScoreForMAL(score float64) mal.Score {
+	if score <= 0 {
+		return mal.Score(0)
+	}
+
+	s := score
+	// Handle 100-point scale (or any scale > 10)
+	if s > MALScoreMax {
+		s /= MALScoreScaleDivisor
+	}
+
+	// Clamp to valid MAL range (0-10) and round to nearest integer
+	s = min(s, float64(MALScoreMax))
+	normalized := int(math.Round(s))
+
+	// Clamp to valid range (shouldn't be needed after above checks, but safety)
+	normalized = max(0, min(normalized, MALScoreMax))
+
+	return mal.Score(normalized)
+}
+
+// checkTitlePair checks if two title strings match using the given comparison function
+func checkTitlePair(title1, title2 string, compare func(string, string) bool) bool {
+	return title1 != "" && title2 != "" && compare(title1, title2)
+}
+
+// titleMatchingLevels performs multi-level title matching with increasing flexibility
 func titleMatchingLevels(titleEN1, titleJP1, titleRomaji1, titleEN2, titleJP2, titleRomaji2 string) bool {
-	// Level 1: Exact case-insensitive title matching
-	if titleEN1 != "" && titleEN2 != "" && strings.EqualFold(titleEN1, titleEN2) {
-		DPrintf("Exact match found TitleEN: %s == %s", titleEN1, titleEN2)
+	// Level 1: Exact case-insensitive match
+	if checkTitlePair(titleEN1, titleEN2, strings.EqualFold) ||
+		checkTitlePair(titleJP1, titleJP2, strings.EqualFold) ||
+		checkTitlePair(titleRomaji1, titleRomaji2, strings.EqualFold) {
 		return true
 	}
 
-	if titleJP1 != "" && titleJP2 != "" && strings.EqualFold(titleJP1, titleJP2) {
-		DPrintf("Exact match found TitleJP: %s == %s", titleJP1, titleJP2)
+	// Level 2: Normalized match (removes punctuation, brackets)
+	normalizedMatch := func(t1, t2 string) bool {
+		return normalizeTitle(t1) == normalizeTitle(t2)
+	}
+	if checkTitlePair(titleEN1, titleEN2, normalizedMatch) ||
+		checkTitlePair(titleJP1, titleJP2, normalizedMatch) ||
+		checkTitlePair(titleRomaji1, titleRomaji2, normalizedMatch) {
 		return true
 	}
 
-	if titleRomaji1 != "" && titleRomaji2 != "" && strings.EqualFold(titleRomaji1, titleRomaji2) {
-		DPrintf("Exact match found TitleRomaji: %s == %s", titleRomaji1, titleRomaji2)
+	// Level 3: Fuzzy match (word-based similarity)
+	fuzzyMatch := func(t1, t2 string) bool {
+		return titleSimilarity(t1, t2) >= TitleSimilarityThreshold
+	}
+	if checkTitlePair(titleEN1, titleEN2, fuzzyMatch) ||
+		checkTitlePair(titleJP1, titleJP2, fuzzyMatch) ||
+		checkTitlePair(titleRomaji1, titleRomaji2, fuzzyMatch) {
 		return true
 	}
 
-	// Level 2: Normalized exact matching (removes punctuation, brackets, etc.)
-	if titleEN1 != "" && titleEN2 != "" {
-		normalizedA := normalizeTitle(titleEN1)
-		normalizedB := normalizeTitle(titleEN2)
-		if normalizedA == normalizedB {
-			DPrintf("Normalized match found TitleEN: '%s' == '%s' (original: '%s' vs '%s')", normalizedA,
-				normalizedB, titleEN1, titleEN2)
-			return true
-		}
+	// Level 4: Levenshtein distance match
+	levenshteinMatch := func(t1, t2 string) bool {
+		return titleLevenshteinSimilarity(t1, t2) >= TitleLevenshteinThreshold
 	}
-
-	if titleJP1 != "" && titleJP2 != "" {
-		normalizedA := normalizeTitle(titleJP1)
-		normalizedB := normalizeTitle(titleJP2)
-		if normalizedA == normalizedB {
-			DPrintf("Normalized match found TitleJP: '%s' == '%s' (original: '%s' vs '%s')",
-				normalizedA, normalizedB, titleJP1, titleJP2)
-			return true
-		}
-	}
-
-	if titleRomaji1 != "" && titleRomaji2 != "" {
-		normalizedA := normalizeTitle(titleRomaji1)
-		normalizedB := normalizeTitle(titleRomaji2)
-		if normalizedA == normalizedB {
-			DPrintf("Normalized match found TitleRomaji: '%s' == '%s' (original: '%s' vs '%s')",
-				normalizedA, normalizedB, titleRomaji1, titleRomaji2)
-			return true
-		}
-	}
-
-	// Level 3: Fuzzy matching with similarity threshold
-	const similarityThreshold = 98.0
-	if titleEN1 != "" && titleEN2 != "" {
-		similarity := titleSimilarity(titleEN1, titleEN2)
-		if similarity >= similarityThreshold {
-			DPrintf("Fuzzy match found TitleEN: '%s' ~= '%s' (similarity: %.2f)", titleEN1, titleEN2, similarity)
-			return true
-		}
-	}
-
-	if titleJP1 != "" && titleJP2 != "" {
-		similarity := titleSimilarity(titleJP1, titleJP2)
-		if similarity >= similarityThreshold {
-			DPrintf("Fuzzy match found TitleJP: '%s' ~= '%s' (similarity: %.2f)", titleJP1, titleJP2, similarity)
-			return true
-		}
-	}
-
-	if titleRomaji1 != "" && titleRomaji2 != "" {
-		similarity := titleSimilarity(titleRomaji1, titleRomaji2)
-		if similarity >= similarityThreshold {
-			DPrintf("Fuzzy match found TitleRomaji: '%s' ~= '%s' (similarity: %.2f)", titleRomaji1,
-				titleRomaji2, similarity)
-			return true
-		}
-	}
-
-	// Level 4: Levenshtein distance-based matching
-	const levenshteinThreshold = 98.0
-	if titleEN1 != "" && titleEN2 != "" {
-		similarity := titleLevenshteinSimilarity(titleEN1, titleEN2)
-		if similarity >= levenshteinThreshold {
-			DPrintf("Levenshtein match found TitleEN: '%s' ~= '%s' (similarity: %.2f)", titleEN1, titleEN2, similarity)
-			return true
-		}
-	}
-
-	if titleJP1 != "" && titleJP2 != "" {
-		similarity := titleLevenshteinSimilarity(titleJP1, titleJP2)
-		if similarity >= levenshteinThreshold {
-			DPrintf("Levenshtein match found TitleJP: '%s' ~= '%s' (similarity: %.2f)", titleJP1, titleJP2, similarity)
-			return true
-		}
-	}
-
-	if titleRomaji1 != "" && titleRomaji2 != "" {
-		similarity := titleLevenshteinSimilarity(titleRomaji1, titleRomaji2)
-		if similarity >= levenshteinThreshold {
-			DPrintf("Levenshtein match found TitleRomaji: '%s' ~= '%s' (similarity: %.2f)", titleRomaji1,
-				titleRomaji2, similarity)
-			return true
-		}
+	if checkTitlePair(titleEN1, titleEN2, levenshteinMatch) ||
+		checkTitlePair(titleJP1, titleJP2, levenshteinMatch) ||
+		checkTitlePair(titleRomaji1, titleRomaji2, levenshteinMatch) {
+		return true
 	}
 
 	return false

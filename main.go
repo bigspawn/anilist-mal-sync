@@ -9,39 +9,35 @@ import (
 )
 
 var (
-	configFile       = flag.String("c", "config.yaml", "path to config file")
-	forceSync        = flag.Bool("f", false, "force sync all animes")
-	dryRun           = flag.Bool("d", false, "dry run without updating MyAnimeList")
-	mangaSync        = flag.Bool("manga", false, "sync manga instead of anime")
-	allSync          = flag.Bool("all", false, "sync all animes and mangas")
-	verbose          = flag.Bool("verbose", false, "enable verbose logging")
-	reverseDirection = flag.Bool(
-		"reverse-direction",
-		false,
-		"sync from MyAnimeList to AniList (default is AniList to MyAnimeList)",
+	configFile = flag.String(FlagConfigFile, DefaultConfigFile, "path to config file")
+	forceSync  = flag.Bool(FlagForceSync, DefaultForceSync, "force sync all entries")
+	dryRun     = flag.Bool(FlagDryRun, DefaultDryRun, "dry run without making any changes")
+	mangaSync  = flag.Bool(FlagMangaSync, DefaultMangaSync, "sync manga instead of anime")
+	allSync    = flag.Bool(FlagAllSync, DefaultAllSync, "sync both anime and manga")
+	verbose    = flag.Bool(FlagVerbose, DefaultVerbose, "enable verbose logging")
+	direction  = flag.String(
+		FlagDirection,
+		DefaultDirection,
+		"sync direction: 'anilist-to-mal' (AniList → MAL, default), 'mal-to-anilist' (MAL → AniList), or 'both' (bidirectional)",
 	)
 )
 
 func main() {
 	flag.Parse()
 
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	ctx, _ := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 
-	config, err := loadConfigFromFile(*configFile)
+	config, err := Load(*configFile)
 	if err != nil {
-		cancel()
-		log.Fatalf("error: %v", err)
+		log.Fatalf("error loading config: %v", err)
 	}
 
-	app, err := NewApp(ctx, config)
+	app, err := NewApp(ctx, config, *forceSync, *dryRun, *verbose, *mangaSync, *allSync, *direction)
 	if err != nil {
-		cancel()
-		log.Fatalf("create app: %v", err)
+		log.Fatalf("error creating app: %v", err)
 	}
 
 	if err := app.Run(ctx); err != nil {
-		cancel()
-		log.Fatalf("run app: %v", err)
+		log.Fatalf("error running app: %v", err)
 	}
-	cancel()
 }
