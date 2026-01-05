@@ -342,8 +342,6 @@ func (a *App) fetchData(ctx context.Context, mediaType string, fromAnilist bool,
 }
 
 // fetchFromAnilistToMAL fetches data for AniList -> MAL sync
-//
-//nolint:dupl // ok
 func (a *App) fetchFromAnilistToMAL(ctx context.Context, mediaType string, prefix string) ([]Source, []Target, error) {
 	log.Printf("[%s] Fetching AniList...", prefix)
 
@@ -390,8 +388,6 @@ func (a *App) fetchFromAnilistToMAL(ctx context.Context, mediaType string, prefi
 }
 
 // fetchFromMALToAnilist fetches data for MAL -> AniList sync
-//
-//nolint:dupl // ok
 func (a *App) fetchFromMALToAnilist(ctx context.Context, mediaType string, prefix string) ([]Source, []Target, error) {
 	log.Printf("[%s] Fetching MAL...", prefix)
 

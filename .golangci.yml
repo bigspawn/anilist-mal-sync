@@ -53,6 +53,9 @@ linters:
       - text: "exported: exported"
         linters:
           - revive
+      - path: "_test\\.go"
+        linters:
+          - dupl
   settings:
     lll:
       line-length: 140
