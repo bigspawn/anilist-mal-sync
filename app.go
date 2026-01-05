@@ -341,7 +341,11 @@ func (a *App) fetchData(ctx context.Context, mediaType string, fromAnilist bool,
 	return a.fetchFromMALToAnilist(ctx, mediaType, prefix)
 }
 
-// fetchFromAnilistToMAL fetches data for AniList -> MAL sync
+// fetchFromAnilistToMAL fetches data for AniList -> MAL sync.
+// Note: this function intentionally mirrors the corresponding MAL -> AniList
+// fetch function, so some duplication is expected and acceptable. We keep
+// these flows separate for clarity and to make each sync direction easier
+// to reason about, even though this may trigger dupl linter warnings.
 func (a *App) fetchFromAnilistToMAL(ctx context.Context, mediaType string, prefix string) ([]Source, []Target, error) {
 	log.Printf("[%s] Fetching AniList...", prefix)
 
@@ -387,7 +391,9 @@ func (a *App) fetchFromAnilistToMAL(ctx context.Context, mediaType string, prefi
 	return srcs, tgts, nil
 }
 
-// fetchFromMALToAnilist fetches data for MAL -> AniList sync
+// fetchFromMALToAnilist fetches data for MAL -> AniList sync.
+// The structure of this function intentionally mirrors fetchFromAnilistToMAL
+// to keep the two sync directions explicit and symmetrical.
 func (a *App) fetchFromMALToAnilist(ctx context.Context, mediaType string, prefix string) ([]Source, []Target, error) {
 	log.Printf("[%s] Fetching MAL...", prefix)
 
