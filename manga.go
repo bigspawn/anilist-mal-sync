@@ -68,7 +68,7 @@ type Manga struct {
 	IDMal           int
 	Progress        int
 	ProgressVolumes int
-	Score           float64
+	Score           int
 	Status          MangaStatus
 	TitleEN         string
 	TitleJP         string
@@ -115,7 +115,7 @@ func (m Manga) SameProgressWithTarget(t Target) bool {
 		return false
 	}
 	if m.Score != b.Score {
-		DPrintf("Score: %f != %f", m.Score, b.Score)
+		DPrintf("Score: %d != %d", m.Score, b.Score)
 		return false
 	}
 	if m.Progress != b.Progress {
@@ -187,7 +187,7 @@ func (m Manga) String() string {
 	sb.WriteString(fmt.Sprintf("TitleEN: %s, ", m.TitleEN))
 	sb.WriteString(fmt.Sprintf("TitleJP: %s, ", m.TitleJP))
 	sb.WriteString(fmt.Sprintf("Status: %s, ", m.Status))
-	sb.WriteString(fmt.Sprintf("Score: %f, ", m.Score))
+	sb.WriteString(fmt.Sprintf("Score: %d, ", m.Score))
 	sb.WriteString(fmt.Sprintf("Progress: %d, ", m.Progress))
 	sb.WriteString(fmt.Sprintf("ProgressVolumes: %d, ", m.ProgressVolumes))
 	sb.WriteString(fmt.Sprintf("Chapters: %d, ", m.Chapters))
@@ -227,7 +227,7 @@ func (m Manga) GetUpdateOptions() []mal.UpdateMyMangaListStatusOption {
 	return opts
 }
 
-func newMangaFromMediaListEntry(mediaList verniy.MediaList) (Manga, error) {
+func newMangaFromMediaListEntry(mediaList verniy.MediaList, scoreFormat verniy.ScoreFormat) (Manga, error) {
 	if mediaList.Media == nil {
 		return Manga{}, errors.New("media is nil")
 	}
@@ -240,9 +240,10 @@ func newMangaFromMediaListEntry(mediaList verniy.MediaList) (Manga, error) {
 		return Manga{}, errors.New("title is nil")
 	}
 
-	var score float64
+	var score int
 	if mediaList.Score != nil {
-		score = *mediaList.Score
+		// Normalize AniList score to MAL format (0-10)
+		score = normalizeMangaScoreForMAL(*mediaList.Score, scoreFormat)
 	}
 
 	var progress int
@@ -334,7 +335,7 @@ func newMangaFromMalManga(manga mal.Manga) (Manga, error) {
 		IDMal:           manga.ID,
 		Progress:        manga.MyListStatus.NumChaptersRead,
 		ProgressVolumes: manga.MyListStatus.NumVolumesRead,
-		Score:           float64(manga.MyListStatus.Score),
+		Score:           manga.MyListStatus.Score, // MAL score is already 0-10 int
 		Status:          mapMalMangaStatusToStatus(manga.MyListStatus.Status),
 		TitleEN:         titleEN,
 		TitleJP:         titleJP,
@@ -382,11 +383,11 @@ func mapAnilistMangaStatustToStatus(s verniy.MediaListStatus) MangaStatus {
 	}
 }
 
-func newMangasFromMediaListGroups(groups []verniy.MediaListGroup) []Manga {
+func newMangasFromMediaListGroups(groups []verniy.MediaListGroup, scoreFormat verniy.ScoreFormat) []Manga {
 	res := make([]Manga, 0, len(groups))
 	for _, group := range groups {
 		for _, mediaList := range group.Entries {
-			r, err := newMangaFromMediaListEntry(mediaList)
+			r, err := newMangaFromMediaListEntry(mediaList, scoreFormat)
 			if err != nil {
 				log.Printf("Error creating manga from media list entry: %v", err)
 				continue

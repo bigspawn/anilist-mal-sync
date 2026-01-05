@@ -1,4 +1,4 @@
-.PHONY: build test lint help clean
+.PHONY: build test lint fmt help clean
 
 BINARY_NAME=anilist-mal-sync
 LINT_VERSION=v1.64.6
@@ -13,6 +13,12 @@ build:
 # Run tests
 test:
 	go test ./... -v
+
+# Format code with gofumpt
+fmt:
+	@echo "Formatting code with gofumpt..."
+	@gofumpt -l -w .
+	@echo "Formatting complete!"
 
 # Run linter using Docker
 lint:
@@ -32,6 +38,7 @@ help:
 	@echo "Available commands:"
 	@echo "  build     - Build the application"
 	@echo "  test      - Run tests"
+	@echo "  fmt       - Format code with gofumpt"
 	@echo "  lint      - Run linter using Docker (golangci-lint $(LINT_VERSION))"
 	@echo "  clean     - Remove build artifacts, temporary files and clean test cache"
 	@echo "  help      - Show this help message"

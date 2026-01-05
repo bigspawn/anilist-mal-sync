@@ -69,7 +69,7 @@ type Anime struct {
 	IDAnilist   int
 	IDMal       int
 	Progress    int
-	Score       float64
+	Score       int
 	SeasonYear  int
 	Status      Status
 	TitleEN     string
@@ -118,7 +118,7 @@ func (a Anime) SameProgressWithTarget(t Target) bool {
 		return false
 	}
 	if a.Score != b.Score {
-		DPrintf("Score: %f != %f", a.Score, b.Score)
+		DPrintf("Score: %d != %d", a.Score, b.Score)
 		return false
 	}
 	progress := a.Progress == b.Progress
@@ -224,7 +224,7 @@ func (a Anime) String() string {
 	sb.WriteString(fmt.Sprintf("TitleEN: %s, ", a.TitleEN))
 	sb.WriteString(fmt.Sprintf("TitleJP: %s, ", a.TitleJP))
 	sb.WriteString(fmt.Sprintf("MediaListStatus: %s, ", a.Status))
-	sb.WriteString(fmt.Sprintf("Score: %f, ", a.Score))
+	sb.WriteString(fmt.Sprintf("Score: %d, ", a.Score))
 	sb.WriteString(fmt.Sprintf("Progress: %d, ", a.Progress))
 	sb.WriteString(fmt.Sprintf("EpisodeNumber: %d, ", a.NumEpisodes))
 	sb.WriteString(fmt.Sprintf("SeasonYear: %d, ", a.SeasonYear))
@@ -234,11 +234,11 @@ func (a Anime) String() string {
 	return sb.String()
 }
 
-func newAnimesFromMediaListGroups(groups []verniy.MediaListGroup) []Anime {
+func newAnimesFromMediaListGroups(groups []verniy.MediaListGroup, scoreFormat verniy.ScoreFormat) []Anime {
 	res := make([]Anime, 0, len(groups))
 	for _, group := range groups {
 		for _, mediaList := range group.Entries {
-			a, err := newAnimeFromMediaListEntry(mediaList)
+			a, err := newAnimeFromMediaListEntry(mediaList, scoreFormat)
 			if err != nil {
 				log.Printf("Error creating anime from media list entry: %v", err)
 				continue
@@ -250,7 +250,7 @@ func newAnimesFromMediaListGroups(groups []verniy.MediaListGroup) []Anime {
 	return res
 }
 
-func newAnimeFromMediaListEntry(mediaList verniy.MediaList) (Anime, error) {
+func newAnimeFromMediaListEntry(mediaList verniy.MediaList, scoreFormat verniy.ScoreFormat) (Anime, error) {
 	if mediaList.Media == nil {
 		return Anime{}, errors.New("media is nil")
 	}
@@ -263,9 +263,10 @@ func newAnimeFromMediaListEntry(mediaList verniy.MediaList) (Anime, error) {
 		return Anime{}, errors.New("title is nil")
 	}
 
-	var score float64
+	var score int
 	if mediaList.Score != nil {
-		score = *mediaList.Score
+		// Normalize AniList score to MAL format (0-10)
+		score = normalizeScoreForMAL(*mediaList.Score, scoreFormat)
 	}
 
 	var progress int
@@ -381,7 +382,7 @@ func newAnimeFromMalAnime(malAnime mal.Anime) (Anime, error) {
 		IDAnilist:   anilistID,
 		IDMal:       malAnime.ID,
 		Progress:    malAnime.MyListStatus.NumEpisodesWatched,
-		Score:       float64(malAnime.MyListStatus.Score),
+		Score:       malAnime.MyListStatus.Score, // MAL score is already 0-10 int
 		SeasonYear:  malAnime.StartSeason.Year,
 		Status:      mapMalAnimeStatusToStatus(malAnime.MyListStatus.Status),
 		TitleEN:     titleEN,
