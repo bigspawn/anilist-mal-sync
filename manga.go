@@ -68,7 +68,7 @@ type Manga struct {
 	IDMal           int
 	Progress        int
 	ProgressVolumes int
-	Score           float64
+	Score           int
 	Status          MangaStatus
 	TitleEN         string
 	TitleJP         string
@@ -115,7 +115,7 @@ func (m Manga) SameProgressWithTarget(t Target) bool {
 		return false
 	}
 	if m.Score != b.Score {
-		DPrintf("Score: %f != %f", m.Score, b.Score)
+		DPrintf("Score: %d != %d", m.Score, b.Score)
 		return false
 	}
 	if m.Progress != b.Progress {
@@ -187,7 +187,7 @@ func (m Manga) String() string {
 	sb.WriteString(fmt.Sprintf("TitleEN: %s, ", m.TitleEN))
 	sb.WriteString(fmt.Sprintf("TitleJP: %s, ", m.TitleJP))
 	sb.WriteString(fmt.Sprintf("Status: %s, ", m.Status))
-	sb.WriteString(fmt.Sprintf("Score: %f, ", m.Score))
+	sb.WriteString(fmt.Sprintf("Score: %d, ", m.Score))
 	sb.WriteString(fmt.Sprintf("Progress: %d, ", m.Progress))
 	sb.WriteString(fmt.Sprintf("ProgressVolumes: %d, ", m.ProgressVolumes))
 	sb.WriteString(fmt.Sprintf("Chapters: %d, ", m.Chapters))
@@ -227,7 +227,7 @@ func (m Manga) GetUpdateOptions() []mal.UpdateMyMangaListStatusOption {
 	return opts
 }
 
-func newMangaFromMediaListEntry(mediaList verniy.MediaList) (Manga, error) {
+func newMangaFromMediaListEntry(mediaList verniy.MediaList, scoreFormat verniy.ScoreFormat) (Manga, error) {
 	if mediaList.Media == nil {
 		return Manga{}, errors.New("media is nil")
 	}
@@ -240,9 +240,10 @@ func newMangaFromMediaListEntry(mediaList verniy.MediaList) (Manga, error) {
 		return Manga{}, errors.New("title is nil")
 	}
 
-	var score float64
+	var score int
 	if mediaList.Score != nil {
-		score = *mediaList.Score
+		// Normalize AniList score to MAL format (0-10)
+		score = normalizeMangaScoreForMAL(*mediaList.Score, scoreFormat)
 	}
 
 	var progress int
@@ -334,7 +335,7 @@ func newMangaFromMalManga(manga mal.Manga) (Manga, error) {
 		IDMal:           manga.ID,
 		Progress:        manga.MyListStatus.NumChaptersRead,
 		ProgressVolumes: manga.MyListStatus.NumVolumesRead,
-		Score:           float64(manga.MyListStatus.Score),
+		Score:           manga.MyListStatus.Score, // MAL score is already 0-10 int
 		Status:          mapMalMangaStatusToStatus(manga.MyListStatus.Status),
 		TitleEN:         titleEN,
 		TitleJP:         titleJP,
@@ -382,11 +383,11 @@ func mapAnilistMangaStatustToStatus(s verniy.MediaListStatus) MangaStatus {
 	}
 }
 
-func newMangasFromMediaListGroups(groups []verniy.MediaListGroup) []Manga {
+func newMangasFromMediaListGroups(groups []verniy.MediaListGroup, scoreFormat verniy.ScoreFormat) []Manga {
 	res := make([]Manga, 0, len(groups))
 	for _, group := range groups {
 		for _, mediaList := range group.Entries {
-			r, err := newMangaFromMediaListEntry(mediaList)
+			r, err := newMangaFromMediaListEntry(mediaList, scoreFormat)
 			if err != nil {
 				log.Printf("Error creating manga from media list entry: %v", err)
 				continue
@@ -508,4 +509,89 @@ func newMangaFromVerniyMedia(media verniy.Media) (Manga, error) {
 		StartedAt:       nil, // Will be set from MAL source
 		FinishedAt:      nil, // Will be set from MAL source
 	}, nil
+}
+
+// normalizeMangaScoreForMAL converts AniList score to 0-10 int format
+func normalizeMangaScoreForMAL(anilistScore float64, scoreFormat verniy.ScoreFormat) int {
+	if anilistScore == 0 {
+		return 0
+	}
+
+	var normalized float64
+
+	switch scoreFormat {
+	case verniy.ScoreFormatPoint100:
+		normalized = anilistScore / 10.0
+		DPrintf("Score normalized (POINT_100): %.1f → %.1f", anilistScore, normalized)
+
+	case verniy.ScoreFormatPoint100Decimal: // "POINT_10_DECIMAL"
+		normalized = anilistScore
+
+	case verniy.ScoreFormatPoint10:
+		normalized = anilistScore
+
+	case verniy.ScoreFormatPoint5:
+		normalized = anilistScore * 2.0
+		DPrintf("Score normalized (POINT_5): %.1f → %.1f", anilistScore, normalized)
+
+	case verniy.ScoreFormatPoint3:
+		normalized = (anilistScore / 3.0) * 10.0
+		DPrintf("Score normalized (POINT_3): %.1f → %.1f", anilistScore, normalized)
+
+	default:
+		if anilistScore > 10 {
+			normalized = anilistScore / 10.0
+			DPrintf("Score normalized (unknown): %.1f → %.1f", anilistScore, normalized)
+		} else {
+			normalized = anilistScore
+		}
+	}
+
+	// Clamp 0-10
+	if normalized > 10 {
+		DPrintf("Score %.1f > 10, clamping", normalized)
+		normalized = 10
+	}
+	if normalized < 0 {
+		normalized = 0
+	}
+
+	return int(normalized + 0.5) // Round to nearest int
+}
+
+// denormalizeMangaScoreForAniList converts 0-10 int format back to AniList format
+func denormalizeMangaScoreForAniList(normalizedScore int, scoreFormat verniy.ScoreFormat) int {
+	if normalizedScore == 0 {
+		return 0
+	}
+
+	var result float64
+
+	switch scoreFormat {
+	case verniy.ScoreFormatPoint100:
+		result = float64(normalizedScore) * 10.0
+		DPrintf("Score denormalized (POINT_100): %d → %.1f", normalizedScore, result)
+
+	case verniy.ScoreFormatPoint100Decimal: // "POINT_10_DECIMAL"
+		result = float64(normalizedScore)
+
+	case verniy.ScoreFormatPoint10:
+		result = float64(normalizedScore)
+
+	case verniy.ScoreFormatPoint5:
+		result = float64(normalizedScore) / 2.0
+		DPrintf("Score denormalized (POINT_5): %d → %.1f", normalizedScore, result)
+
+	case verniy.ScoreFormatPoint3:
+		result = (float64(normalizedScore) / 10.0) * 3.0
+		if result < 1 && normalizedScore > 0 {
+			result = 1
+		}
+		DPrintf("Score denormalized (POINT_3): %d → %.1f", normalizedScore, result)
+
+	default:
+		result = float64(normalizedScore)
+	}
+
+	return int(result + 0.5) // Round to nearest int
 }

@@ -448,3 +448,35 @@ func retryWithBackoff(ctx context.Context, operation func() error, operationName
 		},
 	)
 }
+
+// GetUserScoreFormat retrieves the user's score format preference from AniList
+func (c *AnilistClient) GetUserScoreFormat(ctx context.Context) (verniy.ScoreFormat, error) {
+	var result *verniy.User
+
+	err := retryWithBackoff(ctx, func() error {
+		user, e := c.c.GetUserWithContext(ctx, c.username,
+			verniy.UserFieldMediaListOptions(
+				verniy.MediaListOptionsFieldScoreFormat,
+			),
+		)
+		if e != nil {
+			return fmt.Errorf("failed to get user score format: %w", e)
+		}
+		result = user
+		return nil
+	}, fmt.Sprintf("AniList get user score format: %s", c.username))
+
+	if err != nil {
+		return "", err
+	}
+
+	if result.MediaListOptions == nil {
+		return "", fmt.Errorf("user media list options is nil")
+	}
+
+	if result.MediaListOptions.ScoreFormat == nil {
+		return "", fmt.Errorf("user score format is nil")
+	}
+
+	return *result.MediaListOptions.ScoreFormat, nil
+}
