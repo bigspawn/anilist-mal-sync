@@ -465,7 +465,6 @@ func (c *AnilistClient) GetUserScoreFormat(ctx context.Context) (verniy.ScoreFor
 		result = user
 		return nil
 	}, fmt.Sprintf("AniList get user score format: %s", c.username))
-
 	if err != nil {
 		return "", err
 	}
