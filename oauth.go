@@ -216,6 +216,24 @@ func startServer(ctx context.Context, oauth *OAuth, port string, done chan<- boo
 		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
 
+		// Validate state parameter for CSRF protection
+		state := r.URL.Query().Get("state")
+		if state == "" {
+			http.Error(w, "State parameter missing", http.StatusBadRequest)
+			log.Printf("State parameter missing in callback")
+			return
+		}
+
+		oauth.stateMu.RLock()
+		expectedState := oauth.state
+		oauth.stateMu.RUnlock()
+
+		if state != expectedState {
+			http.Error(w, "Invalid state parameter", http.StatusBadRequest)
+			log.Printf("State mismatch: expected=%s, got=%s", expectedState, state)
+			return
+		}
+
 		code := r.URL.Query().Get("code")
 		if code == "" {
 			http.Error(w, "Code parameter missing", http.StatusBadRequest)
