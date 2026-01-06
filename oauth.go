@@ -200,18 +200,43 @@ func readTokenFile(tokenFilePath string) (*TokenFile, error) {
 }
 
 func writeTokenFile(tokenFilePath string, tokenFile *TokenFile) error {
+	// Use atomic write pattern: write to temp file, then rename
+	// This prevents partial writes and corruption if process crashes
 	// #nosec G304 - Token file path is user's config directory for OAuth tokens
-	file, err := os.Create(tokenFilePath)
-	if err != nil {
-		return fmt.Errorf("error creating token file: %w", err)
-	}
-	defer func() {
-		if err := file.Close(); err != nil {
-			log.Printf("Error closing token file: %v", err)
-		}
-	}()
+	dir := filepath.Dir(tokenFilePath)
 
-	return json.NewEncoder(file).Encode(tokenFile)
+	// Create temporary file in same directory (ensures same filesystem)
+	tmpFile, err := os.CreateTemp(dir, "token*.tmp")
+	if err != nil {
+		return fmt.Errorf("error creating temp file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+
+	// Write to temp file
+	if err := json.NewEncoder(tmpFile).Encode(tokenFile); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpPath)
+		return fmt.Errorf("error encoding token file: %w", err)
+	}
+
+	// Ensure data is flushed to disk before rename
+	if err := tmpFile.Sync(); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpPath)
+		return fmt.Errorf("error syncing temp file: %w", err)
+	}
+
+	if err := tmpFile.Close(); err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("error closing temp file: %w", err)
+	}
+
+	// Atomic rename (overwrites target if exists)
+	if err := os.Rename(tmpPath, tokenFilePath); err != nil {
+		return fmt.Errorf("error renaming temp file: %w", err)
+	}
+
+	return nil
 }
 
 func shutdownServer(ctx context.Context, server *http.Server) {
