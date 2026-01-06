@@ -10,8 +10,6 @@ import (
 	"golang.org/x/oauth2"
 )
 
-const randNumb = 43
-
 var errEmptyMalID = errors.New("mal id is empty")
 
 var animeFields = mal.Fields{

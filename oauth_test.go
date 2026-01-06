@@ -38,7 +38,6 @@ func TestNewOAuth_Success(t *testing.T) {
 
 	config := testSiteConfig()
 	oauth, err := NewOAuth(config, "http://localhost:18080/callback", "test", []oauth2.AuthCodeOption{}, tokenPath)
-
 	if err != nil {
 		t.Fatalf("NewOAuth() error = %v", err)
 	}
@@ -279,6 +278,7 @@ func TestMissingTokenFile(t *testing.T) {
 
 	if tf == nil {
 		t.Error("readTokenFile() should return empty TokenFile, not nil")
+		return
 	}
 
 	if len(tf.Tokens) != 0 {
@@ -291,7 +291,7 @@ func TestInvalidTokenFileJSON(t *testing.T) {
 	tokenPath := filepath.Join(tmpDir, "invalid.json")
 
 	// Write invalid JSON
-	if err := os.WriteFile(tokenPath, []byte("{invalid json"), 0600); err != nil {
+	if err := os.WriteFile(tokenPath, []byte("{invalid json}"), 0o600); err != nil {
 		t.Fatalf("setup: WriteFile() error = %v", err)
 	}
 
@@ -539,7 +539,9 @@ func TestStateValidation_MissingState(t *testing.T) {
 	handler.ServeHTTP(w, req)
 
 	resp := w.Result()
-	resp.Body.Close()
+	if err := resp.Body.Close(); err != nil {
+		t.Logf("Warning: failed to close response body: %v", err)
+	}
 
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("status code = %v, want %v", resp.StatusCode, http.StatusBadRequest)
@@ -583,7 +585,9 @@ func TestStateValidation_MismatchedState(t *testing.T) {
 	handler.ServeHTTP(w, req)
 
 	resp := w.Result()
-	resp.Body.Close()
+	if err := resp.Body.Close(); err != nil {
+		t.Logf("Warning: failed to close response body: %v", err)
+	}
 
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("status code = %v, want %v", resp.StatusCode, http.StatusBadRequest)
@@ -630,7 +634,9 @@ func TestStateValidation_ValidState(t *testing.T) {
 	handler.ServeHTTP(w, req)
 
 	resp := w.Result()
-	resp.Body.Close()
+	if err := resp.Body.Close(); err != nil {
+		t.Logf("Warning: failed to close response body: %v", err)
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("status code = %v, want %v", resp.StatusCode, http.StatusOK)
@@ -801,9 +807,11 @@ func TestConcurrentTokenAndStateAccess(t *testing.T) {
 
 func setupMockOAuthServer(t *testing.T) (*httptest.Server, *oauth2.Config) {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/x-www-form-urlencoded")
-		w.Write([]byte("access_token=mocktoken&token_type=bearer&expires_in=3600"))
+		if _, err := w.Write([]byte("access_token=mocktoken&token_type=bearer&expires_in=3600")); err != nil {
+			http.Error(w, "failed to write response", http.StatusInternalServerError)
+		}
 	})
 
 	server := httptest.NewServer(mux)
@@ -828,11 +836,11 @@ func TestExchangeToken_WithMockServer(t *testing.T) {
 
 	// Create OAuth with mock config
 	oauth := &OAuth{
-		Config:         mockConfig,
-		siteName:       "test",
+		Config:          mockConfig,
+		siteName:        "test",
 		authCodeOptions: []oauth2.AuthCodeOption{},
-		tokenFilePath:  tokenPath,
-		state:          "test_state",
+		tokenFilePath:   tokenPath,
+		state:           "test_state",
 	}
 
 	// Exchange token (will use mock server)

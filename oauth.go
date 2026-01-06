@@ -103,10 +103,13 @@ func (oauth *OAuth) TokenSource(ctx context.Context) oauth2.TokenSource {
 	}
 }
 
-// contextAwareTokenSource wraps OAuth with a context for Token() calls
+// contextAwareTokenSource wraps OAuth with a context for Token() calls.
+// Storing context in struct is forced by oauth2.TokenSource interface which
+// doesn't accept context in Token() method. This is necessary for proper
+// context propagation during token refresh (commit 89f04a5).
 type contextAwareTokenSource struct {
 	oauth *OAuth
-	ctx   context.Context
+	ctx   context.Context //nolint:containedctx // forced by oauth2.TokenSource interface
 }
 
 func (s *contextAwareTokenSource) Token() (*oauth2.Token, error) {
@@ -214,20 +217,21 @@ func writeTokenFile(tokenFilePath string, tokenFile *TokenFile) error {
 
 	// Write to temp file
 	if err := json.NewEncoder(tmpFile).Encode(tokenFile); err != nil {
-		tmpFile.Close()
-		os.Remove(tmpPath)
+		cleanupFile(tmpFile, tmpPath)
 		return fmt.Errorf("error encoding token file: %w", err)
 	}
 
 	// Ensure data is flushed to disk before rename
 	if err := tmpFile.Sync(); err != nil {
-		tmpFile.Close()
-		os.Remove(tmpPath)
+		cleanupFile(tmpFile, tmpPath)
 		return fmt.Errorf("error syncing temp file: %w", err)
 	}
 
 	if err := tmpFile.Close(); err != nil {
-		os.Remove(tmpPath)
+		// File already closed with error, just remove temp file
+		if err := os.Remove(tmpPath); err != nil {
+			log.Printf("Error removing temp file %s: %v", tmpPath, err)
+		}
 		return fmt.Errorf("error closing temp file: %w", err)
 	}
 
@@ -237,6 +241,17 @@ func writeTokenFile(tokenFilePath string, tokenFile *TokenFile) error {
 	}
 
 	return nil
+}
+
+// cleanupFile closes the file and removes it, logging any errors.
+// In cleanup paths, we still log errors for observability.
+func cleanupFile(f *os.File, path string) {
+	if err := f.Close(); err != nil {
+		log.Printf("Error closing temp file %s: %v", path, err)
+	}
+	if err := os.Remove(path); err != nil {
+		log.Printf("Error removing temp file %s: %v", path, err)
+	}
 }
 
 func startServer(oauth *OAuth, port string, done chan<- bool) *http.Server {
@@ -287,7 +302,7 @@ func startServer(oauth *OAuth, port string, done chan<- bool) *http.Server {
 			w.WriteHeader(http.StatusOK)
 
 			//nolint:lll //ok
-			_, e := w.Write([]byte(`<html><body>Authorization successful. You can close this window.<br><script>window.close();</script></body></html>`))
+			_, e := w.Write([]byte(`<html><body><h2>Authorization successful. You can close this window</h2>.<br><script>window.close();</script></body></html>`))
 			if e != nil {
 				log.Printf("Error writing response: %v", e)
 				return
@@ -319,13 +334,13 @@ func getToken(ctx context.Context, oauth *OAuth, port string) {
 	done := make(chan bool, 1)
 	server := startServer(oauth, port, done)
 
-	defer func() {
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer func(ctx context.Context) {
+		shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
 		if err := server.Shutdown(shutdownCtx); err != nil {
 			log.Printf("Error shutting down server: %v", err)
 		}
-	}()
+	}(ctx)
 
 	select {
 	case <-ctx.Done():
