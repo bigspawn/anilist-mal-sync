@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"log"
-	"net/url"
 	"time"
 
 	"github.com/nstratos/go-myanimelist/mal"
@@ -154,16 +153,16 @@ func (c *MyAnimeListClient) UpdateMangaByIDAndOptions(ctx context.Context, id in
 }
 
 func NewMyAnimeListOAuth(ctx context.Context, config Config) (*OAuth, error) {
-	code := url.QueryEscape(randHTTPParamString(randNumb))
+	// Generate PKCE code verifier using oauth2 package
+	verifier := oauth2.GenerateVerifier()
 
 	oauthMAL, err := NewOAuth(
 		config.MyAnimeList,
 		config.OAuth.RedirectURI,
 		"myanimelist",
 		[]oauth2.AuthCodeOption{
-			oauth2.SetAuthURLParam("code_challenge", code),
-			oauth2.SetAuthURLParam("code_verifier", code),
-			oauth2.SetAuthURLParam("code_challenge_method", "plain"),
+			oauth2.S256ChallengeOption(verifier), // S256 challenge for auth URL
+			oauth2.VerifierOption(verifier),      // Verifier for token exchange
 		},
 		config.TokenFilePath,
 	)
