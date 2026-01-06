@@ -40,7 +40,7 @@ func NewOAuth(
 	tokenFilePath string,
 ) (*OAuth, error) {
 	if !path.IsAbs(tokenFilePath) {
-		return nil, fmt.Errorf("path must be relative: %s", tokenFilePath)
+		return nil, fmt.Errorf("path must be absolute: %s", tokenFilePath)
 	}
 
 	if err := createDirIfNotExists(tokenFilePath); err != nil {
