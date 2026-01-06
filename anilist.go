@@ -139,6 +139,24 @@ func NewAnilistOAuth(ctx context.Context, config Config) (*OAuth, error) {
 	return oauthAnilist, nil
 }
 
+// NewAnilistOAuthWithoutInit creates AniList OAuth without starting auth flow.
+// Use InitToken() to manually trigger authentication when needed.
+func NewAnilistOAuthWithoutInit(config Config) (*OAuth, error) {
+	verifier := oauth2.GenerateVerifier()
+
+	return NewOAuth(
+		config.Anilist,
+		config.OAuth.RedirectURI,
+		"anilist",
+		[]oauth2.AuthCodeOption{
+			oauth2.AccessTypeOffline,
+			oauth2.S256ChallengeOption(verifier),
+			oauth2.VerifierOption(verifier),
+		},
+		config.TokenFilePath,
+	)
+}
+
 // GraphQLError represents a GraphQL error
 type GraphQLError struct {
 	Message   string `json:"message"`

@@ -181,3 +181,21 @@ func NewMyAnimeListOAuth(ctx context.Context, config Config) (*OAuth, error) {
 
 	return oauthMAL, nil
 }
+
+// NewMyAnimeListOAuthWithoutInit creates MAL OAuth without starting auth flow.
+// Use InitToken() to manually trigger authentication when needed.
+func NewMyAnimeListOAuthWithoutInit(config Config) (*OAuth, error) {
+	verifier := oauth2.GenerateVerifier()
+
+	return NewOAuth(
+		config.MyAnimeList,
+		config.OAuth.RedirectURI,
+		"myanimelist",
+		[]oauth2.AuthCodeOption{
+			oauth2.SetAuthURLParam("code_challenge", verifier),
+			oauth2.SetAuthURLParam("code_challenge_method", "plain"),
+			oauth2.VerifierOption(verifier),
+		},
+		config.TokenFilePath,
+	)
+}
