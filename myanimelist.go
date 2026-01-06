@@ -4,14 +4,11 @@ import (
 	"context"
 	"errors"
 	"log"
-	"net/url"
 	"time"
 
 	"github.com/nstratos/go-myanimelist/mal"
 	"golang.org/x/oauth2"
 )
-
-const randNumb = 43
 
 var errEmptyMalID = errors.New("mal id is empty")
 
@@ -37,7 +34,7 @@ type MyAnimeListClient struct {
 }
 
 func NewMyAnimeListClient(ctx context.Context, oauth *OAuth, username string) *MyAnimeListClient {
-	httpClient := oauth2.NewClient(ctx, oauth.TokenSource())
+	httpClient := oauth2.NewClient(ctx, oauth.TokenSource(ctx))
 	httpClient.Timeout = 10 * time.Minute
 
 	client := mal.NewClient(httpClient)
@@ -154,16 +151,17 @@ func (c *MyAnimeListClient) UpdateMangaByIDAndOptions(ctx context.Context, id in
 }
 
 func NewMyAnimeListOAuth(ctx context.Context, config Config) (*OAuth, error) {
-	code := url.QueryEscape(randHTTPParamString(randNumb))
+	// Generate PKCE code verifier using oauth2 package
+	verifier := oauth2.GenerateVerifier()
 
 	oauthMAL, err := NewOAuth(
 		config.MyAnimeList,
 		config.OAuth.RedirectURI,
 		"myanimelist",
 		[]oauth2.AuthCodeOption{
-			oauth2.SetAuthURLParam("code_challenge", code),
-			oauth2.SetAuthURLParam("code_verifier", code),
-			oauth2.SetAuthURLParam("code_challenge_method", "plain"),
+			oauth2.SetAuthURLParam("code_challenge", verifier),       // Plain challenge (same as verifier)
+			oauth2.SetAuthURLParam("code_challenge_method", "plain"), // Explicit plain method
+			oauth2.VerifierOption(verifier),                          // Verifier for token exchange
 		},
 		config.TokenFilePath,
 	)
@@ -173,6 +171,10 @@ func NewMyAnimeListOAuth(ctx context.Context, config Config) (*OAuth, error) {
 
 	if oauthMAL.NeedInit() {
 		getToken(ctx, oauthMAL, config.OAuth.Port)
+		// Check if context was cancelled during OAuth flow
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 	} else {
 		log.Println("Token already set, no need to start server")
 	}

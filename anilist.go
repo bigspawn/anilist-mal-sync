@@ -21,7 +21,7 @@ type AnilistClient struct {
 }
 
 func NewAnilistClient(ctx context.Context, oauth *OAuth, username string) *AnilistClient {
-	httpClient := oauth2.NewClient(ctx, oauth.TokenSource())
+	httpClient := oauth2.NewClient(ctx, oauth.TokenSource(ctx))
 	httpClient.Timeout = 10 * time.Minute
 
 	v := verniy.New()
@@ -108,12 +108,17 @@ func (c *AnilistClient) GetUserMangaList(ctx context.Context) ([]verniy.MediaLis
 }
 
 func NewAnilistOAuth(ctx context.Context, config Config) (*OAuth, error) {
+	// Generate PKCE code verifier using oauth2 package
+	verifier := oauth2.GenerateVerifier()
+
 	oauthAnilist, err := NewOAuth(
 		config.Anilist,
 		config.OAuth.RedirectURI,
 		"anilist",
 		[]oauth2.AuthCodeOption{
 			oauth2.AccessTypeOffline,
+			oauth2.S256ChallengeOption(verifier), // S256 challenge for auth URL
+			oauth2.VerifierOption(verifier),      // Verifier for token exchange
 		},
 		config.TokenFilePath,
 	)
@@ -123,6 +128,10 @@ func NewAnilistOAuth(ctx context.Context, config Config) (*OAuth, error) {
 
 	if oauthAnilist.NeedInit() {
 		getToken(ctx, oauthAnilist, config.OAuth.Port)
+		// Check if context was cancelled during OAuth flow
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 	} else {
 		log.Println("Token already set, no need to start server")
 	}

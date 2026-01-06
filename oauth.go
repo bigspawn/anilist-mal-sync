@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -25,9 +26,12 @@ func NewTokenFile() *TokenFile {
 
 type OAuth struct {
 	token           *oauth2.Token
+	tokenMu         sync.RWMutex
 	siteName        string
 	authCodeOptions []oauth2.AuthCodeOption
 	tokenFilePath   string
+	state           string
+	stateMu         sync.RWMutex
 
 	Config *oauth2.Config
 }
@@ -40,7 +44,7 @@ func NewOAuth(
 	tokenFilePath string,
 ) (*OAuth, error) {
 	if !path.IsAbs(tokenFilePath) {
-		return nil, fmt.Errorf("path must be relative: %s", tokenFilePath)
+		return nil, fmt.Errorf("path must be absolute: %s", tokenFilePath)
 	}
 
 	if err := createDirIfNotExists(tokenFilePath); err != nil {
@@ -60,6 +64,7 @@ func NewOAuth(
 		siteName:        siteName,
 		authCodeOptions: authCodeOptions,
 		tokenFilePath:   tokenFilePath,
+		state:           randHTTPParamString(32),
 	}
 
 	oauth.loadTokenFromFile()
@@ -68,7 +73,9 @@ func NewOAuth(
 }
 
 func (oauth *OAuth) GetAuthURL() string {
-	return oauth.Config.AuthCodeURL("state", oauth.authCodeOptions...)
+	oauth.stateMu.RLock()
+	defer oauth.stateMu.RUnlock()
+	return oauth.Config.AuthCodeURL(oauth.state, oauth.authCodeOptions...)
 }
 
 func (oauth *OAuth) ExchangeToken(ctx context.Context, code string) error {
@@ -76,18 +83,51 @@ func (oauth *OAuth) ExchangeToken(ctx context.Context, code string) error {
 	if err != nil {
 		return fmt.Errorf("error exchanging code for token: %w", err)
 	}
+
+	oauth.tokenMu.Lock()
 	oauth.token = token
+	oauth.tokenMu.Unlock()
+
 	return oauth.saveTokenToFile()
 }
 
-func (oauth *OAuth) TokenSource() oauth2.TokenSource {
-	return oauth2.ReuseTokenSourceWithExpiry(oauth.token, oauth, 24*time.Hour)
+func (oauth *OAuth) TokenSource(ctx context.Context) oauth2.TokenSource {
+	oauth.tokenMu.RLock()
+	defer oauth.tokenMu.RUnlock()
+
+	// Create a context-aware token source that carries the context
+	// through to Token() refreshes for proper cancellation support
+	return &contextAwareTokenSource{
+		oauth: oauth,
+		ctx:   ctx,
+	}
+}
+
+// contextAwareTokenSource wraps OAuth with a context for Token() calls.
+// Storing context in struct is forced by oauth2.TokenSource interface which
+// doesn't accept context in Token() method. This is necessary for proper
+// context propagation during token refresh (commit 89f04a5).
+type contextAwareTokenSource struct {
+	oauth *OAuth
+	ctx   context.Context //nolint:containedctx // forced by oauth2.TokenSource interface
+}
+
+func (s *contextAwareTokenSource) Token() (*oauth2.Token, error) {
+	return s.oauth.TokenWithContext(s.ctx)
 }
 
 func (oauth *OAuth) Token() (*oauth2.Token, error) {
+	// Deprecated: Use TokenWithContext for proper context propagation
+	return oauth.TokenWithContext(context.Background())
+}
+
+func (oauth *OAuth) TokenWithContext(ctx context.Context) (*oauth2.Token, error) {
+	oauth.tokenMu.Lock()
+	defer oauth.tokenMu.Unlock()
+
 	log.Printf("Refreshing token for %s", oauth.siteName)
 
-	t, err := oauth.Config.TokenSource(context.Background(), oauth.token).Token()
+	t, err := oauth.Config.TokenSource(ctx, oauth.token).Token()
 	if err != nil {
 		return nil, fmt.Errorf("error refreshing token: %w", err)
 	}
@@ -106,6 +146,8 @@ func (oauth *OAuth) Token() (*oauth2.Token, error) {
 }
 
 func (oauth *OAuth) NeedInit() bool {
+	oauth.tokenMu.RLock()
+	defer oauth.tokenMu.RUnlock()
 	return oauth.token == nil
 }
 
@@ -118,7 +160,9 @@ func (oauth *OAuth) loadTokenFromFile() {
 
 	if token, exists := tokenFile.Tokens[oauth.siteName]; exists {
 		log.Printf("Token loaded for %s", oauth.siteName)
+		oauth.tokenMu.Lock()
 		oauth.token = token
+		oauth.tokenMu.Unlock()
 	}
 }
 
@@ -159,32 +203,58 @@ func readTokenFile(tokenFilePath string) (*TokenFile, error) {
 }
 
 func writeTokenFile(tokenFilePath string, tokenFile *TokenFile) error {
+	// Use atomic write pattern: write to temp file, then rename
+	// This prevents partial writes and corruption if process crashes
 	// #nosec G304 - Token file path is user's config directory for OAuth tokens
-	file, err := os.Create(tokenFilePath)
+	dir := filepath.Dir(tokenFilePath)
+
+	// Create temporary file in same directory (ensures same filesystem)
+	tmpFile, err := os.CreateTemp(dir, "token*.tmp")
 	if err != nil {
-		return fmt.Errorf("error creating token file: %w", err)
+		return fmt.Errorf("error creating temp file: %w", err)
 	}
-	defer func() {
-		if err := file.Close(); err != nil {
-			log.Printf("Error closing token file: %v", err)
+	tmpPath := tmpFile.Name()
+
+	// Write to temp file
+	if err := json.NewEncoder(tmpFile).Encode(tokenFile); err != nil {
+		cleanupFile(tmpFile, tmpPath)
+		return fmt.Errorf("error encoding token file: %w", err)
+	}
+
+	// Ensure data is flushed to disk before rename
+	if err := tmpFile.Sync(); err != nil {
+		cleanupFile(tmpFile, tmpPath)
+		return fmt.Errorf("error syncing temp file: %w", err)
+	}
+
+	if err := tmpFile.Close(); err != nil {
+		// File already closed with error, just remove temp file
+		if err := os.Remove(tmpPath); err != nil {
+			log.Printf("Error removing temp file %s: %v", tmpPath, err)
 		}
-	}()
-
-	return json.NewEncoder(file).Encode(tokenFile)
-}
-
-func shutdownServer(ctx context.Context, server *http.Server) {
-	log.Println("Shutting down server...")
-	shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	if err := server.Shutdown(shutdownCtx); err != nil {
-		cancel()
-		log.Fatalf("Error shutting down server: %v", err)
+		return fmt.Errorf("error closing temp file: %w", err)
 	}
-	cancel()
-	log.Println("Server shut down")
+
+	// Atomic rename (overwrites target if exists)
+	if err := os.Rename(tmpPath, tokenFilePath); err != nil {
+		return fmt.Errorf("error renaming temp file: %w", err)
+	}
+
+	return nil
 }
 
-func startServer(ctx context.Context, oauth *OAuth, port string, done chan<- bool) {
+// cleanupFile closes the file and removes it, logging any errors.
+// In cleanup paths, we still log errors for observability.
+func cleanupFile(f *os.File, path string) {
+	if err := f.Close(); err != nil {
+		log.Printf("Error closing temp file %s: %v", path, err)
+	}
+	if err := os.Remove(path); err != nil {
+		log.Printf("Error removing temp file %s: %v", path, err)
+	}
+}
+
+func startServer(oauth *OAuth, port string, done chan<- bool) *http.Server {
 	server := &http.Server{
 		Addr:              ":" + port,
 		ReadHeaderTimeout: 10 * time.Second,
@@ -192,15 +262,39 @@ func startServer(ctx context.Context, oauth *OAuth, port string, done chan<- boo
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		callbackCtx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 
-		code := r.URL.Query().Get("code")
+		// Validate state parameter for CSRF protection
+		state := r.URL.Query().Get("state")
+		if state == "" {
+			http.Error(w, "State parameter missing", http.StatusBadRequest)
+			log.Printf("State parameter missing in callback")
+			return
+		}
 
-		err := oauth.ExchangeToken(ctx, code)
+		oauth.stateMu.RLock()
+		expectedState := oauth.state
+		oauth.stateMu.RUnlock()
+
+		if state != expectedState {
+			http.Error(w, "Invalid state parameter", http.StatusBadRequest)
+			log.Printf("State mismatch: expected=%s, got=%s", expectedState, state)
+			return
+		}
+
+		code := r.URL.Query().Get("code")
+		if code == "" {
+			http.Error(w, "Code parameter missing", http.StatusBadRequest)
+			log.Printf("Code parameter missing in callback")
+			return
+		}
+
+		err := oauth.ExchangeToken(callbackCtx, code)
 		if err != nil {
 			http.Error(w, "Error exchanging code for token", http.StatusInternalServerError)
-			log.Fatalf("Error exchanging code for token: %v", err)
+			log.Printf("Error exchanging code for token: %v", err)
+			return
 		}
 
 		if !oauth.NeedInit() {
@@ -208,17 +302,16 @@ func startServer(ctx context.Context, oauth *OAuth, port string, done chan<- boo
 			w.WriteHeader(http.StatusOK)
 
 			//nolint:lll //ok
-			_, e := w.Write([]byte(`<html><body>Authorization successful. You can close this window.<br><script>window.close();</script></body></html>`))
+			_, e := w.Write([]byte(`<html><body><h2>Authorization successful. You can close this window</h2>.<br><script>window.close();</script></body></html>`))
 			if e != nil {
-				log.Fatalf("Error writing response: %v", e)
+				log.Printf("Error writing response: %v", e)
+				return
 			}
 
 			done <- true
-
-			go shutdownServer(ctx, server)
 		} else {
 			http.Error(w, "Token not set", http.StatusInternalServerError)
-			log.Fatalf("Token not set")
+			log.Printf("Token not set after exchange")
 		}
 	})
 
@@ -227,23 +320,34 @@ func startServer(ctx context.Context, oauth *OAuth, port string, done chan<- boo
 	go func() {
 		log.Printf("Server started at http://localhost:%s", port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Error starting server: %v", err)
+			log.Printf("Error starting server: %v", err)
 		}
 		log.Println("Server stopped")
 	}()
 
 	log.Println("Navigate to the following URL for authorization:", oauth.GetAuthURL())
+
+	return server
 }
 
 func getToken(ctx context.Context, oauth *OAuth, port string) {
-	done := make(chan bool)
+	done := make(chan bool, 1)
+	server := startServer(oauth, port, done)
 
-	go startServer(ctx, oauth, port, done)
+	defer func(ctx context.Context) {
+		shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			log.Printf("Error shutting down server: %v", err)
+		}
+	}(ctx)
 
 	select {
 	case <-ctx.Done():
+		log.Println("Context cancelled, exiting...")
 		return
 	case <-done:
+		log.Println("OAuth flow completed successfully")
 	}
 }
 
@@ -259,6 +363,7 @@ func createDirIfNotExists(path string) error {
 		if err = os.MkdirAll(dir, 0o750); err != nil {
 			return fmt.Errorf("error creating directory: %w", err)
 		}
+		return nil
 	}
 	return fmt.Errorf("error checking directory: %w", err)
 }
