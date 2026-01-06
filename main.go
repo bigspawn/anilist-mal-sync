@@ -18,12 +18,12 @@ var (
 
 // Default values for flags - used when sync is not called via CLI (e.g., tests)
 var (
-	defaultForce        = false
-	defaultDryRun       = false
-	defaultManga        = false
-	defaultAll          = false
-	defaultVerbose      = false
-	defaultReverse      = false
+	defaultForce   = false
+	defaultDryRun  = false
+	defaultManga   = false
+	defaultAll     = false
+	defaultVerbose = false
+	defaultReverse = false
 )
 
 func init() {

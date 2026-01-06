@@ -10,8 +10,8 @@ import (
 
 func newStatusCommand() *cli.Command {
 	return &cli.Command{
-		Name:  "status",
-		Usage: "Check authentication status for services",
+		Name:   "status",
+		Usage:  "Check authentication status for services",
 		Action: runStatus,
 	}
 }
