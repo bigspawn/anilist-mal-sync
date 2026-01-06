@@ -239,19 +239,7 @@ func writeTokenFile(tokenFilePath string, tokenFile *TokenFile) error {
 	return nil
 }
 
-func shutdownServer(ctx context.Context, server *http.Server) {
-	log.Println("Shutting down server...")
-	shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	if err := server.Shutdown(shutdownCtx); err != nil {
-		log.Printf("Error shutting down server: %v", err)
-		return
-	}
-	log.Println("Server shut down")
-}
-
-func startServer(ctx context.Context, oauth *OAuth, port string, done chan<- bool) {
+func startServer(oauth *OAuth, port string, done chan<- bool) *http.Server {
 	server := &http.Server{
 		Addr:              ":" + port,
 		ReadHeaderTimeout: 10 * time.Second,
@@ -259,7 +247,7 @@ func startServer(ctx context.Context, oauth *OAuth, port string, done chan<- boo
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		callbackCtx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 
 		// Validate state parameter for CSRF protection
@@ -287,7 +275,7 @@ func startServer(ctx context.Context, oauth *OAuth, port string, done chan<- boo
 			return
 		}
 
-		err := oauth.ExchangeToken(ctx, code)
+		err := oauth.ExchangeToken(callbackCtx, code)
 		if err != nil {
 			http.Error(w, "Error exchanging code for token", http.StatusInternalServerError)
 			log.Printf("Error exchanging code for token: %v", err)
@@ -306,8 +294,6 @@ func startServer(ctx context.Context, oauth *OAuth, port string, done chan<- boo
 			}
 
 			done <- true
-
-			go shutdownServer(ctx, server)
 		} else {
 			http.Error(w, "Token not set", http.StatusInternalServerError)
 			log.Printf("Token not set after exchange")
@@ -325,17 +311,28 @@ func startServer(ctx context.Context, oauth *OAuth, port string, done chan<- boo
 	}()
 
 	log.Println("Navigate to the following URL for authorization:", oauth.GetAuthURL())
+
+	return server
 }
 
 func getToken(ctx context.Context, oauth *OAuth, port string) {
-	done := make(chan bool)
+	done := make(chan bool, 1)
+	server := startServer(oauth, port, done)
 
-	go startServer(ctx, oauth, port, done)
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			log.Printf("Error shutting down server: %v", err)
+		}
+	}()
 
 	select {
 	case <-ctx.Done():
+		log.Println("Context cancelled, exiting...")
 		return
 	case <-done:
+		log.Println("OAuth flow completed successfully")
 	}
 }
 

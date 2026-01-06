@@ -128,6 +128,10 @@ func NewAnilistOAuth(ctx context.Context, config Config) (*OAuth, error) {
 
 	if oauthAnilist.NeedInit() {
 		getToken(ctx, oauthAnilist, config.OAuth.Port)
+		// Check if context was cancelled during OAuth flow
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 	} else {
 		log.Println("Token already set, no need to start server")
 	}
