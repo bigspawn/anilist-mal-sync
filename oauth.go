@@ -176,11 +176,12 @@ func writeTokenFile(tokenFilePath string, tokenFile *TokenFile) error {
 func shutdownServer(ctx context.Context, server *http.Server) {
 	log.Println("Shutting down server...")
 	shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
 	if err := server.Shutdown(shutdownCtx); err != nil {
-		cancel()
-		log.Fatalf("Error shutting down server: %v", err)
+		log.Printf("Error shutting down server: %v", err)
+		return
 	}
-	cancel()
 	log.Println("Server shut down")
 }
 
@@ -196,11 +197,17 @@ func startServer(ctx context.Context, oauth *OAuth, port string, done chan<- boo
 		defer cancel()
 
 		code := r.URL.Query().Get("code")
+		if code == "" {
+			http.Error(w, "Code parameter missing", http.StatusBadRequest)
+			log.Printf("Code parameter missing in callback")
+			return
+		}
 
 		err := oauth.ExchangeToken(ctx, code)
 		if err != nil {
 			http.Error(w, "Error exchanging code for token", http.StatusInternalServerError)
-			log.Fatalf("Error exchanging code for token: %v", err)
+			log.Printf("Error exchanging code for token: %v", err)
+			return
 		}
 
 		if !oauth.NeedInit() {
@@ -210,7 +217,8 @@ func startServer(ctx context.Context, oauth *OAuth, port string, done chan<- boo
 			//nolint:lll //ok
 			_, e := w.Write([]byte(`<html><body>Authorization successful. You can close this window.<br><script>window.close();</script></body></html>`))
 			if e != nil {
-				log.Fatalf("Error writing response: %v", e)
+				log.Printf("Error writing response: %v", e)
+				return
 			}
 
 			done <- true
@@ -218,7 +226,7 @@ func startServer(ctx context.Context, oauth *OAuth, port string, done chan<- boo
 			go shutdownServer(ctx, server)
 		} else {
 			http.Error(w, "Token not set", http.StatusInternalServerError)
-			log.Fatalf("Token not set")
+			log.Printf("Token not set after exchange")
 		}
 	})
 
@@ -227,7 +235,7 @@ func startServer(ctx context.Context, oauth *OAuth, port string, done chan<- boo
 	go func() {
 		log.Printf("Server started at http://localhost:%s", port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Error starting server: %v", err)
+			log.Printf("Error starting server: %v", err)
 		}
 		log.Println("Server stopped")
 	}()
