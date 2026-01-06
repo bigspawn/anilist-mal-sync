@@ -108,12 +108,17 @@ func (c *AnilistClient) GetUserMangaList(ctx context.Context) ([]verniy.MediaLis
 }
 
 func NewAnilistOAuth(ctx context.Context, config Config) (*OAuth, error) {
+	// Generate PKCE code verifier using oauth2 package
+	verifier := oauth2.GenerateVerifier()
+
 	oauthAnilist, err := NewOAuth(
 		config.Anilist,
 		config.OAuth.RedirectURI,
 		"anilist",
 		[]oauth2.AuthCodeOption{
 			oauth2.AccessTypeOffline,
+			oauth2.S256ChallengeOption(verifier), // S256 challenge for auth URL
+			oauth2.VerifierOption(verifier),      // Verifier for token exchange
 		},
 		config.TokenFilePath,
 	)
