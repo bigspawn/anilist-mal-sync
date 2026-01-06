@@ -36,7 +36,7 @@ type MyAnimeListClient struct {
 }
 
 func NewMyAnimeListClient(ctx context.Context, oauth *OAuth, username string) *MyAnimeListClient {
-	httpClient := oauth2.NewClient(ctx, oauth.TokenSource())
+	httpClient := oauth2.NewClient(ctx, oauth.TokenSource(ctx))
 	httpClient.Timeout = 10 * time.Minute
 
 	client := mal.NewClient(httpClient)

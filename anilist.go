@@ -21,7 +21,7 @@ type AnilistClient struct {
 }
 
 func NewAnilistClient(ctx context.Context, oauth *OAuth, username string) *AnilistClient {
-	httpClient := oauth2.NewClient(ctx, oauth.TokenSource())
+	httpClient := oauth2.NewClient(ctx, oauth.TokenSource(ctx))
 	httpClient.Timeout = 10 * time.Minute
 
 	v := verniy.New()

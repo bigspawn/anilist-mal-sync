@@ -91,19 +91,40 @@ func (oauth *OAuth) ExchangeToken(ctx context.Context, code string) error {
 	return oauth.saveTokenToFile()
 }
 
-func (oauth *OAuth) TokenSource() oauth2.TokenSource {
+func (oauth *OAuth) TokenSource(ctx context.Context) oauth2.TokenSource {
 	oauth.tokenMu.RLock()
 	defer oauth.tokenMu.RUnlock()
-	return oauth2.ReuseTokenSourceWithExpiry(oauth.token, oauth, 24*time.Hour)
+
+	// Create a context-aware token source that carries the context
+	// through to Token() refreshes for proper cancellation support
+	return &contextAwareTokenSource{
+		oauth: oauth,
+		ctx:   ctx,
+	}
+}
+
+// contextAwareTokenSource wraps OAuth with a context for Token() calls
+type contextAwareTokenSource struct {
+	oauth *OAuth
+	ctx   context.Context
+}
+
+func (s *contextAwareTokenSource) Token() (*oauth2.Token, error) {
+	return s.oauth.TokenWithContext(s.ctx)
 }
 
 func (oauth *OAuth) Token() (*oauth2.Token, error) {
+	// Deprecated: Use TokenWithContext for proper context propagation
+	return oauth.TokenWithContext(context.Background())
+}
+
+func (oauth *OAuth) TokenWithContext(ctx context.Context) (*oauth2.Token, error) {
 	oauth.tokenMu.Lock()
 	defer oauth.tokenMu.Unlock()
 
 	log.Printf("Refreshing token for %s", oauth.siteName)
 
-	t, err := oauth.Config.TokenSource(context.Background(), oauth.token).Token()
+	t, err := oauth.Config.TokenSource(ctx, oauth.token).Token()
 	if err != nil {
 		return nil, fmt.Errorf("error refreshing token: %w", err)
 	}
