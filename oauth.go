@@ -151,6 +151,70 @@ func (oauth *OAuth) NeedInit() bool {
 	return oauth.token == nil
 }
 
+// InitToken starts the OAuth flow if token is not present.
+// Returns error if context is cancelled during flow or token acquisition fails.
+func (oauth *OAuth) InitToken(ctx context.Context, port string) error {
+	if !oauth.NeedInit() {
+		return nil // Token already exists
+	}
+
+	getToken(ctx, oauth, port)
+
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
+	if oauth.NeedInit() {
+		return fmt.Errorf("failed to obtain token for %s", oauth.siteName)
+	}
+
+	return nil
+}
+
+// DeleteToken removes the token for this site from the token file.
+func (oauth *OAuth) DeleteToken() error {
+	tokenFile, err := readTokenFile(oauth.tokenFilePath)
+	if err != nil {
+		return fmt.Errorf("error reading token file: %w", err)
+	}
+
+	delete(tokenFile.Tokens, oauth.siteName)
+
+	oauth.tokenMu.Lock()
+	oauth.token = nil
+	oauth.tokenMu.Unlock()
+
+	return writeTokenFile(oauth.tokenFilePath, tokenFile)
+}
+
+// IsTokenValid checks if token exists and is not expired.
+func (oauth *OAuth) IsTokenValid() bool {
+	oauth.tokenMu.RLock()
+	defer oauth.tokenMu.RUnlock()
+
+	if oauth.token == nil {
+		return false
+	}
+
+	// Token with zero expiry is considered always valid (some services don't provide expiry)
+	if oauth.token.Expiry.IsZero() {
+		return true
+	}
+
+	return oauth.token.Expiry.After(time.Now())
+}
+
+// TokenExpiry returns token expiry time or zero time if no token.
+func (oauth *OAuth) TokenExpiry() time.Time {
+	oauth.tokenMu.RLock()
+	defer oauth.tokenMu.RUnlock()
+
+	if oauth.token == nil {
+		return time.Time{}
+	}
+	return oauth.token.Expiry
+}
+
 func (oauth *OAuth) loadTokenFromFile() {
 	tokenFile, err := readTokenFile(oauth.tokenFilePath)
 	if err != nil {
