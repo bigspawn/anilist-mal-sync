@@ -91,12 +91,14 @@ func RunCLI() error {
 
 	cmd := NewCLI()
 
-	// Run and show help on error
+	// Run and show help on error (except for config errors which have their own help)
 	if err := cmd.Run(ctx, os.Args); err != nil {
-		// Show help on any error
-		fmt.Fprintf(os.Stderr, "\nError: %v\n\n", err)
-		//nolint:gosec // G104: best effort help display
-		cli.ShowAppHelp(cmd) //nolint:errcheck // best effort help display
+		// Don't show help for config errors (they already show helpful instructions)
+		if !IsConfigNotFoundError(err) {
+			fmt.Fprintf(os.Stderr, "\nError: %v\n\n", err)
+			//nolint:gosec // G104: best effort help display
+			cli.ShowAppHelp(cmd) //nolint:errcheck // best effort help display
+		}
 		return fmt.Errorf("command failed")
 	}
 

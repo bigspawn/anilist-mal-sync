@@ -32,13 +32,17 @@ func loadConfigFromFile(filename string) (Config, error) {
 	// #nosec G304 - Config file path is provided by user via command line flag
 	data, err := os.ReadFile(filename)
 	if err != nil {
-		return Config{}, fmt.Errorf("config file not found: %w\n\n%s", err, getConfigHelp(filename))
+		// Print help message to stderr
+		fmt.Fprintln(os.Stderr, getConfigHelp(filename))
+		return Config{}, fmt.Errorf("config file not found: %w", err)
 	}
 
 	var cfg Config
 	err = yaml.Unmarshal(data, &cfg)
 	if err != nil {
-		return Config{}, fmt.Errorf("failed to parse config file: %w\n\n%s", err, getConfigHelp(filename))
+		// Print help message to stderr
+		fmt.Fprintln(os.Stderr, getConfigHelp(filename))
+		return Config{}, fmt.Errorf("failed to parse config file: %w", err)
 	}
 
 	if port := os.Getenv("PORT"); port != "" {
