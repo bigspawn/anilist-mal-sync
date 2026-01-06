@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -25,9 +26,12 @@ func NewTokenFile() *TokenFile {
 
 type OAuth struct {
 	token           *oauth2.Token
+	tokenMu         sync.RWMutex
 	siteName        string
 	authCodeOptions []oauth2.AuthCodeOption
 	tokenFilePath   string
+	state           string
+	stateMu         sync.RWMutex
 
 	Config *oauth2.Config
 }
@@ -60,6 +64,7 @@ func NewOAuth(
 		siteName:        siteName,
 		authCodeOptions: authCodeOptions,
 		tokenFilePath:   tokenFilePath,
+		state:           randHTTPParamString(32),
 	}
 
 	oauth.loadTokenFromFile()
@@ -68,7 +73,9 @@ func NewOAuth(
 }
 
 func (oauth *OAuth) GetAuthURL() string {
-	return oauth.Config.AuthCodeURL("state", oauth.authCodeOptions...)
+	oauth.stateMu.RLock()
+	defer oauth.stateMu.RUnlock()
+	return oauth.Config.AuthCodeURL(oauth.state, oauth.authCodeOptions...)
 }
 
 func (oauth *OAuth) ExchangeToken(ctx context.Context, code string) error {
@@ -76,15 +83,24 @@ func (oauth *OAuth) ExchangeToken(ctx context.Context, code string) error {
 	if err != nil {
 		return fmt.Errorf("error exchanging code for token: %w", err)
 	}
+
+	oauth.tokenMu.Lock()
 	oauth.token = token
+	oauth.tokenMu.Unlock()
+
 	return oauth.saveTokenToFile()
 }
 
 func (oauth *OAuth) TokenSource() oauth2.TokenSource {
+	oauth.tokenMu.RLock()
+	defer oauth.tokenMu.RUnlock()
 	return oauth2.ReuseTokenSourceWithExpiry(oauth.token, oauth, 24*time.Hour)
 }
 
 func (oauth *OAuth) Token() (*oauth2.Token, error) {
+	oauth.tokenMu.Lock()
+	defer oauth.tokenMu.Unlock()
+
 	log.Printf("Refreshing token for %s", oauth.siteName)
 
 	t, err := oauth.Config.TokenSource(context.Background(), oauth.token).Token()
@@ -106,6 +122,8 @@ func (oauth *OAuth) Token() (*oauth2.Token, error) {
 }
 
 func (oauth *OAuth) NeedInit() bool {
+	oauth.tokenMu.RLock()
+	defer oauth.tokenMu.RUnlock()
 	return oauth.token == nil
 }
 
@@ -118,7 +136,9 @@ func (oauth *OAuth) loadTokenFromFile() {
 
 	if token, exists := tokenFile.Tokens[oauth.siteName]; exists {
 		log.Printf("Token loaded for %s", oauth.siteName)
+		oauth.tokenMu.Lock()
 		oauth.token = token
+		oauth.tokenMu.Unlock()
 	}
 }
 
