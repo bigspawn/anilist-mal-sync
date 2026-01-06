@@ -11,7 +11,7 @@ require github.com/rl404/verniy v0.3.1
 
 require github.com/nstratos/go-myanimelist v0.9.5
 
-require github.com/urfave/cli/v3 v3.6.1 // indirect
+require github.com/urfave/cli/v3 v3.6.1
 
 require (
 	github.com/cenkalti/backoff/v4 v4.3.0
