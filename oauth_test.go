@@ -892,3 +892,266 @@ func TestOAuth_RoundTrip(t *testing.T) {
 		t.Errorf("state in URL = %v, want %v", state, oauth.state)
 	}
 }
+
+// =============================================================================
+// Category 8: CLI-Related OAuth Tests
+// =============================================================================
+
+func TestIsTokenValid_NoToken(t *testing.T) {
+	tmpDir := t.TempDir()
+	tokenPath := filepath.Join(tmpDir, "token.json")
+
+	config := testSiteConfig()
+	oauth, err := NewOAuth(config, "http://localhost/callback", "test", []oauth2.AuthCodeOption{}, tokenPath)
+	if err != nil {
+		t.Fatalf("NewOAuth() error = %v", err)
+	}
+
+	if oauth.IsTokenValid() {
+		t.Error("IsTokenValid() should return false when token is nil")
+	}
+}
+
+func TestIsTokenValid_ValidToken(t *testing.T) {
+	tmpDir := t.TempDir()
+	tokenPath := filepath.Join(tmpDir, "token.json")
+
+	// Pre-create token file with valid token
+	token := &oauth2.Token{
+		AccessToken: "test_token",
+		TokenType:   "Bearer",
+		Expiry:      time.Now().Add(time.Hour),
+	}
+	tf := &TokenFile{Tokens: map[string]*oauth2.Token{"test": token}}
+	if err := writeTokenFile(tokenPath, tf); err != nil {
+		t.Fatalf("setup: writeTokenFile() error = %v", err)
+	}
+
+	config := testSiteConfig()
+	oauth, err := NewOAuth(config, "http://localhost/callback", "test", []oauth2.AuthCodeOption{}, tokenPath)
+	if err != nil {
+		t.Fatalf("NewOAuth() error = %v", err)
+	}
+
+	if !oauth.IsTokenValid() {
+		t.Error("IsTokenValid() should return true for valid token")
+	}
+}
+
+func TestIsTokenValid_ExpiredToken(t *testing.T) {
+	tmpDir := t.TempDir()
+	tokenPath := filepath.Join(tmpDir, "token.json")
+
+	// Pre-create token file with expired token
+	token := &oauth2.Token{
+		AccessToken: "test_token",
+		TokenType:   "Bearer",
+		Expiry:      time.Now().Add(-time.Hour),
+	}
+	tf := &TokenFile{Tokens: map[string]*oauth2.Token{"test": token}}
+	if err := writeTokenFile(tokenPath, tf); err != nil {
+		t.Fatalf("setup: writeTokenFile() error = %v", err)
+	}
+
+	config := testSiteConfig()
+	oauth, err := NewOAuth(config, "http://localhost/callback", "test", []oauth2.AuthCodeOption{}, tokenPath)
+	if err != nil {
+		t.Fatalf("NewOAuth() error = %v", err)
+	}
+
+	if oauth.IsTokenValid() {
+		t.Error("IsTokenValid() should return false for expired token")
+	}
+}
+
+func TestIsTokenValid_ZeroExpiry(t *testing.T) {
+	tmpDir := t.TempDir()
+	tokenPath := filepath.Join(tmpDir, "token.json")
+
+	// Token with zero expiry is considered always valid
+	token := &oauth2.Token{
+		AccessToken: "test_token",
+		TokenType:   "Bearer",
+		Expiry:      time.Time{},
+	}
+	tf := &TokenFile{Tokens: map[string]*oauth2.Token{"test": token}}
+	if err := writeTokenFile(tokenPath, tf); err != nil {
+		t.Fatalf("setup: writeTokenFile() error = %v", err)
+	}
+
+	config := testSiteConfig()
+	oauth, err := NewOAuth(config, "http://localhost/callback", "test", []oauth2.AuthCodeOption{}, tokenPath)
+	if err != nil {
+		t.Fatalf("NewOAuth() error = %v", err)
+	}
+
+	if !oauth.IsTokenValid() {
+		t.Error("IsTokenValid() should return true for token with zero expiry")
+	}
+}
+
+func TestTokenExpiry_NoToken(t *testing.T) {
+	tmpDir := t.TempDir()
+	tokenPath := filepath.Join(tmpDir, "token.json")
+
+	config := testSiteConfig()
+	oauth, err := NewOAuth(config, "http://localhost/callback", "test", []oauth2.AuthCodeOption{}, tokenPath)
+	if err != nil {
+		t.Fatalf("NewOAuth() error = %v", err)
+	}
+
+	expiry := oauth.TokenExpiry()
+	if !expiry.IsZero() {
+		t.Errorf("TokenExpiry() should return zero time when no token, got %v", expiry)
+	}
+}
+
+func TestTokenExpiry_HasToken(t *testing.T) {
+	tmpDir := t.TempDir()
+	tokenPath := filepath.Join(tmpDir, "token.json")
+
+	expectedExpiry := time.Now().Add(2 * time.Hour).Truncate(time.Second)
+	token := &oauth2.Token{
+		AccessToken: "test_token",
+		TokenType:   "Bearer",
+		Expiry:      expectedExpiry,
+	}
+	tf := &TokenFile{Tokens: map[string]*oauth2.Token{"test": token}}
+	if err := writeTokenFile(tokenPath, tf); err != nil {
+		t.Fatalf("setup: writeTokenFile() error = %v", err)
+	}
+
+	config := testSiteConfig()
+	oauth, err := NewOAuth(config, "http://localhost/callback", "test", []oauth2.AuthCodeOption{}, tokenPath)
+	if err != nil {
+		t.Fatalf("NewOAuth() error = %v", err)
+	}
+
+	expiry := oauth.TokenExpiry()
+	if expiry.IsZero() {
+		t.Error("TokenExpiry() should return non-zero time when token exists")
+	}
+
+	// Allow 1 second difference due to truncation
+	diff := expiry.Sub(expectedExpiry)
+	if diff < 0 {
+		diff = -diff
+	}
+	if diff > time.Second {
+		t.Errorf("TokenExpiry() = %v, want %v", expiry, expectedExpiry)
+	}
+}
+
+func TestDeleteToken_Success(t *testing.T) {
+	tmpDir := t.TempDir()
+	tokenPath := filepath.Join(tmpDir, "token.json")
+
+	// Pre-create token file
+	token := &oauth2.Token{
+		AccessToken: "test_token",
+		TokenType:   "Bearer",
+		Expiry:      time.Now().Add(time.Hour),
+	}
+	tf := &TokenFile{Tokens: map[string]*oauth2.Token{"test": token}}
+	if err := writeTokenFile(tokenPath, tf); err != nil {
+		t.Fatalf("setup: writeTokenFile() error = %v", err)
+	}
+
+	config := testSiteConfig()
+	oauth, err := NewOAuth(config, "http://localhost/callback", "test", []oauth2.AuthCodeOption{}, tokenPath)
+	if err != nil {
+		t.Fatalf("NewOAuth() error = %v", err)
+	}
+
+	// Verify token exists
+	if oauth.NeedInit() {
+		t.Fatal("setup: token should exist before DeleteToken")
+	}
+
+	// Delete token
+	if err := oauth.DeleteToken(); err != nil {
+		t.Fatalf("DeleteToken() error = %v", err)
+	}
+
+	// Verify token is deleted from memory
+	if !oauth.NeedInit() {
+		t.Error("NeedInit() should return true after DeleteToken")
+	}
+
+	// Verify token is deleted from file
+	tfRead, err := readTokenFile(tokenPath)
+	if err != nil {
+		t.Fatalf("readTokenFile() error = %v", err)
+	}
+	if _, exists := tfRead.Tokens["test"]; exists {
+		t.Error("token should be deleted from file")
+	}
+}
+
+func TestDeleteToken_NoToken(t *testing.T) {
+	tmpDir := t.TempDir()
+	tokenPath := filepath.Join(tmpDir, "token.json")
+
+	config := testSiteConfig()
+	oauth, err := NewOAuth(config, "http://localhost/callback", "test", []oauth2.AuthCodeOption{}, tokenPath)
+	if err != nil {
+		t.Fatalf("NewOAuth() error = %v", err)
+	}
+
+	// DeleteToken should succeed even if no token exists
+	if err := oauth.DeleteToken(); err != nil {
+		t.Errorf("DeleteToken() should not error when no token: %v", err)
+	}
+}
+
+func TestInitToken_AlreadyHasToken(t *testing.T) {
+	tmpDir := t.TempDir()
+	tokenPath := filepath.Join(tmpDir, "token.json")
+
+	// Pre-create token file
+	token := &oauth2.Token{
+		AccessToken: "test_token",
+		TokenType:   "Bearer",
+		Expiry:      time.Now().Add(time.Hour),
+	}
+	tf := &TokenFile{Tokens: map[string]*oauth2.Token{"test": token}}
+	if err := writeTokenFile(tokenPath, tf); err != nil {
+		t.Fatalf("setup: writeTokenFile() error = %v", err)
+	}
+
+	config := testSiteConfig()
+	oauth, err := NewOAuth(config, "http://localhost/callback", "test", []oauth2.AuthCodeOption{}, tokenPath)
+	if err != nil {
+		t.Fatalf("NewOAuth() error = %v", err)
+	}
+
+	// InitToken should return nil immediately if token exists
+	ctx := context.Background()
+	if err := oauth.InitToken(ctx, "18080"); err != nil {
+		t.Errorf("InitToken() should return nil when token exists: %v", err)
+	}
+}
+
+func TestInitToken_ContextCancelled(t *testing.T) {
+	tmpDir := t.TempDir()
+	tokenPath := filepath.Join(tmpDir, "token.json")
+
+	config := testSiteConfig()
+	oauth, err := NewOAuth(config, "http://localhost/callback", "test", []oauth2.AuthCodeOption{}, tokenPath)
+	if err != nil {
+		t.Fatalf("NewOAuth() error = %v", err)
+	}
+
+	// Cancel context immediately
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	// InitToken should return context cancellation error
+	err = oauth.InitToken(ctx, "18080")
+	if err == nil {
+		t.Error("InitToken() should return error when context is cancelled")
+	}
+	if err != nil && err != context.Canceled {
+		t.Logf("InitToken() returned error (may be expected): %v", err)
+	}
+}
