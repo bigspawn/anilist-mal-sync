@@ -161,8 +161,9 @@ func NewMyAnimeListOAuth(ctx context.Context, config Config) (*OAuth, error) {
 		config.OAuth.RedirectURI,
 		"myanimelist",
 		[]oauth2.AuthCodeOption{
-			oauth2.S256ChallengeOption(verifier), // S256 challenge for auth URL
-			oauth2.VerifierOption(verifier),      // Verifier for token exchange
+			oauth2.SetAuthURLParam("code_challenge", verifier),       // Plain challenge (same as verifier)
+			oauth2.SetAuthURLParam("code_challenge_method", "plain"), // Explicit plain method
+			oauth2.VerifierOption(verifier),                          // Verifier for token exchange
 		},
 		config.TokenFilePath,
 	)
