@@ -16,6 +16,11 @@ import (
 	"golang.org/x/oauth2"
 )
 
+// colorPrintf is a helper for colored output to stdout
+func colorPrintf(format string, args ...interface{}) {
+	_, _ = fmt.Fprintf(os.Stdout, format, args...)
+}
+
 type TokenFile struct {
 	Tokens map[string]*oauth2.Token `json:"tokens"`
 }
@@ -389,7 +394,17 @@ func startServer(oauth *OAuth, port string, done chan<- bool) *http.Server {
 		log.Println("Server stopped")
 	}()
 
-	log.Println("Navigate to the following URL for authorization:", oauth.GetAuthURL())
+	// Color codes for URL highlighting
+	const (
+		colorReset = "\033[0m"
+		colorBold  = "\033[1m"
+		colorCyan  = "\033[36m"
+		colorBlue  = "\033[34m"
+	)
+
+	authURL := oauth.GetAuthURL()
+	colorPrintf("\n%s➜  Open the following URL in your browser:%s\n", colorBold+colorCyan, colorReset)
+	colorPrintf("%s%s%s\n\n", colorBold+colorBlue, authURL, colorReset)
 
 	return server
 }

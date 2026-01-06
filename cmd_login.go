@@ -4,9 +4,28 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/urfave/cli/v3"
 )
+
+// ANSI color codes for terminal output
+const (
+	colorReset  = "\033[0m"
+	colorRed    = "\033[31m"
+	colorGreen  = "\033[32m"
+	colorYellow = "\033[33m"
+	colorBlue   = "\033[34m"
+	colorPurple = "\033[35m"
+	colorCyan   = "\033[36m"
+	colorWhite  = "\033[37m"
+	colorBold   = "\033[1m"
+)
+
+// colorPrint prints colored text to stdout, ignoring write errors
+func colorPrint(format string, args ...interface{}) {
+	_, _ = fmt.Fprintf(os.Stdout, format, args...)
+}
 
 func newLoginCommand() *cli.Command {
 	return &cli.Command{
@@ -49,6 +68,7 @@ func runLogin(ctx context.Context, cmd *cli.Command) error {
 }
 
 func loginAnilist(ctx context.Context, config Config) error {
+	colorPrint("\n%s=== AniList Authentication ===%s\n", colorBold+colorCyan, colorReset)
 	log.Println("Starting AniList authentication...")
 
 	oauth, err := NewAnilistOAuthWithoutInit(config)
@@ -57,7 +77,8 @@ func loginAnilist(ctx context.Context, config Config) error {
 	}
 
 	if !oauth.NeedInit() {
-		log.Println("AniList: Already authenticated")
+		colorPrint("%s✓ AniList: Already authenticated%s\n\n", colorGreen, colorReset)
+		printNextSteps()
 		return nil
 	}
 
@@ -65,11 +86,13 @@ func loginAnilist(ctx context.Context, config Config) error {
 		return fmt.Errorf("anilist authentication failed: %w", err)
 	}
 
-	log.Println("AniList: Authentication successful")
+	colorPrint("%s✓ AniList: Authentication successful%s\n\n", colorGreen, colorReset)
+	printNextSteps()
 	return nil
 }
 
 func loginMyAnimeList(ctx context.Context, config Config) error {
+	colorPrint("\n%s=== MyAnimeList Authentication ===%s\n", colorBold+colorCyan, colorReset)
 	log.Println("Starting MyAnimeList authentication...")
 
 	oauth, err := NewMyAnimeListOAuthWithoutInit(config)
@@ -78,7 +101,8 @@ func loginMyAnimeList(ctx context.Context, config Config) error {
 	}
 
 	if !oauth.NeedInit() {
-		log.Println("MyAnimeList: Already authenticated")
+		colorPrint("%s✓ MyAnimeList: Already authenticated%s\n\n", colorGreen, colorReset)
+		printNextSteps()
 		return nil
 	}
 
@@ -86,6 +110,14 @@ func loginMyAnimeList(ctx context.Context, config Config) error {
 		return fmt.Errorf("myanimelist authentication failed: %w", err)
 	}
 
-	log.Println("MyAnimeList: Authentication successful")
+	colorPrint("%s✓ MyAnimeList: Authentication successful%s\n\n", colorGreen, colorReset)
+	printNextSteps()
 	return nil
+}
+
+func printNextSteps() {
+	colorPrint("%sNext steps:%s\n", colorBold+colorYellow, colorReset)
+	colorPrint("  Run %sstatus%s to check authentication status\n", colorCyan, colorReset)
+	colorPrint("  Run %sanilist-mal-sync sync%s to start synchronization\n", colorCyan, colorReset)
+	colorPrint("  Or run %slogin --service <service>%s for additional authentication\n\n", colorCyan, colorReset)
 }

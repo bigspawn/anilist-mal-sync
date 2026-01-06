@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -53,9 +54,10 @@ func NewCLI() *cli.Command {
 	}
 
 	return &cli.Command{
-		Name:    "anilist-mal-sync",
-		Usage:   "Synchronize anime and manga lists between AniList and MyAnimeList",
-		Version: "1.0.0",
+		Name:        "anilist-mal-sync",
+		Usage:       "Synchronize anime and manga lists between AniList and MyAnimeList",
+		Version:     "1.0.0",
+		Description: "Sync your anime/manga lists between AniList and MyAnimeList.",
 		Flags: []cli.Flag{
 			configFlag,
 			forceSyncFlag,
@@ -73,6 +75,10 @@ func NewCLI() *cli.Command {
 		},
 		// Default action when no command specified - runs sync for backward compatibility
 		Action: func(ctx context.Context, cmd *cli.Command) error {
+			// If there are positional arguments (unknown command), show help
+			if cmd.Args().Present() {
+				return fmt.Errorf("unknown command: %s", cmd.Args().First())
+			}
 			return runSync(ctx, cmd)
 		},
 	}
@@ -83,5 +89,16 @@ func RunCLI() error {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	return NewCLI().Run(ctx, os.Args)
+	cmd := NewCLI()
+
+	// Run and show help on error
+	if err := cmd.Run(ctx, os.Args); err != nil {
+		// Show help on any error
+		fmt.Fprintf(os.Stderr, "\nError: %v\n\n", err)
+		//nolint:gosec // G104: best effort help display
+		cli.ShowAppHelp(cmd) //nolint:errcheck // best effort help display
+		return fmt.Errorf("command failed")
+	}
+
+	return nil
 }
