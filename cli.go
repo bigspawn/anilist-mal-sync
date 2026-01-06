@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -93,8 +94,10 @@ func RunCLI() error {
 
 	// Run and show help on error (except for config errors which have their own help)
 	if err := cmd.Run(ctx, os.Args); err != nil {
-		// Don't show help for config errors (they already show helpful instructions)
-		if !IsConfigNotFoundError(err) {
+		// Don't show help for:
+		// - Config errors (they already show helpful instructions)
+		// - Cancellation errors (user pressed Ctrl+C)
+		if !IsConfigNotFoundError(err) && !IsCancellationError(err) {
 			fmt.Fprintf(os.Stderr, "\nError: %v\n\n", err)
 			//nolint:gosec // G104: best effort help display
 			cli.ShowAppHelp(cmd) //nolint:errcheck // best effort help display
@@ -103,4 +106,12 @@ func RunCLI() error {
 	}
 
 	return nil
+}
+
+// IsCancellationError checks if error is due to context cancellation (e.g., Ctrl+C)
+func IsCancellationError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return errors.Is(err, context.Canceled)
 }

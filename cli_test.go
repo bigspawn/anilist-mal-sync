@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/urfave/cli/v3"
@@ -238,4 +239,56 @@ func TestRunCLI_ContextCancellation(t *testing.T) {
 	// This is a compile-time check essentially
 	_ = ctx
 	_ = cmd
+}
+
+// =============================================================================
+// Error Detection Tests
+// =============================================================================
+
+func TestIsCancellationError_ContextCanceled(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "No error",
+			err:  nil,
+			want: false,
+		},
+		{
+			name: "Random error",
+			err:  fmt.Errorf("random error"),
+			want: false,
+		},
+		{
+			name: "Direct context.Canceled",
+			err:  context.Canceled,
+			want: true,
+		},
+		{
+			name: "Wrapped context.Canceled",
+			err:  fmt.Errorf("run app: %w", context.Canceled),
+			want: true,
+		},
+		{
+			name: "Double wrapped context.Canceled",
+			err:  fmt.Errorf("command failed: %w", fmt.Errorf("run app: %w", context.Canceled)),
+			want: true,
+		},
+		{
+			name: "Context deadline exceeded (not cancellation)",
+			err:  context.DeadlineExceeded,
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsCancellationError(tt.err)
+			if got != tt.want {
+				t.Errorf("IsCancellationError() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
