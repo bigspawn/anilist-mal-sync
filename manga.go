@@ -86,6 +86,13 @@ func (m Manga) GetTargetID() TargetID {
 	return TargetID(m.IDMal)
 }
 
+func (m Manga) GetSourceID() int {
+	if *reverseDirection {
+		return m.IDMal
+	}
+	return m.IDAnilist
+}
+
 func (m Manga) GetStatusString() string {
 	return string(m.Status)
 }

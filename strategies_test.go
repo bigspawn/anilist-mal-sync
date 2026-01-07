@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"testing"
 )
 
@@ -324,5 +325,317 @@ func TestStrategyChain_Integration(t *testing.T) {
 				source.IDMal, target.GetTargetID())
 			t.Error("This causes repeated updates on every sync!")
 		}
+	}
+}
+
+// TestMALIDStrategy_FindsTargetByMALID tests that MALIDStrategy finds targets by MAL ID
+func TestMALIDStrategy_FindsTargetByMALID(t *testing.T) {
+	// Set reverse direction for this test (MAL -> AniList sync)
+	origReverse := reverseDirection
+	defer func() { reverseDirection = origReverse }()
+	trueVal := true
+	reverseDirection = &trueVal
+
+	ctx := context.Background()
+
+	// Source from MAL with IDMal set
+	source := Anime{
+		IDMal:       37341, // Laid-Back Camp Specials on MAL
+		IDAnilist:   0,
+		TitleEN:     "Laid-Back Camp Specials",
+		TitleJP:     "ゆるキャン△ スペシャル",
+		NumEpisodes: 3,
+	}
+
+	// Target from AniList with different title but same MAL ID
+	apiTarget := Anime{
+		IDMal:       37341,
+		IDAnilist:   101206,
+		TitleEN:     "",
+		TitleJP:     "ゆるキャン△ OVA", // Different title on AniList
+		NumEpisodes: 3,
+	}
+
+	existingTargets := map[TargetID]Target{
+		101206: apiTarget,
+	}
+
+	strategy := MALIDStrategy{
+		GetTargetByMALIDFunc: func(ctx context.Context, malID int) (Target, error) {
+			if malID == 37341 {
+				return apiTarget, nil
+			}
+			return nil, nil
+		},
+	}
+
+	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]")
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+
+	if !found {
+		t.Error("Expected to find target by MAL ID, but didn't")
+	}
+
+	if target == nil {
+		t.Error("Expected non-nil target")
+	}
+
+	targetAnime, ok := target.(Anime)
+	if !ok {
+		t.Error("Expected target to be Anime type")
+	}
+
+	if targetAnime.IDMal != 37341 {
+		t.Errorf("Expected MAL ID 37341, got %d", targetAnime.IDMal)
+	}
+
+	if targetAnime.IDAnilist != 101206 {
+		t.Errorf("Expected AniList ID 101206, got %d", targetAnime.IDAnilist)
+	}
+}
+
+// TestMALIDStrategy_ReturnsExistingUserTarget tests that MALIDStrategy returns existing target from user's list
+func TestMALIDStrategy_ReturnsExistingUserTarget(t *testing.T) {
+	// Set reverse direction for this test (MAL -> AniList sync)
+	origReverse := reverseDirection
+	defer func() { reverseDirection = origReverse }()
+	trueVal := true
+	reverseDirection = &trueVal
+
+	ctx := context.Background()
+
+	source := Anime{
+		IDMal:       37341,
+		IDAnilist:   0,
+		TitleEN:     "Laid-Back Camp Specials",
+		NumEpisodes: 3,
+	}
+
+	// API returns this target
+	apiTarget := Anime{
+		IDMal:       37341,
+		IDAnilist:   101206,
+		TitleJP:     "ゆるキャン△ OVA",
+		NumEpisodes: 3,
+	}
+
+	// But user has this in their list (with different status)
+	userTarget := Anime{
+		IDMal:       37341,
+		IDAnilist:   101206,
+		TitleJP:     "ゆるキャン△ OVA",
+		NumEpisodes: 3,
+		Status:      StatusCompleted,
+		Progress:    3,
+		Score:       8,
+	}
+
+	existingTargets := map[TargetID]Target{
+		101206: userTarget,
+	}
+
+	strategy := MALIDStrategy{
+		GetTargetByMALIDFunc: func(ctx context.Context, malID int) (Target, error) {
+			return apiTarget, nil
+		},
+	}
+
+	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]")
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+
+	if !found {
+		t.Error("Expected to find target")
+	}
+
+	// Should return the user's target (with status), not the API target
+	targetAnime, ok := target.(Anime)
+	if !ok {
+		t.Error("Expected target to be Anime type")
+	}
+
+	if targetAnime.Status != StatusCompleted {
+		t.Errorf("Expected user's target status (completed), got %v", targetAnime.Status)
+	}
+
+	if targetAnime.Progress != 3 {
+		t.Errorf("Expected user's target progress (3), got %d", targetAnime.Progress)
+	}
+}
+
+// TestMALIDStrategy_SkipsZeroMALID tests that MALIDStrategy skips when source has no MAL ID
+func TestMALIDStrategy_SkipsZeroMALID(t *testing.T) {
+	// Set reverse direction for this test (MAL -> AniList sync)
+	origReverse := reverseDirection
+	defer func() { reverseDirection = origReverse }()
+	trueVal := true
+	reverseDirection = &trueVal
+
+	ctx := context.Background()
+
+	source := Anime{
+		IDMal:       0, // No MAL ID
+		IDAnilist:   0,
+		TitleEN:     "Test Anime",
+		NumEpisodes: 12,
+	}
+
+	existingTargets := map[TargetID]Target{}
+
+	strategy := MALIDStrategy{
+		GetTargetByMALIDFunc: func(ctx context.Context, malID int) (Target, error) {
+			t.Error("GetTargetByMALIDFunc should not be called when source ID is 0")
+			return nil, nil
+		},
+	}
+
+	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]")
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+
+	if found {
+		t.Error("Expected not to find target (source has no MAL ID)")
+	}
+
+	if target != nil {
+		t.Errorf("Expected nil target, got %v", target)
+	}
+}
+
+// TestMALIDStrategy_ContextCancellation tests that MALIDStrategy respects context cancellation
+func TestMALIDStrategy_ContextCancellation(t *testing.T) {
+	// Set reverse direction for this test (MAL -> AniList sync)
+	origReverse := reverseDirection
+	defer func() { reverseDirection = origReverse }()
+	trueVal := true
+	reverseDirection = &trueVal
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	source := Anime{
+		IDMal:       12345,
+		IDAnilist:   0,
+		TitleEN:     "Test Anime",
+		NumEpisodes: 12,
+	}
+
+	existingTargets := map[TargetID]Target{}
+
+	strategy := MALIDStrategy{
+		GetTargetByMALIDFunc: func(ctx context.Context, malID int) (Target, error) {
+			t.Error("GetTargetByMALIDFunc should not be called when context is cancelled")
+			return nil, nil
+		},
+	}
+
+	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]")
+	if err == nil {
+		t.Error("Expected context cancellation error, got nil")
+	}
+
+	if found {
+		t.Error("Expected not to find target when context is cancelled")
+	}
+
+	if target != nil {
+		t.Errorf("Expected nil target, got %v", target)
+	}
+}
+
+// TestMALIDStrategy_ErrorHandling tests that MALIDStrategy properly handles API errors
+func TestMALIDStrategy_ErrorHandling(t *testing.T) {
+	// Set reverse direction for this test (MAL -> AniList sync)
+	origReverse := reverseDirection
+	defer func() { reverseDirection = origReverse }()
+	trueVal := true
+	reverseDirection = &trueVal
+
+	ctx := context.Background()
+
+	source := Anime{
+		IDMal:       99999, // Non-existent MAL ID
+		IDAnilist:   0,
+		TitleEN:     "Non-existent Anime",
+		NumEpisodes: 12,
+	}
+
+	existingTargets := map[TargetID]Target{}
+
+	strategy := MALIDStrategy{
+		GetTargetByMALIDFunc: func(ctx context.Context, malID int) (Target, error) {
+			return nil, fmt.Errorf("no anime found with MAL ID %d", malID)
+		},
+	}
+
+	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]")
+	if err == nil {
+		t.Error("Expected error from API, got nil")
+	}
+
+	if found {
+		t.Error("Expected not to find target when API returns error")
+	}
+
+	if target != nil {
+		t.Errorf("Expected nil target, got %v", target)
+	}
+}
+
+// TestAnime_GetSourceID tests that GetSourceID returns correct source ID based on sync direction
+func TestAnime_GetSourceID(t *testing.T) {
+	origReverse := reverseDirection
+	defer func() { reverseDirection = origReverse }()
+
+	falseVal := false
+	trueVal := true
+
+	source := Anime{
+		IDMal:     12345,
+		IDAnilist: 67890,
+		TitleEN:   "Test Anime",
+	}
+
+	// Normal sync: source is AniList, so source ID is IDAnilist
+	reverseDirection = &falseVal
+	if got := source.GetSourceID(); got != 67890 {
+		t.Errorf("Normal sync: expected source ID 67890 (AniList), got %d", got)
+	}
+
+	// Reverse sync: source is MAL, so source ID is IDMal
+	reverseDirection = &trueVal
+	if got := source.GetSourceID(); got != 12345 {
+		t.Errorf("Reverse sync: expected source ID 12345 (MAL), got %d", got)
+	}
+}
+
+// TestManga_GetSourceID tests that GetSourceID returns correct source ID based on sync direction
+func TestManga_GetSourceID(t *testing.T) {
+	origReverse := reverseDirection
+	defer func() { reverseDirection = origReverse }()
+
+	falseVal := false
+	trueVal := true
+
+	source := Manga{
+		IDMal:     11111,
+		IDAnilist: 22222,
+		TitleEN:   "Test Manga",
+	}
+
+	// Normal sync: source is AniList, so source ID is IDAnilist
+	reverseDirection = &falseVal
+	if got := source.GetSourceID(); got != 22222 {
+		t.Errorf("Normal sync: expected source ID 22222 (AniList), got %d", got)
+	}
+
+	// Reverse sync: source is MAL, so source ID is IDMal
+	reverseDirection = &trueVal
+	if got := source.GetSourceID(); got != 11111 {
+		t.Errorf("Reverse sync: expected source ID 11111 (MAL), got %d", got)
 	}
 }

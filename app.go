@@ -146,6 +146,19 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		StrategyChain: NewStrategyChain(
 			IDStrategy{},
 			TitleStrategy{},
+			MALIDStrategy{
+				GetTargetByMALIDFunc: func(ctx context.Context, malID int) (Target, error) {
+					resp, err := anilistClient.GetAnimeByMALID(ctx, malID, "MAL to AniList Anime")
+					if err != nil {
+						return nil, fmt.Errorf("error getting anilist anime by MAL ID: %w", err)
+					}
+					ani, err := newAnimeFromVerniyMedia(*resp)
+					if err != nil {
+						return nil, fmt.Errorf("error creating anime from anilist media: %w", err)
+					}
+					return ani, nil
+				},
+			},
 			APISearchStrategy{
 				GetTargetByIDFunc: func(ctx context.Context, id TargetID) (Target, error) {
 					resp, err := anilistClient.GetAnimeByID(ctx, int(id), "MAL to AniList Anime")
@@ -195,6 +208,19 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		StrategyChain: NewStrategyChain(
 			IDStrategy{},
 			TitleStrategy{},
+			MALIDStrategy{
+				GetTargetByMALIDFunc: func(ctx context.Context, malID int) (Target, error) {
+					resp, err := anilistClient.GetMangaByMALID(ctx, malID, "MAL to AniList Manga")
+					if err != nil {
+						return nil, fmt.Errorf("error getting anilist manga by MAL ID: %w", err)
+					}
+					manga, err := newMangaFromVerniyMedia(*resp)
+					if err != nil {
+						return nil, fmt.Errorf("error creating manga from anilist media: %w", err)
+					}
+					return manga, nil
+				},
+			},
 			APISearchStrategy{
 				GetTargetByIDFunc: func(ctx context.Context, id TargetID) (Target, error) {
 					resp, err := anilistClient.GetMangaByID(ctx, int(id), "MAL to AniList Manga")

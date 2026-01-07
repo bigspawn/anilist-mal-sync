@@ -86,6 +86,13 @@ func (a Anime) GetTargetID() TargetID {
 	return TargetID(a.IDMal)
 }
 
+func (a Anime) GetSourceID() int {
+	if *reverseDirection {
+		return a.IDMal
+	}
+	return a.IDAnilist
+}
+
 func (a Anime) GetStatusString() string {
 	return string(a.Status)
 }
