@@ -1,0 +1,48 @@
+version: "3"
+
+# Example using named volumes (no local file management)
+# Best for simple deployments where you don't need direct access to config/tokens
+
+services:
+  sync:
+    image: ghcr.io/bigspawn/anilist-mal-sync:latest
+    command: ["watch"]
+    ports:
+      - "18080:18080"  # For OAuth authentication
+    volumes:
+      # Docker manages these volumes, no PUID/PGID needed
+      - config:/etc/anilist-mal-sync
+      - tokens:/home/appuser/.config/anilist-mal-sync
+    restart: unless-stopped
+
+volumes:
+  config:
+  tokens:
+
+# Setup instructions:
+#
+# 1. Create config file in the volume:
+#    docker-compose run --rm sync sh -c 'cat > /etc/anilist-mal-sync/config.yaml << EOF
+#    port: 18080
+#    redirect_uri: http://localhost:18080/callback
+#
+#    anilist:
+#      client_id: YOUR_ANILIST_CLIENT_ID
+#      client_secret: YOUR_ANILIST_CLIENT_SECRET
+#
+#    myanimelist:
+#      client_id: YOUR_MAL_CLIENT_ID
+#
+#    watch:
+#      interval: 12h
+#    EOF'
+#
+# 2. Login to services:
+#    docker-compose run --rm --service-ports sync login all
+#
+# 3. Start watching:
+#    docker-compose up -d
+#
+# To view/edit config later:
+#   docker-compose run --rm sync cat /etc/anilist-mal-sync/config.yaml
+#   docker-compose run --rm sync vi /etc/anilist-mal-sync/config.yaml

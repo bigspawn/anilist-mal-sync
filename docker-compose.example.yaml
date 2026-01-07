@@ -3,11 +3,18 @@ services:
   sync:
     image: ghcr.io/bigspawn/anilist-mal-sync:latest
     command: ["watch"]
+    ports:
+      - "18080:18080"  # For OAuth login
     environment:
-      # Set to your user's UID/GID (find with: id -u / id -g)
+      # Replace with your user's UID/GID (find with: id -u / id -g)
       - PUID=1000
       - PGID=1000
     volumes:
       - ./config.yaml:/etc/anilist-mal-sync/config.yaml:ro
       - ./tokens:/home/appuser/.config/anilist-mal-sync
     restart: unless-stopped
+
+# Usage:
+# 1. Create config.yaml in this directory (see config.example.yaml)
+# 2. Replace PUID/PGID with your IDs: id -u / id -g
+# 3. docker-compose up

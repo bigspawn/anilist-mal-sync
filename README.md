@@ -150,35 +150,36 @@ anilist-mal-sync sync
 
 **Important:** For Docker, set `token_file_path: ""` in config.yaml to use the container's home directory.
 
-#### Volume Permissions
+#### Quick Start
 
-The image uses **PUID/PGID** environment variables to match container user with your host user, avoiding permission issues with bind mounts.
+**Simple setup (recommended):**
 
-**Docker Compose (recommended):**
+See [`docker-compose.example.yaml`](docker-compose.example.yaml):
+
 ```yaml
 version: '3'
 services:
   sync:
     image: ghcr.io/bigspawn/anilist-mal-sync:latest
+    command: ["watch"]
     environment:
-      - PUID=1000  # Your user ID from: id -u
-      - PGID=1000  # Your group ID from: id -g
+      # Find your IDs: id -u / id -g
+      - PUID=1000
+      - PGID=1000
     volumes:
       - ./config.yaml:/etc/anilist-mal-sync/config.yaml:ro
       - ./tokens:/home/appuser/.config/anilist-mal-sync
+    restart: unless-stopped
 ```
 
-**How it works:**
-1. Container starts as root
-2. Entrypoint adjusts internal user UID/GID to match your PUID/PGID
-3. Application runs as that user, so files have correct ownership
-4. No manual `chown` needed!
-
-**Find your UID/GID:**
+**To find your PUID and PGID:**
 ```bash
-id -u  # UID
-id -g  # GID
+id -u  # Returns your PUID (e.g., 1000)
+id -g  # Returns your PGID (e.g., 1000)
 ```
+
+Then just replace `1000` with your numbers in `docker-compose.yaml`.
+
 
 #### Pre-built image
 
