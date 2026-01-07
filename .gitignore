@@ -6,6 +6,7 @@ anilist-mal-sync
 .token*
 .claude
 
+docker-compose.yaml
 config.yaml
 CLAUDE.md
 TASK.md
