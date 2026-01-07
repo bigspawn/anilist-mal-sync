@@ -113,7 +113,7 @@ func TestManga_SameTypeWithTarget(t *testing.T) {
 			name: "reverse sync scenario - MAL source with zero AniList ID finds AniList target by MAL ID",
 			source: Manga{
 				IDMal:     30013, // Oshi no Ko MAL ID
-				IDAnilist: 0,    // MAL source doesn't know AniList ID
+				IDAnilist: 0,     // MAL source doesn't know AniList ID
 				TitleEN:   "[Oshi No Ko]",
 				Chapters:  167,
 			},

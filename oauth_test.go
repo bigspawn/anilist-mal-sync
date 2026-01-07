@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -1151,7 +1152,7 @@ func TestInitToken_ContextCancelled(t *testing.T) {
 	if err == nil {
 		t.Error("InitToken() should return error when context is cancelled")
 	}
-	if err != nil && err != context.Canceled {
+	if err != nil && !errors.Is(err, context.Canceled) {
 		t.Logf("InitToken() returned error (may be expected): %v", err)
 	}
 }

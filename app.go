@@ -139,6 +139,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 	}
 
 	// Reverse updaters for MAL -> AniList sync
+	//nolint:dupl // Similar structure to reverseMangaUpdater below (anime vs manga)
 	reverseAnimeUpdater := &Updater{
 		Prefix:       "MAL to AniList Anime",
 		Statistics:   new(Statistics),
@@ -201,6 +202,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		},
 	}
 
+	//nolint:dupl // Similar structure to reverseAnimeUpdater above (manga vs anime)
 	reverseMangaUpdater := &Updater{
 		Prefix:       "MAL to AniList Manga",
 		Statistics:   new(Statistics),
