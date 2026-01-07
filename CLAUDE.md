@@ -79,7 +79,7 @@ make lint
 # Run linter directly (if golangci-lint is installed locally)
 golangci-lint run --new
 
-# This uses golangci-lint v1.64.6 in Docker container
+# This uses golangci-lint v2.2.2 in Docker container
 # Note: dupl linter is disabled for test files to allow identical test structures
 ```
 
@@ -105,7 +105,7 @@ make install
 ```
 
 This installs:
-- **golangci-lint** v1.64.6 (via brew)
+- **golangci-lint** v2.2.2 (via brew)
 - **gofumpt** (via go install)
 - **goimports** (via go install)
 - **gci** - import organizer (via go install)

@@ -1,7 +1,7 @@
 .PHONY: build test lint fmt check clean install hooks-install hooks-uninstall
 
 BINARY_NAME=anilist-mal-sync
-LINT_VERSION=v1.64.6
+LINT_VERSION=v2.2.2
 DOCKER_LINT_CMD=docker run --rm -v $(PWD):/app -w /app golangci/golangci-lint:$(LINT_VERSION)
 
 .DEFAULT_GOAL := help

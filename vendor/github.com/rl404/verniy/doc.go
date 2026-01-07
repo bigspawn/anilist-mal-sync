@@ -47,7 +47,7 @@
 // value of the variadic parameters.
 //
 // If you want the complete list of available params,
-// read the official docs (https://anilist.github.io/ApiV2-GraphQL-Docs/).
+// read the official docs (https://studio.apollographql.com/sandbox/explorer?endpoint=https%3A%2F%2Fgraphql.anilist.co).
 //
 // # Response
 //

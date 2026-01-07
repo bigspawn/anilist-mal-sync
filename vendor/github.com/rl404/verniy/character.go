@@ -50,10 +50,9 @@ func (c *Client) GetCharacterWithContext(ctx context.Context, id int, fields ...
 	}, fields...))
 
 	var d characterResponse
-	err := c.post(ctx, query, queryVariable{
+	if err := c.post(ctx, query, queryVariable{
 		"id": id,
-	}, &d)
-	if err != nil {
+	}, &d); err != nil {
 		return nil, err
 	}
 

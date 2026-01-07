@@ -35,8 +35,7 @@ func (c *Client) GetTagsWithContext(ctx context.Context, fields ...MediaTagField
 	query := FieldObject("query", nil, c.tagQuery(fields...))
 
 	var d tagResponse
-	err := c.post(ctx, query, nil, &d)
-	if err != nil {
+	if err := c.post(ctx, query, nil, &d); err != nil {
 		return nil, err
 	}
 

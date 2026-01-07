@@ -89,12 +89,10 @@ linters:
       min-complexity: 15
     cyclop:
       # Maximum cyclomatic complexity
-      # Tests are excluded, this applies to main code only
+      # Tests are excluded via exclusions section above
       max-complexity: 25
       # Maximum average complexity (across all files in package)
       package-average: 0
-      # Skip tests
-      skip-tests: true
     nestif:
       # Maximum depth of if statements
       # Default: 4

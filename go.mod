@@ -1,13 +1,15 @@
 module github.com/bigspawn/anilist-mal-sync
 
-go 1.22.4
+go 1.24.0
+
+toolchain go1.24.5
 
 require (
-	golang.org/x/oauth2 v0.24.0
+	golang.org/x/oauth2 v0.34.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
-require github.com/rl404/verniy v0.3.1
+require github.com/rl404/verniy v0.3.4
 
 require github.com/nstratos/go-myanimelist v0.9.5
 

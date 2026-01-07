@@ -55,10 +55,9 @@ func (c *Client) GetUserWithContext(ctx context.Context, username string, fields
 	}, fields...))
 
 	var d userResponse
-	err := c.post(ctx, query, queryVariable{
+	if err := c.post(ctx, query, queryVariable{
 		"name": username,
-	}, &d)
-	if err != nil {
+	}, &d); err != nil {
 		return nil, err
 	}
 

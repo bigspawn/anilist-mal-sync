@@ -26,11 +26,10 @@ func (c *Client) getMedia(ctx context.Context, id int, mediaType MediaType, fiel
 	}, fields...))
 
 	var d mediaResponse
-	err := c.post(ctx, query, queryVariable{
+	if err := c.post(ctx, query, queryVariable{
 		"id":   id,
 		"type": mediaType,
-	}, &d)
-	if err != nil {
+	}, &d); err != nil {
 		return nil, err
 	}
 
