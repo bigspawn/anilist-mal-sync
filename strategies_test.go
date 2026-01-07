@@ -361,7 +361,7 @@ func TestMALIDStrategy_FindsTargetByMALID(t *testing.T) {
 	}
 
 	strategy := MALIDStrategy{
-		GetTargetByMALIDFunc: func(ctx context.Context, malID int) (Target, error) {
+		GetTargetByMALIDFunc: func(_ context.Context, malID int) (Target, error) {
 			if malID == 37341 {
 				return apiTarget, nil
 			}
@@ -437,7 +437,7 @@ func TestMALIDStrategy_ReturnsExistingUserTarget(t *testing.T) {
 	}
 
 	strategy := MALIDStrategy{
-		GetTargetByMALIDFunc: func(ctx context.Context, malID int) (Target, error) {
+		GetTargetByMALIDFunc: func(_ context.Context, _ int) (Target, error) {
 			return apiTarget, nil
 		},
 	}
@@ -486,7 +486,7 @@ func TestMALIDStrategy_SkipsZeroMALID(t *testing.T) {
 	existingTargets := map[TargetID]Target{}
 
 	strategy := MALIDStrategy{
-		GetTargetByMALIDFunc: func(ctx context.Context, malID int) (Target, error) {
+		GetTargetByMALIDFunc: func(_ context.Context, _ int) (Target, error) {
 			t.Error("GetTargetByMALIDFunc should not be called when source ID is 0")
 			return nil, nil
 		},
@@ -527,7 +527,7 @@ func TestMALIDStrategy_ContextCancellation(t *testing.T) {
 	existingTargets := map[TargetID]Target{}
 
 	strategy := MALIDStrategy{
-		GetTargetByMALIDFunc: func(ctx context.Context, malID int) (Target, error) {
+		GetTargetByMALIDFunc: func(_ context.Context, _ int) (Target, error) {
 			t.Error("GetTargetByMALIDFunc should not be called when context is cancelled")
 			return nil, nil
 		},
@@ -567,7 +567,7 @@ func TestMALIDStrategy_ErrorHandling(t *testing.T) {
 	existingTargets := map[TargetID]Target{}
 
 	strategy := MALIDStrategy{
-		GetTargetByMALIDFunc: func(ctx context.Context, malID int) (Target, error) {
+		GetTargetByMALIDFunc: func(_ context.Context, malID int) (Target, error) {
 			return nil, fmt.Errorf("no anime found with MAL ID %d", malID)
 		},
 	}
