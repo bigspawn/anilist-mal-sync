@@ -22,8 +22,6 @@ type App struct {
 }
 
 // NewApp creates a new App instance with configured clients and updaters
-//
-//nolint:funlen //ok
 func NewApp(ctx context.Context, config Config) (*App, error) {
 	oauthMAL, err := NewMyAnimeListOAuth(ctx, config)
 	if err != nil {
@@ -53,12 +51,33 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 	}
 	log.Printf("AniList score format: %s", scoreFormat)
 
-	animeUpdater := &Updater{
+	// Create updaters using helper functions
+	animeUpdater := newAnimeUpdater(malClient)
+	mangaUpdater := newMangaUpdater(malClient)
+	reverseAnimeUpdater := newReverseAnimeUpdater(anilistClient, scoreFormat)
+	reverseMangaUpdater := newReverseMangaUpdater(anilistClient, scoreFormat)
+
+	return &App{
+		config:              config,
+		mal:                 malClient,
+		anilist:             anilistClient,
+		anilistScoreFormat:  scoreFormat,
+		animeUpdater:        animeUpdater,
+		mangaUpdater:        mangaUpdater,
+		reverseAnimeUpdater: reverseAnimeUpdater,
+		reverseMangaUpdater: reverseMangaUpdater,
+	}, nil
+}
+
+// Helper functions to create updaters - reduces NewApp complexity
+
+func newAnimeUpdater(malClient *MyAnimeListClient) *Updater {
+	return &Updater{
 		Prefix:     "AniList to MAL Anime",
 		Statistics: new(Statistics),
-		IgnoreTitles: map[string]struct{}{ // in lowercase, TODO: move to config
-			"scott pilgrim takes off":       {}, // this anime is not in MAL
-			"bocchi the rock! recap part 2": {}, // this anime is not in MAL
+		IgnoreTitles: map[string]struct{}{
+			"scott pilgrim takes off":       {},
+			"bocchi the rock! recap part 2": {},
 		},
 		StrategyChain: NewStrategyChain(
 			IDStrategy{},
@@ -84,7 +103,6 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 				},
 			},
 		),
-
 		UpdateTargetBySourceFunc: func(ctx context.Context, id TargetID, src Source) error {
 			a, ok := src.(Anime)
 			if !ok {
@@ -96,8 +114,10 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 			return nil
 		},
 	}
+}
 
-	mangaUpdater := &Updater{
+func newMangaUpdater(malClient *MyAnimeListClient) *Updater {
+	return &Updater{
 		Prefix:       "AniList to MAL Manga",
 		Statistics:   new(Statistics),
 		IgnoreTitles: map[string]struct{}{},
@@ -125,7 +145,6 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 				},
 			},
 		),
-
 		UpdateTargetBySourceFunc: func(ctx context.Context, id TargetID, src Source) error {
 			m, ok := src.(Manga)
 			if !ok {
@@ -137,10 +156,11 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 			return nil
 		},
 	}
+}
 
-	// Reverse updaters for MAL -> AniList sync
-	//nolint:dupl // Similar structure to reverseMangaUpdater below (anime vs manga)
-	reverseAnimeUpdater := &Updater{
+//nolint:dupl // Similar structure to newReverseMangaUpdater (anime vs manga)
+func newReverseAnimeUpdater(anilistClient *AnilistClient, scoreFormat verniy.ScoreFormat) *Updater {
+	return &Updater{
 		Prefix:       "MAL to AniList Anime",
 		Statistics:   new(Statistics),
 		IgnoreTitles: map[string]struct{}{},
@@ -181,13 +201,11 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 				},
 			},
 		),
-
 		UpdateTargetBySourceFunc: func(ctx context.Context, id TargetID, src Source) error {
 			a, ok := src.(Anime)
 			if !ok {
 				return fmt.Errorf("source is not an anime")
 			}
-			// Denormalize score from 0-10 format back to user's AniList format
 			anilistScore := denormalizeScoreForAniList(a.Score, scoreFormat)
 			if err := anilistClient.UpdateAnimeEntry(
 				ctx,
@@ -201,9 +219,11 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 			return nil
 		},
 	}
+}
 
-	//nolint:dupl // Similar structure to reverseAnimeUpdater above (manga vs anime)
-	reverseMangaUpdater := &Updater{
+//nolint:dupl // Similar structure to newReverseAnimeUpdater (manga vs anime)
+func newReverseMangaUpdater(anilistClient *AnilistClient, scoreFormat verniy.ScoreFormat) *Updater {
+	return &Updater{
 		Prefix:       "MAL to AniList Manga",
 		Statistics:   new(Statistics),
 		IgnoreTitles: map[string]struct{}{},
@@ -244,13 +264,11 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 				},
 			},
 		),
-
 		UpdateTargetBySourceFunc: func(ctx context.Context, id TargetID, src Source) error {
 			m, ok := src.(Manga)
 			if !ok {
 				return fmt.Errorf("source is not a manga")
 			}
-			// Denormalize score from 0-10 format back to user's AniList format
 			anilistScore := denormalizeMangaScoreForAniList(m.Score, scoreFormat)
 			if err := anilistClient.UpdateMangaEntry(
 				ctx,
@@ -265,17 +283,6 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 			return nil
 		},
 	}
-
-	return &App{
-		config:              config,
-		mal:                 malClient,
-		anilist:             anilistClient,
-		anilistScoreFormat:  scoreFormat,
-		animeUpdater:        animeUpdater,
-		mangaUpdater:        mangaUpdater,
-		reverseAnimeUpdater: reverseAnimeUpdater,
-		reverseMangaUpdater: reverseMangaUpdater,
-	}, nil
 }
 
 func (a *App) Run(ctx context.Context) error {

@@ -43,11 +43,10 @@ func (c *Client) page(ctx context.Context, page int, perPage int, fields ...Page
 	}, fields...))
 
 	var d pageResponse
-	err := c.post(ctx, query, queryVariable{
+	if err := c.post(ctx, query, queryVariable{
 		"page":    page,
 		"perPage": perPage,
-	}, &d)
-	if err != nil {
+	}, &d); err != nil {
 		return nil, err
 	}
 

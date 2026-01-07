@@ -18,8 +18,7 @@ func (c *Client) GetGenresWithContext(ctx context.Context) ([]string, error) {
 	query := FieldObject("query", nil, "GenreCollection")
 
 	var d genreResponse
-	err := c.post(ctx, query, nil, &d)
-	if err != nil {
+	if err := c.post(ctx, query, nil, &d); err != nil {
 		return nil, err
 	}
 

@@ -990,7 +990,6 @@ func yaml_parser_unroll_indent(parser *yaml_parser_t, column int) bool {
 
 // Initialize the scanner and produce the STREAM-START token.
 func yaml_parser_fetch_stream_start(parser *yaml_parser_t) bool {
-
 	// Set the initial indentation.
 	parser.indent = -1
 
@@ -1018,7 +1017,6 @@ func yaml_parser_fetch_stream_start(parser *yaml_parser_t) bool {
 
 // Produce the STREAM-END token and shut down the scanner.
 func yaml_parser_fetch_stream_end(parser *yaml_parser_t) bool {
-
 	// Force new line.
 	if parser.mark.column != 0 {
 		parser.mark.column = 0
@@ -1237,7 +1235,6 @@ func yaml_parser_fetch_block_entry(parser *yaml_parser_t) bool {
 
 // Produce the KEY token.
 func yaml_parser_fetch_key(parser *yaml_parser_t) bool {
-
 	// In the block context, additional checks are required.
 	if parser.flow_level == 0 {
 		// Check if we are allowed to start a new key (not nessesary simple).
@@ -1276,13 +1273,11 @@ func yaml_parser_fetch_key(parser *yaml_parser_t) bool {
 
 // Produce the VALUE token.
 func yaml_parser_fetch_value(parser *yaml_parser_t) bool {
-
 	simple_key := &parser.simple_keys[len(parser.simple_keys)-1]
 
 	// Have we found a simple key?
 	if valid, ok := yaml_simple_key_is_valid(parser, simple_key); !ok {
 		return false
-
 	} else if valid {
 
 		// Create the KEY token and insert it into the queue.
@@ -1441,7 +1436,6 @@ func yaml_parser_fetch_plain_scalar(parser *yaml_parser_t) bool {
 
 // Eat whitespaces and comments until the next token is found.
 func yaml_parser_scan_to_next_token(parser *yaml_parser_t) bool {
-
 	// Until the next token is not found.
 	for {
 		// Allow the BOM mark to start a line.
@@ -1500,11 +1494,11 @@ func yaml_parser_scan_to_next_token(parser *yaml_parser_t) bool {
 // Scan a YAML-DIRECTIVE or TAG-DIRECTIVE token.
 //
 // Scope:
-//      %YAML    1.1    # a comment \n
-//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-//      %TAG    !yaml!  tag:yaml.org,2002:  \n
-//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 //
+//	%YAML    1.1    # a comment \n
+//	^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+//	%TAG    !yaml!  tag:yaml.org,2002:  \n
+//	^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 func yaml_parser_scan_directive(parser *yaml_parser_t, token *yaml_token_t) bool {
 	// Eat '%'.
 	start_mark := parser.mark
@@ -1601,11 +1595,11 @@ func yaml_parser_scan_directive(parser *yaml_parser_t, token *yaml_token_t) bool
 // Scan the directive name.
 //
 // Scope:
-//      %YAML   1.1     # a comment \n
-//       ^^^^
-//      %TAG    !yaml!  tag:yaml.org,2002:  \n
-//       ^^^
 //
+//	%YAML   1.1     # a comment \n
+//	 ^^^^
+//	%TAG    !yaml!  tag:yaml.org,2002:  \n
+//	 ^^^
 func yaml_parser_scan_directive_name(parser *yaml_parser_t, start_mark yaml_mark_t, name *[]byte) bool {
 	// Consume the directive name.
 	if parser.unread < 1 && !yaml_parser_update_buffer(parser, 1) {
@@ -1640,8 +1634,9 @@ func yaml_parser_scan_directive_name(parser *yaml_parser_t, start_mark yaml_mark
 // Scan the value of VERSION-DIRECTIVE.
 //
 // Scope:
-//      %YAML   1.1     # a comment \n
-//           ^^^^^^
+//
+//	%YAML   1.1     # a comment \n
+//	     ^^^^^^
 func yaml_parser_scan_version_directive_value(parser *yaml_parser_t, start_mark yaml_mark_t, major, minor *int8) bool {
 	// Eat whitespaces.
 	if parser.unread < 1 && !yaml_parser_update_buffer(parser, 1) {
@@ -1679,12 +1674,12 @@ const max_number_length = 2
 // Scan the version number of VERSION-DIRECTIVE.
 //
 // Scope:
-//      %YAML   1.1     # a comment \n
-//              ^
-//      %YAML   1.1     # a comment \n
-//                ^
+//
+//	%YAML   1.1     # a comment \n
+//	        ^
+//	%YAML   1.1     # a comment \n
+//	          ^
 func yaml_parser_scan_version_directive_number(parser *yaml_parser_t, start_mark yaml_mark_t, number *int8) bool {
-
 	// Repeat while the next character is digit.
 	if parser.unread < 1 && !yaml_parser_update_buffer(parser, 1) {
 		return false
@@ -1716,9 +1711,9 @@ func yaml_parser_scan_version_directive_number(parser *yaml_parser_t, start_mark
 // Scan the value of a TAG-DIRECTIVE token.
 //
 // Scope:
-//      %TAG    !yaml!  tag:yaml.org,2002:  \n
-//          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 //
+//	%TAG    !yaml!  tag:yaml.org,2002:  \n
+//	    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 func yaml_parser_scan_tag_directive_value(parser *yaml_parser_t, start_mark yaml_mark_t, handle, prefix *[]byte) bool {
 	var handle_value, prefix_value []byte
 
@@ -1966,7 +1961,7 @@ func yaml_parser_scan_tag_handle(parser *yaml_parser_t, directive bool, start_ma
 
 // Scan a tag.
 func yaml_parser_scan_tag_uri(parser *yaml_parser_t, directive bool, head []byte, start_mark yaml_mark_t, uri *[]byte) bool {
-	//size_t length = head ? strlen((char *)head) : 0
+	// size_t length = head ? strlen((char *)head) : 0
 	var s []byte
 	hasTag := len(head) > 0
 
@@ -2024,7 +2019,6 @@ func yaml_parser_scan_tag_uri(parser *yaml_parser_t, directive bool, head []byte
 
 // Decode an URI-escape sequence corresponding to a single UTF-8 character.
 func yaml_parser_scan_uri_escapes(parser *yaml_parser_t, directive bool, start_mark yaml_mark_t, s *[]byte) bool {
-
 	// Decode the required number of characters.
 	w := 1024
 	for w > 0 {
@@ -2359,7 +2353,6 @@ func yaml_parser_scan_flow_scalar(parser *yaml_parser_t, token *yaml_token_t, si
 			} else if !single && parser.buffer[parser.buffer_pos] == '"' {
 				// It is a right double quote.
 				break
-
 			} else if !single && parser.buffer[parser.buffer_pos] == '\\' && is_break(parser.buffer, parser.buffer_pos+1) {
 				// It is an escaped line break.
 				if parser.unread < 3 && !yaml_parser_update_buffer(parser, 3) {
@@ -2568,10 +2561,9 @@ func yaml_parser_scan_flow_scalar(parser *yaml_parser_t, token *yaml_token_t, si
 
 // Scan a plain scalar.
 func yaml_parser_scan_plain_scalar(parser *yaml_parser_t, token *yaml_token_t) bool {
-
 	var s, leading_break, trailing_breaks, whitespaces []byte
 	var leading_blanks bool
-	var indent = parser.indent + 1
+	indent := parser.indent + 1
 
 	start_mark := parser.mark
 	end_mark := parser.mark

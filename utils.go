@@ -147,107 +147,103 @@ func titleLevenshteinSimilarity(title1, title2 string) float64 {
 	return similarity
 }
 
+// Helper functions for title matching to reduce complexity
+
+func exactMatch(t1, t2, titleType string) bool {
+	if t1 == "" || t2 == "" {
+		return false
+	}
+	if strings.EqualFold(t1, t2) {
+		DPrintf("Exact match found %s: %s == %s", titleType, t1, t2)
+		return true
+	}
+	return false
+}
+
+func normalizedMatch(t1, t2, titleType string) bool {
+	if t1 == "" || t2 == "" {
+		return false
+	}
+	normalizedA := normalizeTitle(t1)
+	normalizedB := normalizeTitle(t2)
+	if normalizedA == normalizedB {
+		DPrintf("Normalized match found %s: '%s' == '%s' (original: '%s' vs '%s')",
+			titleType, normalizedA, normalizedB, t1, t2)
+		return true
+	}
+	return false
+}
+
+func fuzzyMatch(t1, t2, titleType string, threshold float64) bool {
+	if t1 == "" || t2 == "" {
+		return false
+	}
+	similarity := titleSimilarity(t1, t2)
+	if similarity >= threshold {
+		DPrintf("Fuzzy match found %s: '%s' ~= '%s' (similarity: %.2f)", titleType, t1, t2, similarity)
+		return true
+	}
+	return false
+}
+
+func levenshteinMatch(t1, t2, titleType string, threshold float64) bool {
+	if t1 == "" || t2 == "" {
+		return false
+	}
+	similarity := titleLevenshteinSimilarity(t1, t2)
+	if similarity >= threshold {
+		DPrintf("Levenshtein match found %s: '%s' ~= '%s' (similarity: %.2f)", titleType, t1, t2, similarity)
+		return true
+	}
+	return false
+}
+
 // titleMatchingLevels performs multi-level title matching
 func titleMatchingLevels(titleEN1, titleJP1, titleRomaji1, titleEN2, titleJP2, titleRomaji2 string) bool {
 	// Level 1: Exact case-insensitive title matching
-	if titleEN1 != "" && titleEN2 != "" && strings.EqualFold(titleEN1, titleEN2) {
-		DPrintf("Exact match found TitleEN: %s == %s", titleEN1, titleEN2)
+	if exactMatch(titleEN1, titleEN2, "TitleEN") {
 		return true
 	}
-
-	if titleJP1 != "" && titleJP2 != "" && strings.EqualFold(titleJP1, titleJP2) {
-		DPrintf("Exact match found TitleJP: %s == %s", titleJP1, titleJP2)
+	if exactMatch(titleJP1, titleJP2, "TitleJP") {
 		return true
 	}
-
-	if titleRomaji1 != "" && titleRomaji2 != "" && strings.EqualFold(titleRomaji1, titleRomaji2) {
-		DPrintf("Exact match found TitleRomaji: %s == %s", titleRomaji1, titleRomaji2)
+	if exactMatch(titleRomaji1, titleRomaji2, "TitleRomaji") {
 		return true
 	}
 
 	// Level 2: Normalized exact matching (removes punctuation, brackets, etc.)
-	if titleEN1 != "" && titleEN2 != "" {
-		normalizedA := normalizeTitle(titleEN1)
-		normalizedB := normalizeTitle(titleEN2)
-		if normalizedA == normalizedB {
-			DPrintf("Normalized match found TitleEN: '%s' == '%s' (original: '%s' vs '%s')", normalizedA,
-				normalizedB, titleEN1, titleEN2)
-			return true
-		}
+	if normalizedMatch(titleEN1, titleEN2, "TitleEN") {
+		return true
 	}
-
-	if titleJP1 != "" && titleJP2 != "" {
-		normalizedA := normalizeTitle(titleJP1)
-		normalizedB := normalizeTitle(titleJP2)
-		if normalizedA == normalizedB {
-			DPrintf("Normalized match found TitleJP: '%s' == '%s' (original: '%s' vs '%s')",
-				normalizedA, normalizedB, titleJP1, titleJP2)
-			return true
-		}
+	if normalizedMatch(titleJP1, titleJP2, "TitleJP") {
+		return true
 	}
-
-	if titleRomaji1 != "" && titleRomaji2 != "" {
-		normalizedA := normalizeTitle(titleRomaji1)
-		normalizedB := normalizeTitle(titleRomaji2)
-		if normalizedA == normalizedB {
-			DPrintf("Normalized match found TitleRomaji: '%s' == '%s' (original: '%s' vs '%s')",
-				normalizedA, normalizedB, titleRomaji1, titleRomaji2)
-			return true
-		}
+	if normalizedMatch(titleRomaji1, titleRomaji2, "TitleRomaji") {
+		return true
 	}
 
 	// Level 3: Fuzzy matching with similarity threshold
 	const similarityThreshold = 98.0
-	if titleEN1 != "" && titleEN2 != "" {
-		similarity := titleSimilarity(titleEN1, titleEN2)
-		if similarity >= similarityThreshold {
-			DPrintf("Fuzzy match found TitleEN: '%s' ~= '%s' (similarity: %.2f)", titleEN1, titleEN2, similarity)
-			return true
-		}
+	if fuzzyMatch(titleEN1, titleEN2, "TitleEN", similarityThreshold) {
+		return true
 	}
-
-	if titleJP1 != "" && titleJP2 != "" {
-		similarity := titleSimilarity(titleJP1, titleJP2)
-		if similarity >= similarityThreshold {
-			DPrintf("Fuzzy match found TitleJP: '%s' ~= '%s' (similarity: %.2f)", titleJP1, titleJP2, similarity)
-			return true
-		}
+	if fuzzyMatch(titleJP1, titleJP2, "TitleJP", similarityThreshold) {
+		return true
 	}
-
-	if titleRomaji1 != "" && titleRomaji2 != "" {
-		similarity := titleSimilarity(titleRomaji1, titleRomaji2)
-		if similarity >= similarityThreshold {
-			DPrintf("Fuzzy match found TitleRomaji: '%s' ~= '%s' (similarity: %.2f)", titleRomaji1,
-				titleRomaji2, similarity)
-			return true
-		}
+	if fuzzyMatch(titleRomaji1, titleRomaji2, "TitleRomaji", similarityThreshold) {
+		return true
 	}
 
 	// Level 4: Levenshtein distance-based matching
 	const levenshteinThreshold = 98.0
-	if titleEN1 != "" && titleEN2 != "" {
-		similarity := titleLevenshteinSimilarity(titleEN1, titleEN2)
-		if similarity >= levenshteinThreshold {
-			DPrintf("Levenshtein match found TitleEN: '%s' ~= '%s' (similarity: %.2f)", titleEN1, titleEN2, similarity)
-			return true
-		}
+	if levenshteinMatch(titleEN1, titleEN2, "TitleEN", levenshteinThreshold) {
+		return true
 	}
-
-	if titleJP1 != "" && titleJP2 != "" {
-		similarity := titleLevenshteinSimilarity(titleJP1, titleJP2)
-		if similarity >= levenshteinThreshold {
-			DPrintf("Levenshtein match found TitleJP: '%s' ~= '%s' (similarity: %.2f)", titleJP1, titleJP2, similarity)
-			return true
-		}
+	if levenshteinMatch(titleJP1, titleJP2, "TitleJP", levenshteinThreshold) {
+		return true
 	}
-
-	if titleRomaji1 != "" && titleRomaji2 != "" {
-		similarity := titleLevenshteinSimilarity(titleRomaji1, titleRomaji2)
-		if similarity >= levenshteinThreshold {
-			DPrintf("Levenshtein match found TitleRomaji: '%s' ~= '%s' (similarity: %.2f)", titleRomaji1,
-				titleRomaji2, similarity)
-			return true
-		}
+	if levenshteinMatch(titleRomaji1, titleRomaji2, "TitleRomaji", levenshteinThreshold) {
+		return true
 	}
 
 	return false

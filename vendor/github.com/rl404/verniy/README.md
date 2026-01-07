@@ -12,7 +12,7 @@ The goal of this library is to make a flexible and easy to call Anilist API.
 This library may not cover all available API but you are always welcome to
 make a pull request.
 
-This library is built using [Anilist official docs](https://github.com/AniList/ApiV2-GraphQL-Docs) especially the graphql [reference](https://anilist.github.io/ApiV2-GraphQL-Docs/).
+This library is built using [Anilist official docs](https://github.com/AniList/ApiV2-GraphQL-Docs) especially the graphql [reference](https://studio.apollographql.com/sandbox/explorer?endpoint=https%3A%2F%2Fgraphql.anilist.co).
 
 ## Features
 

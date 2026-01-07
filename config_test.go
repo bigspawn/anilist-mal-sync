@@ -270,3 +270,60 @@ token_file_path: "` + customTokenPath + `"
 		t.Errorf("TokenFilePath = %v, want %v", config.TokenFilePath, customTokenPath)
 	}
 }
+
+// =============================================================================
+// WatchConfig Tests
+// =============================================================================
+
+func TestWatchConfig_GetInterval(t *testing.T) {
+	tests := []struct {
+		name     string
+		interval string
+		want     string // "0" for zero, "duration" for non-zero
+		wantErr  bool
+	}{
+		{"Valid interval", "24h", "24h", false},
+		{"Valid interval hours", "12h", "12h", false},
+		{"Valid interval minutes", "90m", "90m", false},
+		{"Empty interval", "", "0", false},
+		{"Invalid interval", "invalid", "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := WatchConfig{Interval: tt.interval}
+			got, err := w.GetInterval()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetInterval() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr {
+				if tt.want == "0" && got != 0 {
+					t.Errorf("GetInterval() = %v, want 0", got)
+				}
+				if tt.want != "0" && got == 0 {
+					t.Errorf("GetInterval() = 0, want non-zero")
+				}
+			}
+		})
+	}
+}
+
+func TestWatchConfig_GetInterval_Empty(t *testing.T) {
+	w := WatchConfig{Interval: ""}
+	got, err := w.GetInterval()
+	if err != nil {
+		t.Fatalf("GetInterval() unexpected error: %v", err)
+	}
+	if got != 0 {
+		t.Errorf("GetInterval() = %v, want 0", got)
+	}
+}
+
+func TestWatchConfig_GetInterval_Invalid(t *testing.T) {
+	w := WatchConfig{Interval: "not-a-duration"}
+	_, err := w.GetInterval()
+	if err == nil {
+		t.Fatal("GetInterval() expected error, got nil")
+	}
+}

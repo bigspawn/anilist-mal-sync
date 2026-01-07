@@ -27,15 +27,24 @@ linters:
     - gosec
     - ineffassign
     - lll
+    - maintidx
     - misspell
+    - musttag
     - nakedret
+    - nilnil
     - noctx
     - nolintlint
+    - prealloc
     - revive
     - unconvert
     - unparam
     - unused
+    - usestdlibvars
     - whitespace
+
+    # Complexity control (AI-generated code tends to be overly complex)
+    - cyclop
+    - nestif
 
     # Style and formatting
     - asciicheck
@@ -53,25 +62,56 @@ linters:
       - text: "exported: exported"
         linters:
           - revive
+      # Exclude test files from certain linters
       - path: "_test\\.go"
         linters:
           - dupl
+          - funlen
+          - gocyclo
+          - cyclop
+          - nestif
   settings:
     lll:
       line-length: 140
     funlen:
-      # Checks the number of lines in a function.
-      # If lower than 0, disable the check.
-      lines: 200
-      # Checks the number of statements in a function.
-      # If lower than 0, disable the check.
-      statements: 100
-      # Ignore comments when counting lines.
-      # Default: true
+      # Stricter limits for AI-generated code to prevent overly long functions
+      # Tests are excluded from this check via exclusions above
+      # Main code: 100 lines (was 200, AI tends to generate long functions)
+      lines: 100
+      # Maximum number of statements in a function
+      statements: 50
+      # Ignore comments when counting lines
       ignore-comments: true
     gocyclo:
-      # Minimal code complexity to report.
-      min-complexity: 60
+      # Stricter complexity limit for AI-generated code
+      # Tests are excluded from this check via exclusions above
+      # Main code: 15 (was 60, which is too permissive)
+      min-complexity: 15
+    cyclop:
+      # Maximum cyclomatic complexity
+      # Tests are excluded via exclusions section above
+      max-complexity: 25
+      # Maximum average complexity (across all files in package)
+      package-average: 0
+    nestif:
+      # Maximum depth of if statements
+      # Default: 4
+      min-complexity: 4
+    maintidx:
+      # Minimum maintainability index (0-100)
+      # Below this value, code is flagged
+      # Default: 20
+      under: 20
+    prealloc:
+      # Report preallocation suggestions only on simple loops
+      # Default: true
+      simple: true
+      # Report preallocation suggestions on range loops
+      # Default: true
+      range-loops: true
+      # Report preallocation suggestions on for loops
+      # Default: false
+      for-loops: false
 formatters:
   enable:
     - gci

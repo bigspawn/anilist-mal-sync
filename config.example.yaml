@@ -14,3 +14,5 @@ myanimelist:
   token_url: "https://myanimelist.net/v1/oauth2/token"
   username: "username" # Your MyAnimeList username.
 token_file_path: "" # Absolute path to token file, empty string use default path.
+watch:
+  interval: "24h" # Sync interval for watch mode (1h-168h). Can be overridden with --interval flag.

@@ -71,10 +71,9 @@ func (c *Client) GetStudioWithContext(ctx context.Context, id int, page int, per
 	}, fields...))
 
 	var d studioResponse
-	err := c.post(ctx, query, QueryParam{
+	if err := c.post(ctx, query, QueryParam{
 		"id": id,
-	}, &d)
-	if err != nil {
+	}, &d); err != nil {
 		return nil, err
 	}
 

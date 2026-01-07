@@ -513,7 +513,7 @@ func TestStateValidation_MissingState(t *testing.T) {
 	}
 
 	// Create request without state parameter
-	req := httptest.NewRequest("GET", "/callback?code=test_code", nil)
+	req := httptest.NewRequest(http.MethodGet, "/callback?code=test_code", nil)
 	w := httptest.NewRecorder()
 
 	// Call the callback handler (extracted from startServer)
@@ -560,7 +560,7 @@ func TestStateValidation_MismatchedState(t *testing.T) {
 	}
 
 	// Create request with wrong state
-	req := httptest.NewRequest("GET", "/callback?code=test_code&state=wrong_state", nil)
+	req := httptest.NewRequest(http.MethodGet, "/callback?code=test_code&state=wrong_state", nil)
 	w := httptest.NewRecorder()
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -606,7 +606,7 @@ func TestStateValidation_ValidState(t *testing.T) {
 	}
 
 	// Create request with correct state
-	req := httptest.NewRequest("GET", "/callback?code=test_code&state="+oauth.state, nil)
+	req := httptest.NewRequest(http.MethodGet, "/callback?code=test_code&state="+oauth.state, nil)
 	w := httptest.NewRecorder()
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

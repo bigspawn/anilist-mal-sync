@@ -5,29 +5,29 @@
 // to struct. The goal of this library is to make a flexible and easy to
 // call Anilist API.
 //
-//  // Init verniy.
-//  v := verniy.New()
+//	// Init verniy.
+//	v := verniy.New()
 //
-//  // Get anime One Piece data (with default fields).
-//  data, err := v.GetAnime(21)
+//	// Get anime One Piece data (with default fields).
+//	data, err := v.GetAnime(21)
 //
-//  // Get anime One Piece data (with custom fields).
-//  data, err := v.GetAnime(21,
-//    verniy.MediaFieldID,
-//    verniy.MediaFieldTitle(
-//      verniy.MediaTitleFieldRomaji,
-//      verniy.MediaTitleFieldEnglish,
-//      verniy.MediaTitleFieldNative),
-//    verniy.MediaFieldType,
-//    verniy.MediaFieldFormat,
-//    verniy.MediaFieldStatusV2,
-//    verniy.MediaFieldDescription,
-//    verniy.MediaFieldStartDate,
-//    verniy.MediaFieldEndDate,
-//    verniy.MediaFieldSeason,
-//    verniy.MediaFieldSeasonYear)
+//	// Get anime One Piece data (with custom fields).
+//	data, err := v.GetAnime(21,
+//	  verniy.MediaFieldID,
+//	  verniy.MediaFieldTitle(
+//	    verniy.MediaTitleFieldRomaji,
+//	    verniy.MediaTitleFieldEnglish,
+//	    verniy.MediaTitleFieldNative),
+//	  verniy.MediaFieldType,
+//	  verniy.MediaFieldFormat,
+//	  verniy.MediaFieldStatusV2,
+//	  verniy.MediaFieldDescription,
+//	  verniy.MediaFieldStartDate,
+//	  verniy.MediaFieldEndDate,
+//	  verniy.MediaFieldSeason,
+//	  verniy.MediaFieldSeasonYear)
 //
-// Functions
+// # Functions
 //
 // There are alot of functions in verniy package but
 // most of the time, you just need functions in `Client` struct.
@@ -35,7 +35,7 @@
 // If you want to make a custom request, you can use function
 // `MakeRequest()` (go to the function for more details).
 //
-// Parameters
+// # Parameters
 //
 // Yes, there are tons of custom types and functions but let
 // your IDE auto-complete helps you choose the params for the
@@ -47,9 +47,9 @@
 // value of the variadic parameters.
 //
 // If you want the complete list of available params,
-// read the official docs (https://anilist.github.io/ApiV2-GraphQL-Docs/).
+// read the official docs (https://studio.apollographql.com/sandbox/explorer?endpoint=https%3A%2F%2Fgraphql.anilist.co).
 //
-// Response
+// # Response
 //
 // Most of the functions in `Client` struct return a struct and error.
 // Yes, most of the fields in the returned struct are pointers because,
@@ -57,15 +57,15 @@
 // request. It is recommended to make your own pointer handler when
 // using the field. For example.
 //
-//  // Handle *string to string.
-//  func ptrToString(str *string) string {
-//    if str == nil {
-//      return ""
-//    }
-//    return *str
-//  }
+//	// Handle *string to string.
+//	func ptrToString(str *string) string {
+//	  if str == nil {
+//	    return ""
+//	  }
+//	  return *str
+//	}
 //
-// Rate Limit
+// # Rate Limit
 //
 // Anilist has default rate limit 90 requests per minute. If you go over
 // the rate limit you'll receive a 1-minute timeout. But, verniy has

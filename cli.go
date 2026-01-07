@@ -72,6 +72,7 @@ func NewCLI() *cli.Command {
 			newLogoutCommand(),
 			newStatusCommand(),
 			newSyncCommand(),
+			newWatchCommand(),
 		},
 		// Default action when no command specified - runs sync for backward compatibility
 		Action: func(ctx context.Context, cmd *cli.Command) error {
