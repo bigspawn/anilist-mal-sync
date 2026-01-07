@@ -6,15 +6,24 @@ services:
     ports:
       - "18080:18080"  # For OAuth login
     environment:
-      # Replace with your user's UID/GID (find with: id -u / id -g)
-      - PUID=1000
-      - PGID=1000
+      # Required: Your API credentials
+      - ANILIST_CLIENT_ID=your_anilist_client_id
+      - ANILIST_CLIENT_SECRET=your_anilist_secret
+      - ANILIST_USERNAME=your_anilist_username
+      - MAL_CLIENT_ID=your_mal_client_id
+      - MAL_CLIENT_SECRET=your_mal_secret
+      # Optional: Configuration
+      - WATCH_INTERVAL=12h
+      - OAUTH_PORT=18080
+      - OAUTH_REDIRECT_URI=http://localhost:18080/callback
     volumes:
-      - ./config.yaml:/etc/anilist-mal-sync/config.yaml:ro
-      - ./tokens:/home/appuser/.config/anilist-mal-sync
+      - tokens:/home/appuser/.config/anilist-mal-sync
     restart: unless-stopped
 
-# Usage:
-# 1. Create config.yaml in this directory (see config.example.yaml)
-# 2. Replace PUID/PGID with your IDs: id -u / id -g
-# 3. docker-compose up
+volumes:
+  tokens:
+
+# Simple setup:
+# 1. Edit environment variables above with your credentials
+# 2. docker-compose run --rm --service-ports sync login all
+# 3. docker-compose up -d

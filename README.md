@@ -148,37 +148,75 @@ anilist-mal-sync sync
 
 ### Docker
 
-**Important:** For Docker, set `token_file_path: ""` in config.yaml to use the container's home directory.
-
 #### Quick Start
-
-**Simple setup (recommended):**
 
 See [`docker-compose.example.yaml`](docker-compose.example.yaml):
 
 ```yaml
-version: '3'
+version: "3"
 services:
   sync:
     image: ghcr.io/bigspawn/anilist-mal-sync:latest
     command: ["watch"]
+    ports:
+      - "18080:18080"
     environment:
-      # Find your IDs: id -u / id -g
-      - PUID=1000
-      - PGID=1000
+      - ANILIST_CLIENT_ID=your_anilist_client_id
+      - ANILIST_CLIENT_SECRET=your_secret
+      - ANILIST_USERNAME=your_username
+      - MAL_CLIENT_ID=your_mal_client_id
+      - MAL_CLIENT_SECRET=your_secret
+      - WATCH_INTERVAL=12h
+    volumes:
+      - tokens:/home/appuser/.config/anilist-mal-sync
+    restart: unless-stopped
+
+volumes:
+  tokens:
+```
+
+**Setup:**
+1. Edit environment variables with your credentials
+2. `docker-compose run --rm --service-ports sync login all`
+3. `docker-compose up -d`
+
+**Available environment variables:**
+- `ANILIST_CLIENT_ID` - AniList Client ID (required)
+- `ANILIST_CLIENT_SECRET` - AniList Client Secret (required)
+- `ANILIST_USERNAME` - AniList Username (optional)
+- `MAL_CLIENT_ID` - MyAnimeList Client ID (required)
+- `MAL_CLIENT_SECRET` - MyAnimeList Client Secret (optional)
+- `WATCH_INTERVAL` - Sync interval: 1h-168h (default: must specify in config or via flag)
+- `OAUTH_PORT` - OAuth callback port (default: 18080)
+- `OAUTH_REDIRECT_URI` - OAuth redirect URI (default: http://localhost:18080/callback)
+
+**Deprecated (still supported for backward compatibility):**
+- `CLIENT_SECRET_ANILIST` - Use `ANILIST_CLIENT_SECRET` instead
+- `CLIENT_SECRET_MYANIMELIST` - Use `MAL_CLIENT_SECRET` instead
+- `PORT` - Use `OAUTH_PORT` instead
+
+#### Alternative: Config File
+
+If you prefer using `config.yaml`:
+
+```yaml
+version: "3"
+services:
+  sync:
+    image: ghcr.io/bigspawn/anilist-mal-sync:latest
+    command: ["watch"]
+    ports:
+      - "18080:18080"
+    environment:
+      - PUID=1000  # Your UID from: id -u
+      - PGID=1000  # Your GID from: id -g
     volumes:
       - ./config.yaml:/etc/anilist-mal-sync/config.yaml:ro
       - ./tokens:/home/appuser/.config/anilist-mal-sync
     restart: unless-stopped
 ```
 
-**To find your PUID and PGID:**
-```bash
-id -u  # Returns your PUID (e.g., 1000)
-id -g  # Returns your PGID (e.g., 1000)
-```
-
-Then just replace `1000` with your numbers in `docker-compose.yaml`.
+**Note:** Set `PUID`/`PGID` only if using local `./tokens` directory. Find with: `id -u` / `id -g`
 
 
 #### Pre-built image
