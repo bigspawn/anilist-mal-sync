@@ -151,15 +151,20 @@ func (a Anime) SameProgressWithTarget(t Target) bool {
 }
 
 func (a Anime) SameTypeWithTarget(t Target) bool {
-	// First check: Compare target IDs
-	if a.GetTargetID() == t.GetTargetID() {
+	// Type assertion to ensure we're comparing with another Anime
+	b, ok := t.(Anime)
+	if !ok {
+		return false
+	}
+
+	// Check if MAL IDs match (critical for reverse sync)
+	if a.IDMal > 0 && b.IDMal > 0 && a.IDMal == b.IDMal {
 		return true
 	}
 
-	// Type assertion to ensure we're comparing with another Anime
-	_, ok := t.(Anime)
-	if !ok {
-		return false
+	// Check if AniList IDs match
+	if a.IDAnilist > 0 && b.IDAnilist > 0 && a.IDAnilist == b.IDAnilist {
+		return true
 	}
 
 	// Use the comprehensive title matching logic
