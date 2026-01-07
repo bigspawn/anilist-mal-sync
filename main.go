@@ -1,47 +1,34 @@
 package main
 
 import (
-	"context"
-	"flag"
 	"log"
-	"os/signal"
-	"syscall"
+	"os"
 )
 
+// Default values for flags - used when sync is not called via CLI (e.g., tests)
 var (
-	configFile       = flag.String("c", "config.yaml", "path to config file")
-	forceSync        = flag.Bool("f", false, "force sync all animes")
-	dryRun           = flag.Bool("d", false, "dry run without updating MyAnimeList")
-	mangaSync        = flag.Bool("manga", false, "sync manga instead of anime")
-	allSync          = flag.Bool("all", false, "sync all animes and mangas")
-	verbose          = flag.Bool("verbose", false, "enable verbose logging")
-	reverseDirection = flag.Bool(
-		"reverse-direction",
-		false,
-		"sync from MyAnimeList to AniList (default is AniList to MyAnimeList)",
-	)
+	defaultForce   = false
+	defaultDryRun  = false
+	defaultManga   = false
+	defaultAll     = false
+	defaultVerbose = false
+	defaultReverse = false
+)
+
+// Package-level vars for backward compatibility with app.go/updater.go
+// These are set by sync command
+var (
+	forceSync        = &defaultForce
+	dryRun           = &defaultDryRun
+	mangaSync        = &defaultManga
+	allSync          = &defaultAll
+	verbose          = &defaultVerbose
+	reverseDirection = &defaultReverse
 )
 
 func main() {
-	flag.Parse()
-
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-
-	config, err := loadConfigFromFile(*configFile)
-	if err != nil {
-		cancel()
-		log.Fatalf("error: %v", err)
+	if err := RunCLI(); err != nil {
+		log.Printf("Error: %v", err)
+		os.Exit(1)
 	}
-
-	app, err := NewApp(ctx, config)
-	if err != nil {
-		cancel()
-		log.Fatalf("create app: %v", err)
-	}
-
-	if err := app.Run(ctx); err != nil {
-		cancel()
-		log.Fatalf("run app: %v", err)
-	}
-	cancel()
 }

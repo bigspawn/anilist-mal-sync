@@ -8,6 +8,7 @@ anilist-mal-sync
 
 config.yaml
 CLAUDE.md
+TASK.md
 
 *tmp.json
 *.log

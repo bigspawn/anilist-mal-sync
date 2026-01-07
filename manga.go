@@ -86,6 +86,13 @@ func (m Manga) GetTargetID() TargetID {
 	return TargetID(m.IDMal)
 }
 
+func (m Manga) GetSourceID() int {
+	if *reverseDirection {
+		return m.IDMal
+	}
+	return m.IDAnilist
+}
+
 func (m Manga) GetStatusString() string {
 	return string(m.Status)
 }
@@ -136,8 +143,13 @@ func (m Manga) SameTypeWithTarget(t Target) bool {
 		return false
 	}
 
-	// First check: Compare IDs
-	if m.IDMal == b.IDMal || m.IDAnilist == b.IDAnilist {
+	// Check if MAL IDs match (critical for reverse sync)
+	if m.IDMal > 0 && b.IDMal > 0 && m.IDMal == b.IDMal {
+		return true
+	}
+
+	// Check if AniList IDs match
+	if m.IDAnilist > 0 && b.IDAnilist > 0 && m.IDAnilist == b.IDAnilist {
 		return true
 	}
 
@@ -146,8 +158,8 @@ func (m Manga) SameTypeWithTarget(t Target) bool {
 		return true
 	}
 
-	// Fallback: Check if chapters and volumes match
-	if m.Chapters == b.Chapters && m.Volumes == b.Volumes {
+	// Fallback: Check if chapters and volumes match (only if both are known)
+	if (m.Chapters > 0 || m.Volumes > 0) && m.Chapters == b.Chapters && m.Volumes == b.Volumes {
 		// NOTE: some mangas are joined in MAL in the same entry in Volumes, but it is separated in Anilist.
 		// Skip it for now.
 		return true

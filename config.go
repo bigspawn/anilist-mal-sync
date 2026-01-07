@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"os"
+	"strings"
 
 	yaml "gopkg.in/yaml.v2"
 )
@@ -30,13 +32,17 @@ func loadConfigFromFile(filename string) (Config, error) {
 	// #nosec G304 - Config file path is provided by user via command line flag
 	data, err := os.ReadFile(filename)
 	if err != nil {
-		return Config{}, err
+		// Print help message to stderr
+		fmt.Fprintln(os.Stderr, getConfigHelp(filename))
+		return Config{}, fmt.Errorf("config file not found: %w", err)
 	}
 
 	var cfg Config
 	err = yaml.Unmarshal(data, &cfg)
 	if err != nil {
-		return Config{}, err
+		// Print help message to stderr
+		fmt.Fprintln(os.Stderr, getConfigHelp(filename))
+		return Config{}, fmt.Errorf("failed to parse config file: %w", err)
 	}
 
 	if port := os.Getenv("PORT"); port != "" {
@@ -56,4 +62,51 @@ func loadConfigFromFile(filename string) (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// getConfigHelp returns a helpful message for creating config file
+func getConfigHelp(configPath string) string {
+	const (
+		colorReset  = "\033[0m"
+		colorBold   = "\033[1m"
+		colorRed    = "\033[31m"
+		colorYellow = "\033[33m"
+		colorCyan   = "\033[36m"
+	)
+
+	examplePath := "config.example.yaml"
+
+	return fmt.Sprintf(`
+%sConfiguration file not found or invalid!%s
+
+%sTo fix this:%s
+
+1. Copy the example config:
+   %scp %s %s%s
+
+2. Edit the config file with your credentials:
+   %snano config.yaml%s
+
+3. Then run the command again.
+
+%sAlternatively, you can specify a custom config path:%s
+   %sanilist-mal-sync -c /path/to/config.yaml%s
+
+`, colorBold+colorRed, colorReset,
+		colorBold+colorYellow, colorReset,
+		colorCyan, examplePath, configPath, colorReset,
+		colorCyan, colorReset,
+		colorBold+colorYellow, colorReset,
+		colorCyan, colorReset)
+}
+
+// IsConfigNotFoundError checks if error is related to config file
+func IsConfigNotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errMsg := err.Error()
+	return strings.Contains(errMsg, "config file not found") ||
+		strings.Contains(errMsg, "no such file or directory") ||
+		strings.Contains(errMsg, "failed to parse config")
 }

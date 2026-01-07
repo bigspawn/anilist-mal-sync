@@ -11,6 +11,7 @@ type TargetID int
 type Source interface {
 	GetStatusString() string
 	GetTargetID() TargetID
+	GetSourceID() int
 	GetTitle() string
 	GetStringDiffWithTarget(Target) string
 	SameProgressWithTarget(Target) bool

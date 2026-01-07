@@ -139,6 +139,24 @@ func NewAnilistOAuth(ctx context.Context, config Config) (*OAuth, error) {
 	return oauthAnilist, nil
 }
 
+// NewAnilistOAuthWithoutInit creates AniList OAuth without starting auth flow.
+// Use InitToken() to manually trigger authentication when needed.
+func NewAnilistOAuthWithoutInit(config Config) (*OAuth, error) {
+	verifier := oauth2.GenerateVerifier()
+
+	return NewOAuth(
+		config.Anilist,
+		config.OAuth.RedirectURI,
+		"anilist",
+		[]oauth2.AuthCodeOption{
+			oauth2.AccessTypeOffline,
+			oauth2.S256ChallengeOption(verifier),
+			oauth2.VerifierOption(verifier),
+		},
+		config.TokenFilePath,
+	)
+}
+
 // GraphQLError represents a GraphQL error
 type GraphQLError struct {
 	Message   string `json:"message"`
@@ -351,6 +369,36 @@ func (c *AnilistClient) GetAnimesByName(ctx context.Context, name string, prefix
 	return result, err
 }
 
+// GetAnimeByMALID gets an anime from AniList by MAL ID with retry logic
+func (c *AnilistClient) GetAnimeByMALID(ctx context.Context, malID int, prefix string) (*verniy.Media, error) {
+	var result *verniy.Media
+
+	err := retryWithBackoff(ctx, func() error {
+		page, e := c.c.SearchAnimeWithContext(ctx, verniy.PageParamMedia{IDMAL: malID}, 1, 1,
+			verniy.MediaFieldID,
+			verniy.MediaFieldIDMAL,
+			verniy.MediaFieldTitle(
+				verniy.MediaTitleFieldRomaji,
+				verniy.MediaTitleFieldEnglish,
+				verniy.MediaTitleFieldNative,
+			),
+			verniy.MediaFieldStatusV2,
+			verniy.MediaFieldEpisodes,
+			verniy.MediaFieldSeasonYear,
+		)
+		if e != nil {
+			return fmt.Errorf("failed to search anime by MAL ID %d: %w", malID, e)
+		}
+		if len(page.Media) == 0 {
+			return fmt.Errorf("no anime found with MAL ID %d", malID)
+		}
+		result = &page.Media[0]
+		return nil
+	}, fmt.Sprintf("AniList search anime by MAL ID: %d", malID), prefix)
+
+	return result, err
+}
+
 // GetMangaByID gets a manga from AniList by ID with retry logic
 func (c *AnilistClient) GetMangaByID(ctx context.Context, id int, prefix string) (*verniy.Media, error) {
 	var result *verniy.Media
@@ -404,6 +452,38 @@ func (c *AnilistClient) GetMangasByName(ctx context.Context, name string, prefix
 		result = page.Media
 		return nil
 	}, fmt.Sprintf("AniList search manga by name: %s", name), prefix)
+
+	return result, err
+}
+
+// GetMangaByMALID gets a manga from AniList by MAL ID with retry logic
+func (c *AnilistClient) GetMangaByMALID(ctx context.Context, malID int, prefix string) (*verniy.Media, error) {
+	var result *verniy.Media
+
+	err := retryWithBackoff(ctx, func() error {
+		page, e := c.c.SearchMangaWithContext(ctx, verniy.PageParamMedia{IDMAL: malID}, 1, 1,
+			verniy.MediaFieldID,
+			verniy.MediaFieldIDMAL,
+			verniy.MediaFieldTitle(
+				verniy.MediaTitleFieldRomaji,
+				verniy.MediaTitleFieldEnglish,
+				verniy.MediaTitleFieldNative,
+			),
+			verniy.MediaFieldType,
+			verniy.MediaFieldFormat,
+			verniy.MediaFieldStatusV2,
+			verniy.MediaFieldChapters,
+			verniy.MediaFieldVolumes,
+		)
+		if e != nil {
+			return fmt.Errorf("failed to search manga by MAL ID %d: %w", malID, e)
+		}
+		if len(page.Media) == 0 {
+			return fmt.Errorf("no manga found with MAL ID %d", malID)
+		}
+		result = &page.Media[0]
+		return nil
+	}, fmt.Sprintf("AniList search manga by MAL ID: %d", malID), prefix)
 
 	return result, err
 }
