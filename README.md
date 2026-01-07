@@ -8,10 +8,10 @@ Program to synchronize your AniList and MyAnimeList accounts.
 - OAuth2 authentication
 - CLI interface
 
-## Quick Start (5 minutes)
+## Quick Start (Docker - 5 minutes)
 
 ### Prerequisites
-- Go 1.22+ OR Docker
+- Docker
 - Accounts on AniList and MyAnimeList
 
 ### Step 1: Create OAuth applications
@@ -28,21 +28,9 @@ Program to synchronize your AniList and MyAnimeList accounts.
 3. Set redirect URL: `http://localhost:18080/callback`
 4. Save the Client ID and Client Secret
 
-### Step 2: Install and configure
+### Step 2: Configure
 
-```bash
-# Download
-git clone https://github.com/bigspawn/anilist-mal-sync.git
-cd anilist-mal-sync
-
-# Create config
-cp config.example.yaml config.yaml
-
-# Edit config.yaml
-nano config.yaml
-```
-
-Edit `config.yaml` with your credentials:
+Create `config.yaml`:
 ```yaml
 anilist:
   client_id: "your_anilist_client_id"
@@ -52,24 +40,30 @@ myanimelist:
   client_id: "your_mal_client_id"
   client_secret: "your_mal_client_secret"
   username: "your_mal_username"
-token_file_path: ""  # Leave empty for default location
+token_file_path: ""  # Empty = auto-detect (recommended)
 ```
 
 ### Step 3: Authenticate
 
 ```bash
-go run . login all
+docker run --rm -p 18080:18080 \
+  -v $(pwd)/config.yaml:/etc/anilist-mal-sync/config.yaml:ro \
+  -v $(pwd)/tokens:/home/appuser/.config/anilist-mal-sync \
+  ghcr.io/bigspawn/anilist-mal-sync:latest login all
 ```
 
-Follow the URLs printed in terminal to authorize both services.
+Follow the URLs printed in terminal.
 
 ### Step 4: Sync
 
 ```bash
-go run . sync
+docker run --rm -p 18080:18080 \
+  -v $(pwd)/config.yaml:/etc/anilist-mal-sync/config.yaml:ro \
+  -v $(pwd)/tokens:/home/appuser/.config/anilist-mal-sync \
+  ghcr.io/bigspawn/anilist-mal-sync:latest sync
 ```
 
-Your lists are now synchronized!
+Done!
 
 ## Commands
 
