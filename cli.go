@@ -45,9 +45,8 @@ func NewCLI() *cli.Command {
 		Usage: "sync all anime and manga",
 	}
 	verboseFlag := &cli.BoolFlag{
-		Name:    "verbose",
-		Aliases: []string{"v"},
-		Usage:   "enable verbose logging",
+		Name:  "verbose",
+		Usage: "enable verbose logging",
 	}
 	reverseDirectionFlag := &cli.BoolFlag{
 		Name:  "reverse-direction",

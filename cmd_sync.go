@@ -31,9 +31,8 @@ func newSyncCommand() *cli.Command {
 				Usage: "sync all anime and manga",
 			},
 			&cli.BoolFlag{
-				Name:    "verbose",
-				Aliases: []string{"v"},
-				Usage:   "enable verbose logging",
+				Name:  "verbose",
+				Usage: "enable verbose logging",
 			},
 			&cli.BoolFlag{
 				Name:  "reverse-direction",

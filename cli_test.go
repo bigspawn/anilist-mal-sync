@@ -86,6 +86,136 @@ func TestCLI_SyncCommand_HasFlags(t *testing.T) {
 	}
 }
 
+func TestCLI_RootCommand_FlagAliases(t *testing.T) {
+	cmd := NewCLI()
+
+	aliases := make(map[string][]string)
+	for _, f := range cmd.Flags {
+		aliases[f.Names()[0]] = f.Names()
+	}
+
+	tests := []struct {
+		flag     string
+		aliases  []string
+		hasAlias bool
+	}{
+		{"config", []string{"config", "c"}, true},
+		{"force", []string{"force", "f"}, true},
+		{"dry-run", []string{"dry-run", "d"}, true},
+		{"manga", []string{"manga"}, false},
+		{"all", []string{"all"}, false},
+		{"verbose", []string{"verbose"}, false},
+		{"reverse-direction", []string{"reverse-direction"}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.flag, func(t *testing.T) {
+			actual, ok := aliases[tt.flag]
+			if !ok {
+				t.Fatalf("flag %s not found", tt.flag)
+			}
+
+			if !equalSlices(actual, tt.aliases) {
+				t.Errorf("flag %s: expected aliases %v, got %v", tt.flag, tt.aliases, actual)
+			}
+
+			hasAlias := len(actual) > 1
+			if hasAlias != tt.hasAlias {
+				t.Errorf("flag %s: expected hasAlias=%v, got %v", tt.flag, tt.hasAlias, hasAlias)
+			}
+		})
+	}
+}
+
+func TestCLI_SyncCommand_FlagAliases(t *testing.T) {
+	rootCmd := NewCLI()
+
+	var syncCmd *cli.Command
+	for _, c := range rootCmd.Commands {
+		if c.Name == "sync" {
+			syncCmd = c
+			break
+		}
+	}
+
+	if syncCmd == nil {
+		t.Fatal("sync command not found")
+	}
+
+	aliases := make(map[string][]string)
+	for _, f := range syncCmd.Flags {
+		aliases[f.Names()[0]] = f.Names()
+	}
+
+	tests := []struct {
+		flag     string
+		aliases  []string
+		hasAlias bool
+	}{
+		{"force", []string{"force", "f"}, true},
+		{"dry-run", []string{"dry-run", "d"}, true},
+		{"manga", []string{"manga"}, false},
+		{"all", []string{"all"}, false},
+		{"verbose", []string{"verbose"}, false},
+		{"reverse-direction", []string{"reverse-direction"}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.flag, func(t *testing.T) {
+			actual, ok := aliases[tt.flag]
+			if !ok {
+				t.Fatalf("flag %s not found", tt.flag)
+			}
+
+			if !equalSlices(actual, tt.aliases) {
+				t.Errorf("flag %s: expected aliases %v, got %v", tt.flag, tt.aliases, actual)
+			}
+
+			hasAlias := len(actual) > 1
+			if hasAlias != tt.hasAlias {
+				t.Errorf("flag %s: expected hasAlias=%v, got %v", tt.flag, tt.hasAlias, hasAlias)
+			}
+		})
+	}
+}
+
+func TestCLI_VerboseFlag_NoShortAlias(t *testing.T) {
+	rootCmd := NewCLI()
+
+	var verboseFlag cli.Flag
+	for _, f := range rootCmd.Flags {
+		if f.Names()[0] == "verbose" {
+			verboseFlag = f
+			break
+		}
+	}
+
+	if verboseFlag == nil {
+		t.Fatal("verbose flag not found on root command")
+	}
+
+	names := verboseFlag.Names()
+	if len(names) != 1 {
+		t.Errorf("verbose flag should have exactly 1 name (no aliases), got %d: %v", len(names), names)
+	}
+
+	if names[0] != "verbose" {
+		t.Errorf("verbose flag primary name should be 'verbose', got %s", names[0])
+	}
+}
+
+func equalSlices(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func TestCLI_LoginCommand_HasServiceFlag(t *testing.T) {
 	rootCmd := NewCLI()
 
