@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	yaml "gopkg.in/yaml.v2"
 )
@@ -21,11 +22,25 @@ type SiteConfig struct {
 	Username     string `yaml:"username"`
 }
 
+type WatchConfig struct {
+	Interval string `yaml:"interval"`
+}
+
+// GetInterval parses the interval string into a duration.
+// Returns 0 if interval is empty (not specified).
+func (w *WatchConfig) GetInterval() (time.Duration, error) {
+	if w.Interval == "" {
+		return 0, nil
+	}
+	return time.ParseDuration(w.Interval)
+}
+
 type Config struct {
 	OAuth         OAuthConfig `yaml:"oauth"`
 	Anilist       SiteConfig  `yaml:"anilist"`
 	MyAnimeList   SiteConfig  `yaml:"myanimelist"`
 	TokenFilePath string      `yaml:"token_file_path"`
+	Watch         WatchConfig `yaml:"watch"`
 }
 
 func loadConfigFromFile(filename string) (Config, error) {

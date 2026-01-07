@@ -94,8 +94,10 @@ Done!
 **Watch options:**
 | Short | Long | Description |
 |-------|------|-------------|
-| `-i` | `--interval` | Sync interval: 1h-168h (default: 24h) |
+| `-i` | `--interval` | Sync interval: 1h-168h (overrides config) |
 | | `--once` | Sync immediately then start watching |
+
+Interval can be set via `--interval` flag or in `config.yaml` under `watch.interval`.
 
 For backward compatibility, running `anilist-mal-sync [options]` without a command will execute sync.
 
@@ -122,6 +124,8 @@ myanimelist:
   token_url: "https://myanimelist.net/v1/oauth2/token"
   username: "your_username"
 token_file_path: ""  # Leave empty for default: ~/.config/anilist-mal-sync/token.json
+watch:
+  interval: "24h"  # Sync interval for watch mode (1h-168h), can be overridden with --interval flag
 ```
 
 ### Environment variables (optional)
@@ -184,23 +188,30 @@ services:
 
 **Built-in watch mode (Docker-friendly):**
 
-Run continuous sync with Docker Compose:
+Run continuous sync with Docker Compose. Set interval in `config.yaml`:
 ```yaml
 version: '3'
 services:
   sync:
     image: ghcr.io/bigspawn/anilist-mal-sync:latest
-    command: ["watch", "--interval=24h"]
+    command: ["watch"]
     volumes:
       - ./config.yaml:/etc/anilist-mal-sync/config.yaml:ro
       - ./tokens:/home/appuser/.config/anilist-mal-sync
     restart: unless-stopped
 ```
 
+Or override with CLI flag:
+```yaml
+command: ["watch", "--interval=12h"]
+```
+
 **Interval limits:**
 - Minimum: 1 hour (to avoid API rate limits)
 - Maximum: 7 days
 - Format: `12h`, `24h`, `48h` (hours only)
+- Priority: CLI flag > Config file
+- Interval must be specified via one of these methods
 
 **Alternative: External schedulers**
 

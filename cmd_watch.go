@@ -23,8 +23,7 @@ func newWatchCommand() *cli.Command {
 			&cli.DurationFlag{
 				Name:    "interval",
 				Aliases: []string{"i"},
-				Usage:   "Sync interval (1h-168h, default: 24h)",
-				Value:   defaultInterval,
+				Usage:   "Sync interval (1h-168h, required via --interval or config)",
 			},
 			&cli.BoolFlag{
 				Name:  "once",
@@ -50,6 +49,18 @@ func runWatch(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	interval := cmd.Duration("interval")
+
+	// Priority: CLI flag > Config > Error
+	if interval == 0 {
+		cfgInterval, err := config.Watch.GetInterval()
+		if err != nil {
+			return fmt.Errorf("invalid interval in config: %w", err)
+		}
+		if cfgInterval == 0 {
+			return fmt.Errorf("interval required (use --interval or set watch.interval in config)")
+		}
+		interval = cfgInterval
+	}
 
 	// Validate interval
 	if interval < minInterval {

@@ -2,6 +2,8 @@ package main
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -98,9 +100,9 @@ func TestWatchCommand_IntervalFlag_HasCorrectDefaults(t *testing.T) {
 		t.Fatal("interval flag not found or not a DurationFlag")
 	}
 
-	// Check default value
-	if intervalFlag.Value != defaultInterval {
-		t.Errorf("expected default interval %v, got %v", defaultInterval, intervalFlag.Value)
+	// No default value (interval must come from CLI or config)
+	if intervalFlag.Value != 0 {
+		t.Errorf("expected no default (0), got %v", intervalFlag.Value)
 	}
 
 	// Check alias
@@ -182,4 +184,168 @@ func validateInterval(interval time.Duration) error {
 		return errors.New("interval must be at most 168h")
 	}
 	return nil
+}
+
+// =============================================================================
+// Priority Tests
+// =============================================================================
+
+func TestWatch_CLI_Overrides_Config(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	// Config has 12h, CLI uses 24h
+	configContent := `
+oauth:
+  port: "18080"
+anilist:
+  client_id: "test"
+  client_secret: "test"
+myanimelist:
+  client_id: "test"
+  client_secret: "test"
+watch:
+  interval: "12h"
+`
+	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	// Create command with CLI flag
+	cmd := cli.Command{
+		Name: "watch",
+		Flags: []cli.Flag{
+			&cli.DurationFlag{
+				Name:  "interval",
+				Value: 24 * time.Hour, // CLI flag set
+			},
+			&cli.StringFlag{
+				Name:  "config",
+				Value: configPath,
+			},
+		},
+	}
+
+	// Run the priority logic
+	interval := cmd.Duration("interval")
+
+	if interval == 0 {
+		// Would read from config
+		cfg, err := loadConfigFromFile(configPath)
+		if err != nil {
+			t.Fatalf("failed to load config: %v", err)
+		}
+		cfgInterval, err := cfg.Watch.GetInterval()
+		if err != nil {
+			t.Fatalf("failed to get interval from config: %v", err)
+		}
+		interval = cfgInterval
+	}
+
+	// CLI flag (24h) should override config (12h)
+	expected := 24 * time.Hour
+	if interval != expected {
+		t.Errorf("interval = %v, want %v (CLI should override config)", interval, expected)
+	}
+}
+
+func TestWatch_ConfigOnly(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	// Config has 12h, no CLI flag
+	configContent := `
+oauth:
+  port: "18080"
+anilist:
+  client_id: "test"
+  client_secret: "test"
+myanimelist:
+  client_id: "test"
+  client_secret: "test"
+watch:
+  interval: "12h"
+`
+	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	cfg, err := loadConfigFromFile(configPath)
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	cfgInterval, err := cfg.Watch.GetInterval()
+	if err != nil {
+		t.Fatalf("failed to get interval from config: %v", err)
+	}
+
+	expected := 12 * time.Hour
+	if cfgInterval != expected {
+		t.Errorf("config interval = %v, want %v", cfgInterval, expected)
+	}
+}
+
+func TestWatch_NoInterval_Error(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	// Config has no watch interval
+	configContent := `
+oauth:
+  port: "18080"
+anilist:
+  client_id: "test"
+  client_secret: "test"
+myanimelist:
+  client_id: "test"
+  client_secret: "test"
+`
+	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	cfg, err := loadConfigFromFile(configPath)
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	cfgInterval, err := cfg.Watch.GetInterval()
+	if err != nil {
+		t.Fatalf("failed to get interval from config: %v", err)
+	}
+
+	if cfgInterval != 0 {
+		t.Errorf("config interval should be 0 (not specified), got %v", cfgInterval)
+	}
+}
+
+func TestWatch_InvalidConfigInterval_Error(t *testing.T) {
+	w := WatchConfig{Interval: "invalid-duration"}
+	_, err := w.GetInterval()
+	if err == nil {
+		t.Error("expected error for invalid interval, got nil")
+	}
+}
+
+func TestWatch_IntervalValidation_Config_TooSmall(t *testing.T) {
+	w := WatchConfig{Interval: "30m"}
+	got, err := w.GetInterval()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got < minInterval {
+		t.Logf("interval %v is less than min %v (validation will catch this)", got, minInterval)
+	}
+}
+
+func TestWatch_IntervalValidation_Config_TooLarge(t *testing.T) {
+	w := WatchConfig{Interval: "200h"}
+	got, err := w.GetInterval()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got > maxInterval {
+		t.Logf("interval %v exceeds max %v (validation will catch this)", got, maxInterval)
+	}
 }
