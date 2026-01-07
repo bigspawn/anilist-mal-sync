@@ -1,10 +1,57 @@
-.PHONY: build test lint fmt help clean
+.PHONY: build test lint fmt check clean install hooks-install hooks-uninstall
 
 BINARY_NAME=anilist-mal-sync
 LINT_VERSION=v1.64.6
 DOCKER_LINT_CMD=docker run --rm -v $(PWD):/app -w /app golangci/golangci-lint:$(LINT_VERSION)
 
 .DEFAULT_GOAL := help
+
+# Install all development tools
+install:
+	@echo "🔧 Installing development tools..."
+	@echo ""
+	@echo "Installing golangci-lint $(LINT_VERSION)..."
+	@which golangci-lint > /dev/null 2>&1 || \
+		brew install golangci/tap/golangci-lint
+	@echo "✓ golangci-lint installed"
+	@echo ""
+	@echo "Installing gofumpt..."
+	@which gofumpt > /dev/null 2>&1 || \
+		go install mvdan.cc/gofumpt@latest
+	@echo "✓ gofumpt installed"
+	@echo ""
+	@echo "Installing goimports..."
+	@which goimports > /dev/null 2>&1 || \
+		go install golang.org/x/tools/cmd/goimports@latest
+	@echo "✓ goimports installed"
+	@echo ""
+	@echo "Installing gci (import organizer)..."
+	@which gci > /dev/null 2>&1 || \
+		go install github.com/daixiang0/gci@latest
+	@echo "✓ gci installed"
+	@echo ""
+	@echo "Installing govulncheck (vulnerability scanner)..."
+	@which govulncheck > /dev/null 2>&1 || \
+		go install golang.org/x/vuln/cmd/govulncheck@latest
+	@echo "✓ govulncheck installed"
+	@echo ""
+	@echo "Installing lefthook (Git hooks manager)..."
+	@which lefthook > /dev/null 2>&1 || \
+		brew install lefthook
+	@echo "✓ lefthook installed"
+	@echo ""
+	@echo "Installing Git hooks..."
+	@lefthook install
+	@echo "✓ Git hooks installed"
+	@echo ""
+	@echo "✅ All development tools installed successfully!"
+	@echo ""
+	@echo "Available commands:"
+	@echo "  make build    - Build the application"
+	@echo "  make test     - Run tests"
+	@echo "  make fmt      - Format code"
+	@echo "  make lint     - Run linter"
+	@echo "  make clean    - Clean build artifacts"
 
 # Build the application
 build:
@@ -26,6 +73,32 @@ lint:
 	# $(DOCKER_LINT_CMD) golangci-lint run --new
 	golangci-lint run --new
 
+# Run all checks (same as Git hooks: format + imports + lint + vet + test)
+check:
+	@echo "🔍 Running all checks..."
+	@echo ""
+	@echo "1️⃣  Formatting code with gofumpt..."
+	@gofumpt -l -w .
+	@echo "✓ Format complete"
+	@echo ""
+	@echo "2️⃣  Organizing imports with goimports..."
+	@goimports -w .
+	@echo "✓ Imports organized"
+	@echo ""
+	@echo "3️⃣  Running go vet..."
+	@go vet ./...
+	@echo "✓ Vet complete"
+	@echo ""
+	@echo "4️⃣  Running golangci-lint..."
+	@golangci-lint run --timeout=5m
+	@echo "✓ Lint complete"
+	@echo ""
+	@echo "5️⃣  Running tests..."
+	@go test ./... -v
+	@echo "✓ Tests complete"
+	@echo ""
+	@echo "✅ All checks passed!"
+
 # Clean build artifacts, temporary files and test cache
 clean:
 	@echo "Cleaning build artifacts and temporary files..."
@@ -33,12 +106,28 @@ clean:
 	@go clean -testcache
 	@echo "Cleanup complete!"
 
+# Install Git hooks via Lefthook
+hooks-install:
+	@echo "Installing Git hooks..."
+	@lefthook install
+	@echo "Git hooks installed successfully!"
+
+# Uninstall Git hooks via Lefthook
+hooks-uninstall:
+	@echo "Uninstalling Git hooks..."
+	@lefthook uninstall
+	@echo "Git hooks uninstalled!"
+
 # Show help
 help:
 	@echo "Available commands:"
-	@echo "  build     - Build the application"
-	@echo "  test      - Run tests"
-	@echo "  fmt       - Format code with gofumpt"
-	@echo "  lint      - Run linter using Docker (golangci-lint $(LINT_VERSION))"
-	@echo "  clean     - Remove build artifacts, temporary files and clean test cache"
-	@echo "  help      - Show this help message"
+	@echo "  install          - Install all development tools (brew + go install)"
+	@echo "  build            - Build the application"
+	@echo "  test             - Run tests"
+	@echo "  fmt              - Format code with gofumpt"
+	@echo "  lint             - Run linter (golangci-lint $(LINT_VERSION))"
+	@echo "  check            - Run all checks (format + imports + lint + vet + test)"
+	@echo "  clean            - Remove build artifacts, temporary files and clean test cache"
+	@echo "  hooks-install    - Install Git hooks via Lefthook (auto-run lint/format on commit)"
+	@echo "  hooks-uninstall  - Uninstall Git hooks"
+	@echo "  help             - Show this help message"

@@ -76,31 +76,31 @@ func (c *Client) post(ctx context.Context, query string, v map[string]interface{
 //
 // Example:
 //
-//  query := verniy.FieldObject("query", verniy.QueryParam{
-//    "$id":   "Int",
-//    "$type": "MediaType",
-//  }, verniy.FieldObject("Media", verniy.QueryParam{
-//    "id":   "$id",
-//    "type": "$type",
-//  }, "id"))
+//	query := verniy.FieldObject("query", verniy.QueryParam{
+//	  "$id":   "Int",
+//	  "$type": "MediaType",
+//	}, verniy.FieldObject("Media", verniy.QueryParam{
+//	  "id":   "$id",
+//	  "type": "$type",
+//	}, "id"))
 //
-//  body := map[string]interface{}{
-//    "query": query,
-//    "variables": map[string]interface{}{
-//      "id":   1,
-//      "type": "ANIME",
-//    },
-//  }
+//	body := map[string]interface{}{
+//	  "query": query,
+//	  "variables": map[string]interface{}{
+//	    "id":   1,
+//	    "type": "ANIME",
+//	  },
+//	}
 //
-//  jsonBody, _ := json.Marshal(body)
+//	jsonBody, _ := json.Marshal(body)
 //
-//  data, code, err := c.MakeRequest(jsonBody)
-//  if err != nil {
-//    panic(err)
-//  }
+//	data, code, err := c.MakeRequest(jsonBody)
+//	if err != nil {
+//	  panic(err)
+//	}
 //
-//  fmt.Println(code)
-//  fmt.Println(string(data))
+//	fmt.Println(code)
+//	fmt.Println(string(data))
 func (c *Client) MakeRequest(ctx context.Context, requestBody []byte) ([]byte, int, error) {
 	c.Limiter.Take()
 

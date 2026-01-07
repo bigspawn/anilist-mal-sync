@@ -10,17 +10,17 @@ import (
 //
 // Example:
 //
-//   FieldObject("key", map[string]interface{}{
-// 	  "name1": "value1",
-// 	  "name2": []string{"value2", "value3"},
-//   }, "field1", "field2")
+//	  FieldObject("key", map[string]interface{}{
+//		  "name1": "value1",
+//		  "name2": []string{"value2", "value3"},
+//	  }, "field1", "field2")
 //
 // Will generate:
 //
-//   key(name1:value1, name2:[value2,value3]) {
-//     field1
-//     field2
-//   }
+//	key(name1:value1, name2:[value2,value3]) {
+//	  field1
+//	  field2
+//	}
 //
 // Or just see usage example in some functions in verniy package.
 func FieldObject(key string, params map[string]interface{}, fields ...string) string {

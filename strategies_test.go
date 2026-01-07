@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 )
@@ -365,7 +366,7 @@ func TestMALIDStrategy_FindsTargetByMALID(t *testing.T) {
 			if malID == 37341 {
 				return apiTarget, nil
 			}
-			return nil, nil
+			return nil, errors.New("target not found")
 		},
 	}
 
@@ -488,7 +489,7 @@ func TestMALIDStrategy_SkipsZeroMALID(t *testing.T) {
 	strategy := MALIDStrategy{
 		GetTargetByMALIDFunc: func(_ context.Context, _ int) (Target, error) {
 			t.Error("GetTargetByMALIDFunc should not be called when source ID is 0")
-			return nil, nil
+			return nil, errors.New("should not be called")
 		},
 	}
 
@@ -529,7 +530,7 @@ func TestMALIDStrategy_ContextCancellation(t *testing.T) {
 	strategy := MALIDStrategy{
 		GetTargetByMALIDFunc: func(_ context.Context, _ int) (Target, error) {
 			t.Error("GetTargetByMALIDFunc should not be called when context is cancelled")
-			return nil, nil
+			return nil, errors.New("should not be called")
 		},
 	}
 

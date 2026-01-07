@@ -1,0 +1,47 @@
+# Lefthook configuration for Git hooks
+# See: https://github.com/evilmartians/lefthook
+#
+# Install lefthook:
+#   curl -fsSL https://raw.githubusercontent.com/evilmartians/lefthook/master/install.sh | bash
+#
+# Or via Homebrew:
+#   brew install lefthook
+#
+# Then run in repo:
+#   lefthook install
+
+pre-commit:
+  parallel: true
+  commands:
+    # Format Go code with gofumpt
+    go-fmt:
+      glob: "*.go"
+      run: gofumpt -w {staged_files}
+      stage_fixed: true
+
+    # Organize imports with goimports
+    go-imports:
+      glob: "*.go"
+      run: goimports -w {staged_files}
+      stage_fixed: true
+
+    # Run golangci-lint only on changed files
+    # Using --new to check only new issues
+    go-lint:
+      glob: "*.go"
+      run: golangci-lint run --new --timeout=5m
+
+    # Run go vet for additional checks
+    go-vet:
+      glob: "*.go"
+      run: go vet ./...
+
+pre-push:
+  commands:
+    # Full lint check before pushing
+    go-lint-full:
+      run: golangci-lint run --timeout=5m
+
+    # Run tests before pushing
+    go-test:
+      run: go test ./... -v

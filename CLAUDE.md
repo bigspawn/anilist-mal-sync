@@ -83,6 +83,52 @@ golangci-lint run --new
 # Note: dupl linter is disabled for test files to allow identical test structures
 ```
 
+### Full Check (All Git Hooks)
+```bash
+# Run all checks that Git hooks run (format + imports + lint + vet + test)
+make check
+```
+
+This runs the same checks as Git hooks:
+1. **gofumpt** - Format code
+2. **goimports** - Organize imports
+3. **go vet** - Static analysis
+4. **golangci-lint** - Full lint check
+5. **go test** - Run all tests
+
+Use this before pushing or when CI fails locally.
+
+### Development Setup
+```bash
+# One-command setup - installs all development tools and Git hooks
+make install
+```
+
+This installs:
+- **golangci-lint** v1.64.6 (via brew)
+- **gofumpt** (via go install)
+- **goimports** (via go install)
+- **gci** - import organizer (via go install)
+- **govulncheck** - vulnerability scanner (via go install)
+- **lefthook** - Git hooks manager (via brew)
+- Git hooks configuration
+
+### Git Hooks (Lefthook)
+```bash
+# Install Git hooks for automatic linting/formatting on commit
+make hooks-install
+
+# Uninstall Git hooks
+make hooks-uninstall
+```
+
+**What is Lefthook?**
+Lefthook is a Git hooks manager that automatically runs linting and formatting before commits and pushes. When installed:
+- **Pre-commit**: Runs gofumpt, goimports, and golangci-lint on staged files
+- **Pre-push**: Runs full lint check and tests
+
+**Note:** `make install` automatically installs and configures Git hooks. Configuration is in `lefthook.yml` at the repository root.
+
 ### Running
 ```bash
 # Run with default config
@@ -221,3 +267,81 @@ Use the `-verbose` flag to enable detailed logging of the sync process, includin
 
 ### Ignore List
 Hard-coded ignore lists in `app.go` skip entries that don't exist on the target platform (e.g., "Scott Pilgrim Takes Off" is not available on MAL).
+
+## AI Agent Development Rules
+
+### Code Quality Requirements
+
+**CRITICAL**: All code generated or modified MUST pass linting without introducing new warnings.
+
+#### Linting Workflow
+1. Run `make check` after significant code changes (runs all Git hooks checks)
+2. Run `golangci-lint run --new` for quick feedback during development
+3. Run `make fmt` (gofumpt) on all Go files after changes
+4. Fix all linting issues before considering work complete
+5. If linting fails, fix the issues - do not bypass
+
+**Before committing**: Always run `make check` to ensure all checks pass.
+
+#### Code Complexity Limits
+- **Function length**: Maximum 60 lines
+- **Function statements**: Maximum 40 statements
+- **Cyclomatic complexity**: Maximum 15
+- **If nesting**: Maximum 4 levels
+- **Maintainability index**: Minimum 20/100
+
+#### Code Style Rules
+- Preallocate slices with known capacity using `make([]T, 0, capacity)`
+- Use explicit struct types instead of `map[string]interface{}` where possible
+- Avoid capturing loop variables in goroutines (use `copyloopvar` or explicit copies)
+- Never return `(nil, nil)` - use proper error handling
+- Add `json`, `yaml` tags for exported struct fields used in serialization
+
+#### Error Handling
+- Always check errors returned by functions
+- Use `errcheck` compliance - no unchecked errors allowed
+- Prefer wrapped errors with context: `fmt.Errorf("context: %w", err)`
+
+#### Import Organization
+- Imports are automatically organized by `gci` formatter (standard, project, third-party)
+- Run `make fmt` to format imports after changes
+
+#### Testing
+- Write tests for new functionality
+- Test files (`_test.go`) have relaxed `dupl` rules for identical test structures
+- Maintain existing test coverage
+
+#### Dependencies
+- Always run `go mod vendor` after `go get`
+- Keep vendor directory in sync with go.mod
+
+## Additional Tooling
+
+### IDE Integration
+For optimal development experience with AI assistants:
+
+1. **gopls** (Go Language Server)
+   - Built-in analysis: unusedparams, shadow, nilness, fieldalignment
+   - Provides real-time feedback in your IDE
+
+2. **govulncheck**
+   - Official Go vulnerability scanner
+   - Run: `go install golang.org/x/vuln/cmd/govulncheck@latest`
+   - Usage: `govulncheck ./...`
+
+3. **nilaway** (Optional)
+   - Uber's nil-safety analyzer for compile-time nil pointer detection
+   - Catches nil pointer dereferences before runtime
+
+### CI/CD Integration
+- Use GitHub Actions with `only-new-issues: true` for PRs
+- Cache `~/.cache/golangci-lint` using go.sum as cache key (3-5x speedup)
+- Configure timeout to prevent CI blocking (currently 5m)
+- Reject commits that fail linting
+
+### Performance Optimization
+The `.golangci.yml` includes performance optimizations:
+- Build cache enabled
+- Readonly module download mode
+- 4-thread concurrency for parallel linting
+- Specific file exclusions (e.g., `.pb.go` generated files)
