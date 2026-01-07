@@ -24,7 +24,7 @@ func newLogoutCommand() *cli.Command {
 	}
 }
 
-func runLogout(ctx context.Context, cmd *cli.Command) error {
+func runLogout(_ context.Context, cmd *cli.Command) error {
 	configPath := cmd.String("config")
 	service := cmd.String("service")
 
