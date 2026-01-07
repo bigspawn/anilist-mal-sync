@@ -45,9 +45,12 @@ func (s IDStrategy) Name() string {
 }
 
 func (s IDStrategy) FindTarget(_ context.Context, src Source, existingTargets map[TargetID]Target, prefix string) (Target, bool, error) {
-	target, found := existingTargets[src.GetTargetID()]
+	srcID := src.GetTargetID()
+	target, found := existingTargets[srcID]
 	if found {
-		DPrintf("[%s] Found target by ID: %d", prefix, src.GetTargetID())
+		DPrintf("[%s] Found target by ID: %d", prefix, srcID)
+	} else if srcID > 0 {
+		DPrintf("[%s] Target ID %d not found in user's list (will try other strategies)", prefix, srcID)
 	}
 	return target, found, nil
 }
@@ -83,6 +86,18 @@ func (s TitleStrategy) FindTarget(_ context.Context, src Source, existingTargets
 
 	for _, target := range targetSlice {
 		if src.SameTitleWithTarget(target) && src.SameTypeWithTarget(target) {
+			// WARNING: Check for potential mismatches
+			srcID := src.GetTargetID()
+			tgtID := target.GetTargetID()
+
+			if srcID > 0 && tgtID > 0 && srcID != tgtID {
+				DPrintf("[%s] Rejecting title match due to MAL ID mismatch: Source MAL ID: %d, Target MAL ID: %d",
+					prefix, srcID, tgtID)
+				DPrintf("[%s]   Source: %s", prefix, src.String())
+				DPrintf("[%s]   Target: %s", prefix, target.String())
+				continue // Skip this target and try the next one
+			}
+
 			DPrintf("[%s] Found target by title comparison: %s", prefix, srcTitle)
 			return target, true, nil
 		}

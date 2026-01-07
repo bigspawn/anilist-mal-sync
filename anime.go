@@ -172,10 +172,35 @@ func (a Anime) SameTitleWithTarget(t Target) bool {
 		return false
 	}
 
-	return titleMatchingLevels(
+	// Check if titles match
+	if !titleMatchingLevels(
 		a.TitleEN, a.TitleJP, a.TitleRomaji,
 		b.TitleEN, b.TitleJP, b.TitleRomaji,
-	)
+	) {
+		return false
+	}
+
+	// Additional validation: check episode count if both are known
+	// This prevents matching movies (1 ep) with TV series (13+ eps)
+	if a.NumEpisodes > 0 && b.NumEpisodes > 0 {
+		minEps := a.NumEpisodes
+		maxEps := b.NumEpisodes
+		if minEps > maxEps {
+			minEps, maxEps = maxEps, minEps
+		}
+
+		// Calculate percentage difference
+		percentDiff := float64(maxEps-minEps) / float64(maxEps) * 100
+
+		// Reject if difference is more than 20%
+		if percentDiff > 20.0 {
+			DPrintf("Episode count mismatch: %d vs %d (%.1f%% difference)",
+				a.NumEpisodes, b.NumEpisodes, percentDiff)
+			return false
+		}
+	}
+
+	return true
 }
 
 func (a Anime) GetUpdateOptions() []mal.UpdateMyAnimeListStatusOption {
