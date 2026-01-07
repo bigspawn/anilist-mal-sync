@@ -207,9 +207,9 @@ func getRandomValueFromInterval(randomizationFactor, random float64, currentInte
 	if randomizationFactor == 0 {
 		return currentInterval // make sure no randomness is used when randomizationFactor is 0.
 	}
-	var delta = randomizationFactor * float64(currentInterval)
-	var minInterval = float64(currentInterval) - delta
-	var maxInterval = float64(currentInterval) + delta
+	delta := randomizationFactor * float64(currentInterval)
+	minInterval := float64(currentInterval) - delta
+	maxInterval := float64(currentInterval) + delta
 
 	// Get a random value from the range [minInterval, maxInterval].
 	// The formula used below has a +1 because if the minInterval is 1 and the maxInterval is 3 then
