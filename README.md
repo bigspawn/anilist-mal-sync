@@ -73,6 +73,7 @@ Done!
 | `logout` | Remove authentication tokens |
 | `status` | Check authentication status |
 | `sync` | Synchronize anime/manga lists |
+| `watch` | Run sync on interval |
 
 **Login/Logout options:**
 | Short | Long | Description |
@@ -89,6 +90,12 @@ Done!
 | | `--all` | Sync both anime and manga |
 | | `--verbose` | Enable verbose logging |
 | | `--reverse-direction` | Sync from MyAnimeList to AniList |
+
+**Watch options:**
+| Short | Long | Description |
+|-------|------|-------------|
+| `-i` | `--interval` | Sync interval: 1h-168h (default: 24h) |
+| | `--once` | Sync immediately then start watching |
 
 For backward compatibility, running `anilist-mal-sync [options]` without a command will execute sync.
 
@@ -175,11 +182,31 @@ services:
 
 ### Scheduling
 
-This tool does not include built-in scheduling. Use your system's scheduler:
+**Built-in watch mode (Docker-friendly):**
 
+Run continuous sync with Docker Compose:
+```yaml
+version: '3'
+services:
+  sync:
+    image: ghcr.io/bigspawn/anilist-mal-sync:latest
+    command: ["watch", "--interval=24h"]
+    volumes:
+      - ./config.yaml:/etc/anilist-mal-sync/config.yaml:ro
+      - ./tokens:/home/appuser/.config/anilist-mal-sync
+    restart: unless-stopped
+```
+
+**Interval limits:**
+- Minimum: 1 hour (to avoid API rate limits)
+- Maximum: 7 days
+- Format: `12h`, `24h`, `48h` (hours only)
+
+**Alternative: External schedulers**
+
+For non-Docker setups, use your system's scheduler:
 - **Linux/macOS**: cron or systemd timers
 - **Windows**: Task Scheduler
-- **Docker**: host cron or external orchestrator
 
 Example cron entry (daily at 2 AM):
 ```bash

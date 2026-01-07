@@ -15,8 +15,8 @@ import (
 func TestCLI_HasCommands(t *testing.T) {
 	cmd := NewCLI()
 
-	if len(cmd.Commands) != 4 {
-		t.Errorf("expected 4 commands (login, logout, status, sync), got %d", len(cmd.Commands))
+	if len(cmd.Commands) != 5 {
+		t.Errorf("expected 5 commands (login, logout, status, sync, watch), got %d", len(cmd.Commands))
 	}
 
 	commandNames := make(map[string]bool)
@@ -24,7 +24,7 @@ func TestCLI_HasCommands(t *testing.T) {
 		commandNames[c.Name] = true
 	}
 
-	expectedCommands := []string{"login", "logout", "status", "sync"}
+	expectedCommands := []string{"login", "logout", "status", "sync", "watch"}
 	for _, name := range expectedCommands {
 		if !commandNames[name] {
 			t.Errorf("missing command: %s", name)
