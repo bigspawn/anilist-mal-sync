@@ -14,15 +14,19 @@ Program to synchronize your AniList and MyAnimeList accounts.
 
 ### Authentication
 
-First configurate your accounts in the site.
-Then run the program and follow the instructions to authenticate.
-It prints the URL to visit in the browser.
-Then you will be redirected to the callback URL and save the token.
-After that you will go same steps for MyAnimeList.
+Configure your accounts in the respective sites, then authenticate using the CLI:
 
-Token will be saved in the `~/.config/anilist-mal-sync/token.json` file and reused then.
-You can change the path in the config file.
-If you want to reauthenticate, just delete the file.
+```bash
+anilist-mal-sync login anilist
+anilist-mal-sync login myanimelist
+```
+
+The program will print the URL to visit in your browser. After authorization, you'll be redirected and the token will be saved automatically.
+
+Tokens are stored in `~/.config/anilist-mal-sync/token.json` and reused. To reauthenticate, run:
+```bash
+anilist-mal-sync logout <service>
+```
 
 #### AniList
 
@@ -67,32 +71,59 @@ token_file_path: "" # Absolute path to token file, empty string use default path
 - `CLIENT_SECRET_ANILIST` - AniList client secret.
 - `CLIENT_SECRET_MYANIMELIST` - MyAnimeList client secret.
 
-### Options
+### Commands
 
-Program supports the following command-line options:
+#### login
+Authenticate with a service:
+```bash
+anilist-mal-sync login <service>
+```
+Services: `anilist`, `myanimelist`, `all`
 
-- `-c` - Path to the config file. Default is `config.yaml`.
-- `-f` - Force sync (sync all entries, not just the ones that have changed). Default is false.
-- `-d` - Dry run (do not make any changes). Default is false.
-- `-manga` - Sync manga instead of anime. Default is anime.
-- `-all` - Sync both anime and manga. Default is anime.
-- `-verbose` - Print debug messages. Default is false.
-- `-reverse-direction` - Sync from MyAnimeList to AniList (default is AniList to MyAnimeList). Default is false.
-- `-h` - Print help message.
+#### logout
+Logout from a service:
+```bash
+anilist-mal-sync logout <service>
+```
+
+#### status
+Check authentication status:
+```bash
+anilist-mal-sync status
+```
+
+#### sync
+Synchronize anime/manga lists:
+```bash
+anilist-mal-sync sync [options]
+```
+
+Options:
+- `-c, --config` - Path to config file (default: `config.yaml`)
+- `-f, --force` - Force sync all entries
+- `-d, --dry-run` - Dry run without making changes
+- `--manga` - Sync manga instead of anime
+- `--all` - Sync both anime and manga
+- `--verbose` - Enable verbose logging
+- `--reverse-direction` - Sync from MyAnimeList to AniList
+
+For backward compatibility, running `anilist-mal-sync [options]` without a command will execute sync.
 
 
 ### How to run
 
-Requirements:
+Requirements: Go 1.22 or later
 
-- Go 1.22 or later
-
-Build and run the program from source:
-
-1. Clone the repository: `git clone https://github.com/bigspawn/anilist-mal-sync.git`
-2. Change directory: `cd anilist-mal-sync`
-3. Configure the program: `cp config.example.yaml config.yaml` and fill in the necessary fields
-4. Run the program: `go run .`
+Build and run from source:
+```bash
+git clone https://github.com/bigspawn/anilist-mal-sync.git
+cd anilist-mal-sync
+cp config.example.yaml config.yaml
+# Edit config.yaml with your credentials
+go run . login anilist
+go run . login myanimelist
+go run . sync
+```
 
 Or install the program:
 
