@@ -3,20 +3,11 @@ services:
   sync:
     image: ghcr.io/bigspawn/anilist-mal-sync:latest
     command: ["watch"]
-
-    # Option 1 (RECOMMENDED): Named volume - Docker manages permissions automatically
+    environment:
+      # Set to your user's UID/GID (find with: id -u / id -g)
+      - PUID=1000
+      - PGID=1000
     volumes:
       - ./config.yaml:/etc/anilist-mal-sync/config.yaml:ro
-      - tokens:/home/appuser/.config/anilist-mal-sync
-
-    # Option 2: Bind mount with host user - uncomment 'user' and replace volume mount
-    # user: "${UID:-1000}:${GID:-1000}"
-    # volumes:
-    #   - ./config.yaml:/etc/anilist-mal-sync/config.yaml:ro
-    #   - ./tokens:/home/appuser/.config/anilist-mal-sync
-
+      - ./tokens:/home/appuser/.config/anilist-mal-sync
     restart: unless-stopped
-
-# Named volume for Option 1
-volumes:
-  tokens:

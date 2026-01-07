@@ -152,55 +152,55 @@ anilist-mal-sync sync
 
 #### Volume Permissions
 
-To avoid "permission denied" errors, use one of these approaches:
+The image uses **PUID/PGID** environment variables to match container user with your host user, avoiding permission issues with bind mounts.
 
-**Option 1: Named volume (RECOMMENDED)**
+**Docker Compose (recommended):**
 ```yaml
 version: '3'
 services:
   sync:
     image: ghcr.io/bigspawn/anilist-mal-sync:latest
-    volumes:
-      - ./config.yaml:/etc/anilist-mal-sync/config.yaml:ro
-      - tokens:/home/appuser/.config/anilist-mal-sync
-volumes:
-  tokens:
-```
-
-**Option 2: Run as host user (for bind mounts)**
-```yaml
-version: '3'
-services:
-  sync:
-    image: ghcr.io/bigspawn/anilist-mal-sync:latest
-    user: "${UID:-1000}:${GID:-1000}"
+    environment:
+      - PUID=1000  # Your user ID from: id -u
+      - PGID=1000  # Your group ID from: id -g
     volumes:
       - ./config.yaml:/etc/anilist-mal-sync/config.yaml:ro
       - ./tokens:/home/appuser/.config/anilist-mal-sync
 ```
 
-Then run: `UID=$(id -u) GID=$(id -g) docker-compose up`
+**How it works:**
+1. Container starts as root
+2. Entrypoint adjusts internal user UID/GID to match your PUID/PGID
+3. Application runs as that user, so files have correct ownership
+4. No manual `chown` needed!
+
+**Find your UID/GID:**
+```bash
+id -u  # UID
+id -g  # GID
+```
 
 #### Pre-built image
 
 ```bash
 docker pull ghcr.io/bigspawn/anilist-mal-sync:latest
 
-# Login (with named volume)
-docker volume create anilist-tokens
+# Login
 docker run --rm \
   -p 18080:18080 \
-  -v $(pwd)/config.yaml:/etc/anilist-mal-sync/config.yaml:ro \
-  -v anilist-tokens:/home/appuser/.config/anilist-mal-sync \
-  ghcr.io/bigspawn/anilist-mal-sync:latest login all
-
-# Or with host user (bind mount)
-docker run --rm \
-  -p 18080:18080 \
-  --user "$(id -u):$(id -g)" \
+  -e PUID=$(id -u) \
+  -e PGID=$(id -g) \
   -v $(pwd)/config.yaml:/etc/anilist-mal-sync/config.yaml:ro \
   -v $(pwd)/tokens:/home/appuser/.config/anilist-mal-sync \
   ghcr.io/bigspawn/anilist-mal-sync:latest login all
+
+# Sync
+docker run --rm \
+  -e PUID=$(id -u) \
+  -e PGID=$(id -g) \
+  -v $(pwd)/config.yaml:/etc/anilist-mal-sync/config.yaml:ro \
+  -v $(pwd)/tokens:/home/appuser/.config/anilist-mal-sync \
+  ghcr.io/bigspawn/anilist-mal-sync:latest sync
 ```
 
 ### Scheduling
@@ -214,12 +214,13 @@ services:
   sync:
     image: ghcr.io/bigspawn/anilist-mal-sync:latest
     command: ["watch"]
+    environment:
+      - PUID=1000
+      - PGID=1000
     volumes:
       - ./config.yaml:/etc/anilist-mal-sync/config.yaml:ro
-      - tokens:/home/appuser/.config/anilist-mal-sync
+      - ./tokens:/home/appuser/.config/anilist-mal-sync
     restart: unless-stopped
-volumes:
-  tokens:
 ```
 
 Or override with CLI flag:

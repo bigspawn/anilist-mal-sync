@@ -171,11 +171,21 @@ docker build -t anilist-mal-sync .
 docker pull ghcr.io/bigspawn/anilist-mal-sync:latest
 
 # Run with Docker (requires config and token volumes)
+# Use PUID/PGID to match host user permissions
 docker run -p 18080:18080 \
+  -e PUID=$(id -u) \
+  -e PGID=$(id -g) \
   -v /path/to/config.yaml:/etc/anilist-mal-sync/config.yaml \
   -v /path/to/tokens:/home/appuser/.config/anilist-mal-sync \
   ghcr.io/bigspawn/anilist-mal-sync:latest
 ```
+
+**Volume Permissions:**
+The image implements LinuxServer.io-style PUID/PGID environment variables to handle volume permissions:
+- Set `PUID` and `PGID` to your user's UID/GID (from `id -u` / `id -g`)
+- Entrypoint script (`docker-entrypoint.sh`) adjusts container user to match
+- Files created by the container will have correct ownership on the host
+- No manual `chown` required
 
 ## Configuration
 
