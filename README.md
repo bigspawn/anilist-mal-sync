@@ -150,39 +150,57 @@ anilist-mal-sync sync
 
 **Important:** For Docker, set `token_file_path: ""` in config.yaml to use the container's home directory.
 
-**Pre-built image:**
-```bash
-docker pull ghcr.io/bigspawn/anilist-mal-sync:latest
+#### Volume Permissions
 
-# Create tokens directory
-mkdir -p tokens
+To avoid "permission denied" errors, use one of these approaches:
 
-# Login
-docker run --rm \
-  -p 18080:18080 \
-  -v $(pwd)/config.yaml:/etc/anilist-mal-sync/config.yaml:ro \
-  -v $(pwd)/tokens:/home/appuser/.config/anilist-mal-sync \
-  ghcr.io/bigspawn/anilist-mal-sync:latest login all
-
-# Sync
-docker run --rm \
-  -p 18080:18080 \
-  -v $(pwd)/config.yaml:/etc/anilist-mal-sync/config.yaml:ro \
-  -v $(pwd)/tokens:/home/appuser/.config/anilist-mal-sync \
-  ghcr.io/bigspawn/anilist-mal-sync:latest sync
-```
-
-**Docker Compose:**
+**Option 1: Named volume (RECOMMENDED)**
 ```yaml
 version: '3'
 services:
-  anilist-mal-sync:
+  sync:
     image: ghcr.io/bigspawn/anilist-mal-sync:latest
-    ports:
-      - "18080:18080"
+    volumes:
+      - ./config.yaml:/etc/anilist-mal-sync/config.yaml:ro
+      - tokens:/home/appuser/.config/anilist-mal-sync
+volumes:
+  tokens:
+```
+
+**Option 2: Run as host user (for bind mounts)**
+```yaml
+version: '3'
+services:
+  sync:
+    image: ghcr.io/bigspawn/anilist-mal-sync:latest
+    user: "${UID:-1000}:${GID:-1000}"
     volumes:
       - ./config.yaml:/etc/anilist-mal-sync/config.yaml:ro
       - ./tokens:/home/appuser/.config/anilist-mal-sync
+```
+
+Then run: `UID=$(id -u) GID=$(id -g) docker-compose up`
+
+#### Pre-built image
+
+```bash
+docker pull ghcr.io/bigspawn/anilist-mal-sync:latest
+
+# Login (with named volume)
+docker volume create anilist-tokens
+docker run --rm \
+  -p 18080:18080 \
+  -v $(pwd)/config.yaml:/etc/anilist-mal-sync/config.yaml:ro \
+  -v anilist-tokens:/home/appuser/.config/anilist-mal-sync \
+  ghcr.io/bigspawn/anilist-mal-sync:latest login all
+
+# Or with host user (bind mount)
+docker run --rm \
+  -p 18080:18080 \
+  --user "$(id -u):$(id -g)" \
+  -v $(pwd)/config.yaml:/etc/anilist-mal-sync/config.yaml:ro \
+  -v $(pwd)/tokens:/home/appuser/.config/anilist-mal-sync \
+  ghcr.io/bigspawn/anilist-mal-sync:latest login all
 ```
 
 ### Scheduling
@@ -198,8 +216,10 @@ services:
     command: ["watch"]
     volumes:
       - ./config.yaml:/etc/anilist-mal-sync/config.yaml:ro
-      - ./tokens:/home/appuser/.config/anilist-mal-sync
+      - tokens:/home/appuser/.config/anilist-mal-sync
     restart: unless-stopped
+volumes:
+  tokens:
 ```
 
 Or override with CLI flag:
