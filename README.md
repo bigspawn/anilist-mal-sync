@@ -4,197 +4,215 @@ Program to synchronize your AniList and MyAnimeList accounts.
 
 ## Features
 
-- Sync AniList to MyAnimeList (anime and manga)
-- Sync MyAnimeList to AniList (anime and manga) using `-reverse-direction` flag
-- OAuth2 authentication with AniList and MyAnimeList
+- Bidirectional sync between AniList and MyAnimeList (anime and manga)
+- OAuth2 authentication
 - CLI interface
-- Configurable by environment variables and config file
 
-## Usage
+## Quick Start (5 minutes)
 
-### Authentication
+### Prerequisites
+- Go 1.22+ OR Docker
+- Accounts on AniList and MyAnimeList
 
-Configure your accounts in the respective sites, then authenticate using the CLI:
+### Step 1: Create OAuth applications
+
+**AniList:**
+1. Go to [AniList Developer Settings](https://anilist.co/settings/developer)
+2. Click "Create New Client"
+3. Set redirect URL: `http://localhost:18080/callback`
+4. Save the Client ID and Client Secret
+
+**MyAnimeList:**
+1. Go to [MAL API Settings](https://myanimelist.net/apiconfig)
+2. Click "Create Application"
+3. Set redirect URL: `http://localhost:18080/callback`
+4. Save the Client ID and Client Secret
+
+### Step 2: Install and configure
 
 ```bash
-anilist-mal-sync login anilist
-anilist-mal-sync login myanimelist
-```
-
-The program will print the URL to visit in your browser. After authorization, you'll be redirected and the token will be saved automatically.
-
-Tokens are stored in `~/.config/anilist-mal-sync/token.json` and reused. To reauthenticate, run:
-```bash
-anilist-mal-sync logout <service>
-```
-
-#### AniList
-
-1. Go to [AniList settings](https://anilist.co/settings/developer) (Settings -> Apps -> Developer)
-2. Create a new client
-3. Set the redirect URL to `http://localhost:18080/callback`
-4. Set the client ID and client secret in the config file or as environment variables
-
-#### MyAnimeList
-
-1. Go to [MyAnimeList API Settings](https://myanimelist.net/apiconfig) (Profile -> Account Settings -> API)
-2. Create a new application
-3. Set the redirect URL to `http://localhost:18080/callback`
-3. Set the client ID and client secret in the config file or as environment variables
-
-### Configuration
-
-#### Config file
-
-```yaml
-oauth:
-  port: "18080" # Port for OAuth server to listen on (default: 18080).
-  redirect_uri: "http://localhost:18080/callback" # Redirect URI for OAuth server (default: http://localhost:18080/callback).
-anilist:
-  client_id: "1" # AniList client ID.
-  client_secret: "secret" # AniList client secret.
-  auth_url: "https://anilist.co/api/v2/oauth/authorize"
-  token_url: "https://anilist.co/api/v2/oauth/token"
-  username: "username" # Your AniList username.
-myanimelist:
-  client_id: "1" # MyAnimeList client ID.
-  client_secret: "secret" # MyAnimeList client secret.
-  auth_url: "https://myanimelist.net/v1/oauth2/authorize"
-  token_url: "https://myanimelist.net/v1/oauth2/token"
-  username: "username" # Your MyAnimeList username.
-token_file_path: "" # Absolute path to token file, empty string use default path `$HOME/.config/anilist-mal-sync/token.json`
-```
-
-#### Environment variables
-
-- `PORT` - Port for OAuth server to listen on (default: 18080).
-- `CLIENT_SECRET_ANILIST` - AniList client secret.
-- `CLIENT_SECRET_MYANIMELIST` - MyAnimeList client secret.
-
-### Commands
-
-#### login
-Authenticate with a service:
-```bash
-anilist-mal-sync login <service>
-```
-Services: `anilist`, `myanimelist`, `all`
-
-#### logout
-Logout from a service:
-```bash
-anilist-mal-sync logout <service>
-```
-
-#### status
-Check authentication status:
-```bash
-anilist-mal-sync status
-```
-
-#### sync
-Synchronize anime/manga lists:
-```bash
-anilist-mal-sync sync [options]
-```
-
-Options:
-- `-c, --config` - Path to config file (default: `config.yaml`)
-- `-f, --force` - Force sync all entries
-- `-d, --dry-run` - Dry run without making changes
-- `--manga` - Sync manga instead of anime
-- `--all` - Sync both anime and manga
-- `--verbose` - Enable verbose logging
-- `--reverse-direction` - Sync from MyAnimeList to AniList
-
-For backward compatibility, running `anilist-mal-sync [options]` without a command will execute sync.
-
-
-### How to run
-
-Requirements: Go 1.22 or later
-
-Build and run from source:
-```bash
+# Download
 git clone https://github.com/bigspawn/anilist-mal-sync.git
 cd anilist-mal-sync
+
+# Create config
 cp config.example.yaml config.yaml
-# Edit config.yaml with your credentials
-go run . login anilist
-go run . login myanimelist
+
+# Edit config.yaml
+nano config.yaml
+```
+
+Edit `config.yaml` with your credentials:
+```yaml
+anilist:
+  client_id: "your_anilist_client_id"
+  client_secret: "your_anilist_client_secret"
+  username: "your_anilist_username"
+myanimelist:
+  client_id: "your_mal_client_id"
+  client_secret: "your_mal_client_secret"
+  username: "your_mal_username"
+token_file_path: ""  # Leave empty for default location
+```
+
+### Step 3: Authenticate
+
+```bash
+go run . login all
+```
+
+Follow the URLs printed in terminal to authorize both services.
+
+### Step 4: Sync
+
+```bash
 go run . sync
 ```
 
-Or install the program:
+Your lists are now synchronized!
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `login` | Authenticate with services |
+| `logout` | Remove authentication tokens |
+| `status` | Check authentication status |
+| `sync` | Synchronize anime/manga lists |
+
+**Login/Logout options:**
+| Short | Long | Description |
+|-------|------|-------------|
+| `-s` | `--service` | Service: `anilist`, `myanimelist`, `all` (default) |
+
+**Sync options:**
+| Short | Long | Description |
+|-------|------|-------------|
+| `-c` | `--config` | Path to config file (default: `config.yaml`) |
+| `-f` | `--force` | Force sync all entries |
+| `-d` | `--dry-run` | Dry run without making changes |
+| | `--manga` | Sync manga instead of anime |
+| | `--all` | Sync both anime and manga |
+| | `--verbose` | Enable verbose logging |
+| | `--reverse-direction` | Sync from MyAnimeList to AniList |
+
+For backward compatibility, running `anilist-mal-sync [options]` without a command will execute sync.
+
+## Configuration
+
+### Config file
+
+Full `config.yaml` example:
+
+```yaml
+oauth:
+  port: "18080"
+  redirect_uri: "http://localhost:18080/callback"
+anilist:
+  client_id: "your_client_id"
+  client_secret: "your_secret"
+  auth_url: "https://anilist.co/api/v2/oauth/authorize"
+  token_url: "https://anilist.co/api/v2/oauth/token"
+  username: "your_username"
+myanimelist:
+  client_id: "your_client_id"
+  client_secret: "your_secret"
+  auth_url: "https://myanimelist.net/v1/oauth2/authorize"
+  token_url: "https://myanimelist.net/v1/oauth2/token"
+  username: "your_username"
+token_file_path: ""  # Leave empty for default: ~/.config/anilist-mal-sync/token.json
+```
+
+### Environment variables (optional)
+
+Override sensitive values:
+- `PORT` - OAuth server port (default: 18080)
+- `CLIENT_SECRET_ANILIST` - AniList client secret
+- `CLIENT_SECRET_MYANIMELIST` - MyAnimeList client secret
+
+## Advanced
+
+### Install as binary
 
 ```bash
 go install github.com/bigspawn/anilist-mal-sync@latest
-anilist-mal-sync
+anilist-mal-sync login all
+anilist-mal-sync sync
 ```
 
-### Running with Docker
+### Docker
 
-You can also run the application using Docker.
+**Important:** For Docker, set `token_file_path: ""` in config.yaml to use the container's home directory.
 
-#### Using pre-built image
-
-The image is available on GitHub Container Registry:
-
+**Pre-built image:**
 ```bash
 docker pull ghcr.io/bigspawn/anilist-mal-sync:latest
+
+# Create tokens directory
+mkdir -p tokens
+
+# Login
+docker run --rm \
+  -p 18080:18080 \
+  -v $(pwd)/config.yaml:/etc/anilist-mal-sync/config.yaml:ro \
+  -v $(pwd)/tokens:/home/appuser/.config/anilist-mal-sync \
+  ghcr.io/bigspawn/anilist-mal-sync:latest login all
+
+# Sync
+docker run --rm \
+  -p 18080:18080 \
+  -v $(pwd)/config.yaml:/etc/anilist-mal-sync/config.yaml:ro \
+  -v $(pwd)/tokens:/home/appuser/.config/anilist-mal-sync \
+  ghcr.io/bigspawn/anilist-mal-sync:latest sync
 ```
 
-Run the container:
-
-```bash
-docker run \
-    -p 18080:18080 \
-    -v /path/to/your/config.yaml:/etc/anilist-mal-sync/config.yaml \
-    -v /path/to/token/directory:/home/appuser/.config/anilist-mal-sync \
-    ghcr.io/bigspawn/anilist-mal-sync:latest
-```
-
-#### Building your own image
-
-1. Clone the repository: `git clone https://github.com/bigspawn/anilist-mal-sync.git`
-2. Change directory: `cd anilist-mal-sync`
-3. Build the Docker image: `docker build -t anilist-mal-sync .`
-4. Run the container
-
-#### Using Docker Compose
-
-Create a `docker-compose.yml` file:
-
+**Docker Compose:**
 ```yaml
 version: '3'
-
 services:
   anilist-mal-sync:
     image: ghcr.io/bigspawn/anilist-mal-sync:latest
     ports:
       - "18080:18080"
     volumes:
-      - ./config.yaml:/etc/anilist-mal-sync/config.yaml
-      - ./tokens:/root/.config/anilist-mal-sync # it must be a directory
-    environment:
-      - CLIENT_SECRET_ANILIST=your_secret_here  # Optional
-      - CLIENT_SECRET_MYANIMELIST=your_secret_here  # Optional
-      - PORT=18080  # Optional
+      - ./config.yaml:/etc/anilist-mal-sync/config.yaml:ro
+      - ./tokens:/home/appuser/.config/anilist-mal-sync
 ```
 
-Run with Docker Compose:
+### Scheduling
 
+This tool does not include built-in scheduling. Use your system's scheduler:
+
+- **Linux/macOS**: cron or systemd timers
+- **Windows**: Task Scheduler
+- **Docker**: host cron or external orchestrator
+
+Example cron entry (daily at 2 AM):
 ```bash
-docker-compose up
+0 2 * * * /usr/local/bin/anilist-mal-sync sync
 ```
 
-Note: When running in Docker, the browser authentication flow requires that port 18080 is exposed and accessible from your host machine. Also ensure that your token storage directory is mounted as a volume to preserve authentication between runs.
+## Troubleshooting
+
+**"Config file not found"**
+- Ensure `config.yaml` exists in current directory or use `-c /path/to/config.yaml`
+
+**Authentication fails**
+- Check redirect URL matches exactly: `http://localhost:18080/callback`
+- Verify client ID and secret are correct
+- Ensure port 18080 is not already in use
+
+**Sync appears frozen**
+- Both services have rate limits. Wait a few minutes and try again
+- Use `--verbose` to see progress
+
+**Token expired**
+- Run `anilist-mal-sync status` to check
+- Run `anilist-mal-sync login all` to reauthenticate
 
 ## Disclaimer
 
 This project is not affiliated with AniList or MyAnimeList. Use at your own risk.
-Both services have rate limits and the program can look like it's frozen or stop by timeout.
-Just stop it and wait for a while and run again.
 
 ## TODO
 
