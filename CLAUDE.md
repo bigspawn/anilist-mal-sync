@@ -167,17 +167,25 @@ make clean
 # Build Docker image
 docker build -t anilist-mal-sync .
 
-# Run with pre-built image from GitHub Container Registry
-docker pull ghcr.io/bigspawn/anilist-mal-sync:latest
-
-# Run with Docker (requires config and token volumes)
-# Use PUID/PGID to match host user permissions
+# Run with environment variables (recommended)
 docker run -p 18080:18080 \
   -e PUID=$(id -u) \
   -e PGID=$(id -g) \
-  -v /path/to/config.yaml:/etc/anilist-mal-sync/config.yaml \
-  -v /path/to/tokens:/home/appuser/.config/anilist-mal-sync \
+  -e ANILIST_CLIENT_ID=your_id \
+  -e ANILIST_CLIENT_SECRET=your_secret \
+  -e ANILIST_USERNAME=your_username \
+  -e MAL_CLIENT_ID=your_id \
+  -e MAL_CLIENT_SECRET=your_secret \
+  -v tokens:/home/appuser/.config/anilist-mal-sync \
   ghcr.io/bigspawn/anilist-mal-sync:latest
+
+# Or with config file (optional)
+docker run -p 18080:18080 \
+  -e PUID=$(id -u) \
+  -e PGID=$(id -g) \
+  -v /path/to/config.yaml:/etc/anilist-mal-sync/config.yaml:ro \
+  -v /path/to/tokens:/home/appuser/.config/anilist-mal-sync \
+  ghcr.io/bigspawn/anilist-mal-sync:latest -c /etc/anilist-mal-sync/config.yaml
 ```
 
 **Volume Permissions:**
@@ -189,17 +197,23 @@ The image implements LinuxServer.io-style PUID/PGID environment variables to han
 
 ## Configuration
 
-The application uses a YAML configuration file (`config.yaml`) with the following structure:
-- OAuth settings (port, redirect URI)
-- AniList client credentials and settings
-- MyAnimeList client credentials and settings
-- Token file path for persistent authentication
+The application can be configured via environment variables (recommended for Docker) or YAML config file.
 
-Environment variables can override sensitive values:
-- `PORT` - OAuth server port
-- `CLIENT_SECRET_ANILIST` - AniList client secret
-- `CLIENT_SECRET_MYANIMELIST` - MyAnimeList client secret
+**Required environment variables:**
+- `ANILIST_CLIENT_ID` - AniList client ID
+- `ANILIST_CLIENT_SECRET` - AniList client secret
+- `ANILIST_USERNAME` - AniList username
+- `MAL_CLIENT_ID` - MyAnimeList client ID
+- `MAL_CLIENT_SECRET` - MyAnimeList client secret
+
+**Optional environment variables:**
+- `WATCH_INTERVAL` - Sync interval for watch mode (e.g., `12h`)
+- `OAUTH_PORT` - OAuth server port (default: `18080`)
+- `OAUTH_REDIRECT_URI` - OAuth redirect URI
 - `TOKEN_FILE_PATH` - Token file path for persistent authentication
+- `PUID` / `PGID` - User/Group ID for Docker volume permissions
+
+**Config file:** Use `-c config.yaml` flag to load from YAML file instead of environment variables.
 
 ## Key Dependencies
 

@@ -42,4 +42,4 @@ fi
 
 # Execute command as appuser
 echo "Starting application as appuser..."
-exec su-exec appuser "$@"
+exec su-exec appuser ./main "$@"

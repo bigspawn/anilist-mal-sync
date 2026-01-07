@@ -32,4 +32,4 @@ LABEL org.opencontainers.image.source="https://github.com/username/anilist-mal-s
 
 EXPOSE 18080
 ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["./main", "-c", "/etc/anilist-mal-sync/config.yaml"]
+CMD []

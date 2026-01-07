@@ -2,20 +2,20 @@ version: "3"
 services:
   sync:
     image: ghcr.io/bigspawn/anilist-mal-sync:latest
-    command: ["./main", "-c", "/etc/anilist-mal-sync/config.yaml", "watch"]
     ports:
-      - "18080:18080"  # For OAuth login
+      - "18080:18080"
     environment:
-      # Required: Your API credentials
+      # User/Group ID for volume permissions (run: id -u / id -g)
+      - PUID=1000
+      - PGID=1000
+      # Required: API credentials
       - ANILIST_CLIENT_ID=your_anilist_client_id
       - ANILIST_CLIENT_SECRET=your_anilist_secret
       - ANILIST_USERNAME=your_anilist_username
       - MAL_CLIENT_ID=your_mal_client_id
       - MAL_CLIENT_SECRET=your_mal_secret
-      # Optional: Configuration (alternative to command line flag)
-      - WATCH_INTERVAL=12h
-      - OAUTH_PORT=18080
-      - OAUTH_REDIRECT_URI=http://localhost:18080/callback
+      # Optional: Watch mode interval (e.g., 12h, 1h, 30m)
+      # - WATCH_INTERVAL=12h
     volumes:
       - tokens:/home/appuser/.config/anilist-mal-sync
     restart: unless-stopped
@@ -23,7 +23,7 @@ services:
 volumes:
   tokens:
 
-# Simple setup:
-# 1. Edit environment variables above with your credentials
-# 2. docker-compose run --rm --service-ports sync login all
-# 3. docker-compose up -d
+# Usage:
+# 1. Replace environment variables above with your credentials
+# 2. Authenticate: docker-compose run --rm --service-ports sync login all
+# 3. Start sync: docker-compose up -d
