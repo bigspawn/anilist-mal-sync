@@ -134,6 +134,7 @@ Override sensitive values:
 - `PORT` - OAuth server port (default: 18080)
 - `CLIENT_SECRET_ANILIST` - AniList client secret
 - `CLIENT_SECRET_MYANIMELIST` - MyAnimeList client secret
+- `TOKEN_FILE_PATH` - Token file path (default: `~/.config/anilist-mal-sync/token.json`)
 
 ## Advanced
 
