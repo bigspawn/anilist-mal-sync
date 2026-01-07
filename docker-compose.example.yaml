@@ -2,7 +2,7 @@ version: "3"
 services:
   sync:
     image: ghcr.io/bigspawn/anilist-mal-sync:latest
-    command: ["watch"]
+    command: ["./main", "-c", "/etc/anilist-mal-sync/config.yaml", "watch"]
     ports:
       - "18080:18080"  # For OAuth login
     environment:
@@ -12,7 +12,7 @@ services:
       - ANILIST_USERNAME=your_anilist_username
       - MAL_CLIENT_ID=your_mal_client_id
       - MAL_CLIENT_SECRET=your_mal_secret
-      # Optional: Configuration
+      # Optional: Configuration (alternative to command line flag)
       - WATCH_INTERVAL=12h
       - OAUTH_PORT=18080
       - OAUTH_REDIRECT_URI=http://localhost:18080/callback

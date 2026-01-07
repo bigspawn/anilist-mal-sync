@@ -157,7 +157,7 @@ version: "3"
 services:
   sync:
     image: ghcr.io/bigspawn/anilist-mal-sync:latest
-    command: ["watch"]
+    command: ["./main", "-c", "/etc/anilist-mal-sync/config.yaml", "watch"]
     ports:
       - "18080:18080"
     environment:
@@ -204,7 +204,7 @@ version: "3"
 services:
   sync:
     image: ghcr.io/bigspawn/anilist-mal-sync:latest
-    command: ["watch"]
+    command: ["./main", "-c", "/etc/anilist-mal-sync/config.yaml", "watch"]
     ports:
       - "18080:18080"
     environment:
@@ -252,7 +252,7 @@ version: '3'
 services:
   sync:
     image: ghcr.io/bigspawn/anilist-mal-sync:latest
-    command: ["watch"]
+    command: ["./main", "-c", "/etc/anilist-mal-sync/config.yaml", "watch"]
     environment:
       - PUID=1000
       - PGID=1000
@@ -264,8 +264,22 @@ services:
 
 Or override with CLI flag:
 ```yaml
-command: ["watch", "--interval=12h"]
+command: ["./main", "-c", "/etc/anilist-mal-sync/config.yaml", "watch", "--interval=12h"]
 ```
+
+**Important:** Due to BusyBox's built-in `watch` command in Alpine Linux, you must specify the full command path in Docker Compose:
+
+✅ **Correct:**
+```yaml
+command: ["./main", "-c", "/etc/anilist-mal-sync/config.yaml", "watch"]
+```
+
+❌ **Incorrect** (BusyBox will intercept):
+```yaml
+command: ["watch"]
+```
+
+**Recommended approach:** Use environment variable `WATCH_INTERVAL` and omit the `command` field entirely to use the default CMD from Dockerfile.
 
 **Interval limits:**
 - Minimum: 1 hour (to avoid API rate limits)
