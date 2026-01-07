@@ -15,11 +15,13 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=vendor -ldflags="-w -s" 
 FROM alpine:3.19
 
 RUN apk --no-cache add ca-certificates tzdata && \
-    mkdir -p /etc/anilist-mal-sync
+    mkdir -p /etc/anilist-mal-sync && \
+    adduser -D -u 10001 appuser && \
+    mkdir -p /home/appuser/.config/anilist-mal-sync && \
+    chown -R appuser:appuser /home/appuser
 
 WORKDIR /app
 COPY --from=builder /build/main ./main
-COPY --from=builder /etc/passwd /etc/passwd
 
 USER appuser
 

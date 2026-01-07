@@ -72,6 +72,10 @@ func loadConfigFromFile(filename string) (Config, error) {
 		cfg.MyAnimeList.ClientSecret = clientSecret
 	}
 
+	if tokenFilePath := os.Getenv("TOKEN_FILE_PATH"); tokenFilePath != "" {
+		cfg.TokenFilePath = tokenFilePath
+	}
+
 	if cfg.TokenFilePath == "" {
 		cfg.TokenFilePath = os.ExpandEnv("$HOME/.config/anilist-mal-sync/token.json")
 	}

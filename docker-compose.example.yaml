@@ -1,0 +1,9 @@
+version: "3"
+services:
+  sync:
+    image: ghcr.io/bigspawn/anilist-mal-sync:latest
+    command: ["watch"]
+    volumes:
+      - ./config.yaml:/etc/anilist-mal-sync/config.yaml:ro
+      - ./tokens:/home/appuser/.config/anilist-mal-sync
+    restart: unless-stopped
