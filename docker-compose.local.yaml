@@ -1,0 +1,24 @@
+version: "3"
+services:
+  sync:
+    build: .
+    ports:
+      - "18080:18080"
+    environment:
+      # User/Group ID for volume permissions (run: id -u / id -g)
+      # - PUID=1000
+      # - PGID=1000
+      # Required: API credentials
+      - ANILIST_CLIENT_ID=your_anilist_client_id
+      - ANILIST_CLIENT_SECRET=your_anilist_secret
+      - ANILIST_USERNAME=your_anilist_username
+      - MAL_CLIENT_ID=your_mal_client_id
+      - MAL_CLIENT_SECRET=your_mal_secret
+      # Optional: Watch mode interval (e.g., 12h, 1h, 30m)
+      # - WATCH_INTERVAL=12h
+    volumes:
+      - tokens:/home/appuser/.config/anilist-mal-sync
+    restart: unless-stopped
+
+volumes:
+  tokens:
