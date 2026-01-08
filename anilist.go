@@ -6,10 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"strings"
 	"time"
 
-	"github.com/cenkalti/backoff/v4"
 	"github.com/rl404/verniy"
 	"golang.org/x/oauth2"
 )
@@ -486,56 +484,6 @@ func (c *AnilistClient) GetMangaByMALID(ctx context.Context, malID int, prefix s
 	}, fmt.Sprintf("AniList search manga by MAL ID: %d", malID), prefix)
 
 	return result, err
-}
-
-// createBackoffPolicy creates a configured exponential backoff policy for rate limiting
-func createBackoffPolicy() *backoff.ExponentialBackOff {
-	b := backoff.NewExponentialBackOff()
-	b.InitialInterval = 1 * time.Second
-	b.MaxInterval = 30 * time.Second
-	b.MaxElapsedTime = 2 * time.Minute
-	b.Multiplier = 2.0
-	b.RandomizationFactor = 0.1 // Add jitter
-	return b
-}
-
-// isRateLimitError checks if the error is a rate limiting error
-func isRateLimitError(err error) bool {
-	if err == nil {
-		return false
-	}
-	errStr := strings.ToLower(err.Error())
-	return strings.Contains(errStr, "too many requests") ||
-		strings.Contains(errStr, "rate limit") ||
-		strings.Contains(errStr, "429")
-}
-
-// retryWithBackoff wraps an operation with exponential backoff for rate limit handling
-func retryWithBackoff(ctx context.Context, operation func() error, operationName string, prefix ...string) error {
-	b := createBackoffPolicy()
-
-	retryableOperation := func() error {
-		err := operation()
-		if err != nil && !isRateLimitError(err) {
-			// Don't retry non-rate-limit errors
-			return backoff.Permanent(err)
-		}
-		return err
-	}
-
-	return backoff.RetryNotify(
-		retryableOperation,
-		backoff.WithContext(b, ctx),
-		func(err error, duration time.Duration) {
-			if isRateLimitError(err) {
-				if len(prefix) > 0 {
-					log.Printf("[%s] Rate limit hit for %s, retrying in %v: %v", prefix[0], operationName, duration, err)
-				} else {
-					log.Printf("Rate limit hit for %s, retrying in %v: %v", operationName, duration, err)
-				}
-			}
-		},
-	)
 }
 
 // GetUserScoreFormat retrieves the user's score format preference from AniList

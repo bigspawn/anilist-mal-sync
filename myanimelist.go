@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
@@ -89,11 +90,13 @@ func (c *MyAnimeListClient) UpdateAnimeByIDAndOptions(ctx context.Context, id in
 		return nil
 	}
 
-	_, _, err := c.c.Anime.UpdateMyListStatus(ctx, id, opts...)
-	if err != nil {
-		return err
-	}
-	return nil
+	return retryWithBackoff(ctx, func() error {
+		_, _, err := c.c.Anime.UpdateMyListStatus(ctx, id, opts...)
+		if err != nil {
+			return fmt.Errorf("failed to update anime %d: %w", id, err)
+		}
+		return nil
+	}, fmt.Sprintf("MAL update anime: %d", id), "AniList to MAL Anime")
 }
 
 func (c *MyAnimeListClient) GetUserMangaList(ctx context.Context) ([]mal.UserManga, error) {
@@ -143,11 +146,13 @@ func (c *MyAnimeListClient) UpdateMangaByIDAndOptions(ctx context.Context, id in
 		return nil
 	}
 
-	_, _, err := c.c.Manga.UpdateMyListStatus(ctx, id, opts...)
-	if err != nil {
-		return err
-	}
-	return nil
+	return retryWithBackoff(ctx, func() error {
+		_, _, err := c.c.Manga.UpdateMyListStatus(ctx, id, opts...)
+		if err != nil {
+			return fmt.Errorf("failed to update manga %d: %w", id, err)
+		}
+		return nil
+	}, fmt.Sprintf("MAL update manga: %d", id), "AniList to MAL Manga")
 }
 
 func NewMyAnimeListOAuth(ctx context.Context, config Config) (*OAuth, error) {
