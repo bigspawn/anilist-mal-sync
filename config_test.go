@@ -292,8 +292,11 @@ myanimelist:
 		t.Error("TokenFilePath should be set to default value")
 	}
 
-	// Should contain default path
-	expectedPath := os.ExpandEnv("$HOME/.config/anilist-mal-sync/token.json")
+	// Should contain default path from getDefaultTokenPath()
+	expectedPath, err := getDefaultTokenPath()
+	if err != nil {
+		t.Fatalf("getDefaultTokenPath() failed: %v", err)
+	}
 	if config.TokenFilePath != expectedPath {
 		t.Errorf("TokenFilePath = %v, want %v", config.TokenFilePath, expectedPath)
 	}
@@ -430,14 +433,104 @@ func TestLoadConfigFromEnv_MissingRequiredFields(t *testing.T) {
 				t.Setenv("MAL_USERNAME", "mal_user")
 			}
 
-			cfg := loadConfigFromEnv()
+			cfg, err := loadConfigFromEnv()
+			if err != nil {
+				t.Fatalf("loadConfigFromEnv() failed: %v", err)
+			}
 
 			// Manually validate like loadConfigFromFile does
-			err := validateConfig(cfg)
+			err = validateConfig(cfg)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("validateConfig() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestGetDefaultTokenPath(t *testing.T) {
+	path, err := getDefaultTokenPath()
+	if err != nil {
+		t.Fatalf("getDefaultTokenPath() failed: %v", err)
+	}
+
+	if path == "" {
+		t.Error("getDefaultTokenPath() returned empty string")
+	}
+
+	// Verify path contains expected components
+	if !filepath.IsAbs(path) {
+		t.Errorf("getDefaultTokenPath() returned non-absolute path: %s", path)
+	}
+
+	// Verify path ends with expected filename
+	expectedSuffix := filepath.Join("anilist-mal-sync", "token.json")
+	if !strings.HasSuffix(path, expectedSuffix) {
+		t.Errorf("getDefaultTokenPath() = %s, expected suffix %s", path, expectedSuffix)
+	}
+
+	// Verify parent directory can be obtained without error
+	dir := filepath.Dir(path)
+	if dir == "" {
+		t.Error("filepath.Dir(path) returned empty string")
+	}
+
+	// Verify the token filename is correct
+	filename := filepath.Base(path)
+	if filename != "token.json" {
+		t.Errorf("getDefaultTokenPath() filename = %s, expected token.json", filename)
+	}
+}
+
+func TestLoadConfigFromEnv_DefaultTokenPath(t *testing.T) {
+	// Clear TOKEN_FILE_PATH to test default path
+	t.Setenv("TOKEN_FILE_PATH", "")
+
+	// Set required env vars
+	t.Setenv("ANILIST_CLIENT_ID", "test_id")
+	t.Setenv("ANILIST_USERNAME", "test_user")
+	t.Setenv("MAL_CLIENT_ID", "mal_id")
+	t.Setenv("MAL_USERNAME", "mal_user")
+
+	cfg, err := loadConfigFromEnv()
+	if err != nil {
+		t.Fatalf("loadConfigFromEnv() failed: %v", err)
+	}
+
+	// Verify token path is set and uses default
+	if cfg.TokenFilePath == "" {
+		t.Error("loadConfigFromEnv() TokenFilePath is empty")
+	}
+
+	// Verify it's an absolute path
+	if !filepath.IsAbs(cfg.TokenFilePath) {
+		t.Errorf("loadConfigFromEnv() TokenFilePath is not absolute: %s", cfg.TokenFilePath)
+	}
+
+	// Verify it contains the expected suffix
+	expectedSuffix := filepath.Join("anilist-mal-sync", "token.json")
+	if !strings.HasSuffix(cfg.TokenFilePath, expectedSuffix) {
+		t.Errorf("loadConfigFromEnv() TokenFilePath = %s, expected suffix %s", cfg.TokenFilePath, expectedSuffix)
+	}
+}
+
+func TestLoadConfigFromEnv_CustomTokenPath(t *testing.T) {
+	customPath := "/custom/path/tokens.json"
+	t.Setenv("TOKEN_FILE_PATH", customPath)
+
+	// Set required env vars
+	t.Setenv("ANILIST_CLIENT_ID", "test_id")
+	t.Setenv("ANILIST_USERNAME", "test_user")
+	t.Setenv("MAL_CLIENT_ID", "mal_id")
+	t.Setenv("MAL_USERNAME", "mal_user")
+
+	cfg, err := loadConfigFromEnv()
+	if err != nil {
+		t.Fatalf("loadConfigFromEnv() failed: %v", err)
+	}
+
+	// Verify custom path is used
+	if cfg.TokenFilePath != customPath {
+		t.Errorf("loadConfigFromEnv() TokenFilePath = %s, expected %s", cfg.TokenFilePath, customPath)
 	}
 }
