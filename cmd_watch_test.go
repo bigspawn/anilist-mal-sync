@@ -201,9 +201,11 @@ oauth:
 anilist:
   client_id: "test"
   client_secret: "test"
+  username: "ani_user"
 myanimelist:
   client_id: "test"
   client_secret: "test"
+  username: "mal_user"
 watch:
   interval: "12h"
 `
@@ -260,9 +262,11 @@ oauth:
 anilist:
   client_id: "test"
   client_secret: "test"
+  username: "ani_user"
 myanimelist:
   client_id: "test"
   client_secret: "test"
+  username: "mal_user"
 watch:
   interval: "12h"
 `
@@ -297,9 +301,11 @@ oauth:
 anilist:
   client_id: "test"
   client_secret: "test"
+  username: "ani_user"
 myanimelist:
   client_id: "test"
   client_secret: "test"
+  username: "mal_user"
 `
 	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
 		t.Fatalf("failed to write config: %v", err)

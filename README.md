@@ -41,6 +41,7 @@ services:
       - ANILIST_USERNAME=your_anilist_username
       - MAL_CLIENT_ID=your_mal_client_id
       - MAL_CLIENT_SECRET=your_mal_secret
+      - MAL_USERNAME=your_mal_username
       # - WATCH_INTERVAL=12h  # Optional: enable watch mode
     volumes:
       - tokens:/home/appuser/.config/anilist-mal-sync
@@ -139,6 +140,7 @@ Configuration can be provided entirely via environment variables (recommended fo
 - `ANILIST_USERNAME` - AniList username
 - `MAL_CLIENT_ID` - MyAnimeList Client ID
 - `MAL_CLIENT_SECRET` - MyAnimeList Client Secret
+- `MAL_USERNAME` - MyAnimeList username
 
 **Optional:**
 - `WATCH_INTERVAL` - Sync interval for watch mode (e.g., `12h`, `24h`)
@@ -199,7 +201,7 @@ Use your system's scheduler for periodic sync:
 ## Troubleshooting
 
 **"Required environment variables not set"**
-- Set required env vars: `ANILIST_CLIENT_ID`, `ANILIST_CLIENT_SECRET`, `ANILIST_USERNAME`, `MAL_CLIENT_ID`, `MAL_CLIENT_SECRET`
+- Set required env vars: `ANILIST_CLIENT_ID`, `ANILIST_CLIENT_SECRET`, `ANILIST_USERNAME`, `MAL_CLIENT_ID`, `MAL_CLIENT_SECRET`, `MAL_USERNAME`
 - Or use config file with `-c /path/to/config.yaml`
 
 **Authentication fails**
