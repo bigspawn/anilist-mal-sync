@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path"
 	"path/filepath"
 	"sync"
 	"time"
@@ -48,7 +47,7 @@ func NewOAuth(
 	authCodeOptions []oauth2.AuthCodeOption,
 	tokenFilePath string,
 ) (*OAuth, error) {
-	if !path.IsAbs(tokenFilePath) {
+	if !filepath.IsAbs(tokenFilePath) {
 		return nil, fmt.Errorf("path must be absolute: %s", tokenFilePath)
 	}
 
@@ -439,7 +438,7 @@ func createDirIfNotExists(path string) error {
 		return nil
 	}
 	if os.IsNotExist(err) {
-		if err = os.MkdirAll(dir, 0o750); err != nil {
+		if err = os.MkdirAll(dir, 0o700); err != nil {
 			return fmt.Errorf("error creating directory: %w", err)
 		}
 		return nil

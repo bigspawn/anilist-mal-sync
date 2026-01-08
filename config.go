@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -44,7 +45,12 @@ type Config struct {
 }
 
 // loadConfigFromEnv loads configuration from environment variables
-func loadConfigFromEnv() Config {
+func loadConfigFromEnv() (Config, error) {
+	tokenPath, err := getDefaultTokenPath()
+	if err != nil {
+		return Config{}, err
+	}
+
 	cfg := Config{
 		OAuth: OAuthConfig{
 			Port:        getEnvOrDefault("OAUTH_PORT", getEnvOrDefault("PORT", "18080")),
@@ -60,12 +66,12 @@ func loadConfigFromEnv() Config {
 			ClientSecret: os.Getenv("MAL_CLIENT_SECRET"),
 			Username:     os.Getenv("MAL_USERNAME"),
 		},
-		TokenFilePath: getEnvOrDefault("TOKEN_FILE_PATH", os.ExpandEnv("$HOME/.config/anilist-mal-sync/token.json")),
+		TokenFilePath: getEnvOrDefault("TOKEN_FILE_PATH", tokenPath),
 		Watch: WatchConfig{
 			Interval: os.Getenv("WATCH_INTERVAL"),
 		},
 	}
-	return cfg
+	return cfg, nil
 }
 
 // getEnvOrDefault returns environment variable value or default if empty
@@ -76,59 +82,93 @@ func getEnvOrDefault(key, defaultValue string) string {
 	return defaultValue
 }
 
+// getDefaultTokenPath returns the default token file path for the current platform
+func getDefaultTokenPath() (string, error) {
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get user config directory: %w", err)
+	}
+	return filepath.Join(configDir, "anilist-mal-sync", "token.json"), nil
+}
+
 // overrideConfigFromEnv applies environment variable overrides to a config
 func overrideConfigFromEnv(cfg *Config) {
+	overrideOAuthFromEnv(&cfg.OAuth)
+	overrideAnilistFromEnv(&cfg.Anilist)
+	overrideMyAnimeListFromEnv(&cfg.MyAnimeList)
+	overrideWatchFromEnv(&cfg.Watch)
+	overrideTokenPathFromEnv(cfg)
+}
+
+func overrideOAuthFromEnv(oauth *OAuthConfig) {
 	if port := os.Getenv("OAUTH_PORT"); port != "" {
-		cfg.OAuth.Port = port
+		oauth.Port = port
 	} else if port := os.Getenv("PORT"); port != "" {
-		cfg.OAuth.Port = port
+		oauth.Port = port
 	}
 
 	if redirectURI := os.Getenv("OAUTH_REDIRECT_URI"); redirectURI != "" {
-		cfg.OAuth.RedirectURI = redirectURI
+		oauth.RedirectURI = redirectURI
 	}
+}
 
+func overrideAnilistFromEnv(anilist *SiteConfig) {
 	if clientID := os.Getenv("ANILIST_CLIENT_ID"); clientID != "" {
-		cfg.Anilist.ClientID = clientID
+		anilist.ClientID = clientID
 	}
 
 	// Support both new and old env var names for backward compatibility
 	if clientSecret := os.Getenv("ANILIST_CLIENT_SECRET"); clientSecret != "" {
-		cfg.Anilist.ClientSecret = clientSecret
+		anilist.ClientSecret = clientSecret
 	} else if clientSecret := os.Getenv("CLIENT_SECRET_ANILIST"); clientSecret != "" {
-		cfg.Anilist.ClientSecret = clientSecret
+		anilist.ClientSecret = clientSecret
 	}
 
 	if username := os.Getenv("ANILIST_USERNAME"); username != "" {
-		cfg.Anilist.Username = username
+		anilist.Username = username
 	}
+}
 
+func overrideMyAnimeListFromEnv(mal *SiteConfig) {
 	if clientID := os.Getenv("MAL_CLIENT_ID"); clientID != "" {
-		cfg.MyAnimeList.ClientID = clientID
-	}
-
-	if username := os.Getenv("MAL_USERNAME"); username != "" {
-		cfg.MyAnimeList.Username = username
+		mal.ClientID = clientID
 	}
 
 	// Support both new and old env var names for backward compatibility
 	if clientSecret := os.Getenv("MAL_CLIENT_SECRET"); clientSecret != "" {
-		cfg.MyAnimeList.ClientSecret = clientSecret
+		mal.ClientSecret = clientSecret
 	} else if clientSecret := os.Getenv("CLIENT_SECRET_MYANIMELIST"); clientSecret != "" {
-		cfg.MyAnimeList.ClientSecret = clientSecret
+		mal.ClientSecret = clientSecret
 	}
 
+	if username := os.Getenv("MAL_USERNAME"); username != "" {
+		mal.Username = username
+	}
+}
+
+func overrideWatchFromEnv(watch *WatchConfig) {
 	if interval := os.Getenv("WATCH_INTERVAL"); interval != "" {
-		cfg.Watch.Interval = interval
+		watch.Interval = interval
 	}
+}
 
+func overrideTokenPathFromEnv(cfg *Config) {
 	if tokenFilePath := os.Getenv("TOKEN_FILE_PATH"); tokenFilePath != "" {
 		cfg.TokenFilePath = tokenFilePath
 	}
 
 	if cfg.TokenFilePath == "" {
-		cfg.TokenFilePath = os.ExpandEnv("$HOME/.config/anilist-mal-sync/token.json")
+		cfg.TokenFilePath = getDefaultTokenPathOrEmpty()
 	}
+}
+
+// getDefaultTokenPathOrEmpty returns the default token path or empty string on error
+func getDefaultTokenPathOrEmpty() string {
+	path, err := getDefaultTokenPath()
+	if err != nil {
+		return ""
+	}
+	return path
 }
 
 func validateConfig(cfg Config) error {
@@ -142,37 +182,19 @@ func validateConfig(cfg Config) error {
 func loadConfigFromFile(filename string) (Config, error) {
 	// If no config file specified, load from environment variables only
 	if filename == "" {
-		cfg := loadConfigFromEnv()
-		if err := validateConfig(cfg); err != nil {
-			return Config{}, fmt.Errorf("required environment variables not set (ANILIST_CLIENT_ID, ANILIST_USERNAME, MAL_CLIENT_ID, MAL_USERNAME)")
-		}
-		return cfg, nil
+		return loadConfigFromEnvWithValidation()
 	}
 
 	// Try to load from file
 	// #nosec G304 - Config file path is provided by user via command line flag
 	data, err := os.ReadFile(filename)
 	if err != nil {
-		// If file not found, try loading from env vars
-		if os.IsNotExist(err) {
-			cfg := loadConfigFromEnv()
-			// Validate that required fields are set
-			if err := validateConfig(cfg); err != nil {
-				// Print help message to stderr
-				fmt.Fprintln(os.Stderr, getConfigHelp(filename))
-				return Config{}, fmt.Errorf("config file not found and required environment variables not set: %w", err)
-			}
-			return cfg, nil
-		}
-		// Other read errors
-		fmt.Fprintln(os.Stderr, getConfigHelp(filename))
-		return Config{}, fmt.Errorf("config file not found: %w", err)
+		return handleConfigFileReadError(err, filename)
 	}
 
-	var cfg Config
-	if err = yaml.Unmarshal(data, &cfg); err != nil {
-		fmt.Fprintln(os.Stderr, getConfigHelp(filename))
-		return Config{}, fmt.Errorf("failed to parse config file: %w", err)
+	cfg, err := parseConfigFile(data, filename)
+	if err != nil {
+		return Config{}, err
 	}
 
 	// Environment variables override file values
@@ -183,6 +205,50 @@ func loadConfigFromFile(filename string) (Config, error) {
 		return Config{}, fmt.Errorf("required fields not set (anilist.client_id, anilist.username, myanimelist.client_id, myanimelist.username)")
 	}
 
+	return cfg, nil
+}
+
+func loadConfigFromEnvWithValidation() (Config, error) {
+	cfg, err := loadConfigFromEnv()
+	if err != nil {
+		return Config{}, err
+	}
+	if err := validateConfig(cfg); err != nil {
+		return Config{}, fmt.Errorf("required environment variables not set (ANILIST_CLIENT_ID, ANILIST_USERNAME, MAL_CLIENT_ID, MAL_USERNAME)")
+	}
+	return cfg, nil
+}
+
+func handleConfigFileReadError(readErr error, filename string) (Config, error) {
+	// If file not found, try loading from env vars
+	if os.IsNotExist(readErr) {
+		return tryLoadFromEnvWithHelp(filename)
+	}
+	// Other read errors
+	fmt.Fprintln(os.Stderr, getConfigHelp(filename))
+	return Config{}, fmt.Errorf("config file not found: %w", readErr)
+}
+
+func tryLoadFromEnvWithHelp(filename string) (Config, error) {
+	cfg, envErr := loadConfigFromEnv()
+	if envErr != nil {
+		return Config{}, envErr
+	}
+	// Validate that required fields are set
+	if err := validateConfig(cfg); err != nil {
+		// Print help message to stderr
+		fmt.Fprintln(os.Stderr, getConfigHelp(filename))
+		return Config{}, fmt.Errorf("config file not found and required environment variables not set: %w", err)
+	}
+	return cfg, nil
+}
+
+func parseConfigFile(data []byte, filename string) (Config, error) {
+	var cfg Config
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		fmt.Fprintln(os.Stderr, getConfigHelp(filename))
+		return Config{}, fmt.Errorf("failed to parse config file: %w", err)
+	}
 	return cfg, nil
 }
 
