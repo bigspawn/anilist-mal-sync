@@ -8,59 +8,60 @@ Program to synchronize your AniList and MyAnimeList accounts.
 - OAuth2 authentication
 - CLI interface
 
-## Quick Start (Docker - 5 minutes)
-
-### Prerequisites
-- Docker
-- Accounts on AniList and MyAnimeList
+## Quick Start (Docker)
 
 ### Step 1: Create OAuth applications
 
 **AniList:**
 1. Go to [AniList Developer Settings](https://anilist.co/settings/developer)
-2. Click "Create New Client"
-3. Set redirect URL: `http://localhost:18080/callback`
-4. Save the Client ID and Client Secret
+2. Create New Client with redirect URL: `http://localhost:18080/callback`
+3. Save Client ID and Client Secret
 
 **MyAnimeList:**
 1. Go to [MAL API Settings](https://myanimelist.net/apiconfig)
-2. Click "Create Application"
-3. Set redirect URL: `http://localhost:18080/callback`
-4. Save the Client ID and Client Secret
+2. Create Application with redirect URL: `http://localhost:18080/callback`
+3. Save Client ID and Client Secret
 
 ### Step 2: Configure
 
-Create `config.yaml`:
+Download [`docker-compose.example.yaml`](docker-compose.example.yaml) and edit credentials:
+
 ```yaml
-anilist:
-  client_id: "your_anilist_client_id"
-  client_secret: "your_anilist_client_secret"
-  username: "your_anilist_username"
-myanimelist:
-  client_id: "your_mal_client_id"
-  client_secret: "your_mal_client_secret"
-  username: "your_mal_username"
-token_file_path: ""  # Empty = auto-detect (recommended)
+version: "3"
+services:
+  sync:
+    image: ghcr.io/bigspawn/anilist-mal-sync:latest
+    ports:
+      - "18080:18080"
+    environment:
+      - PUID=1000  # Your UID: id -u
+      - PGID=1000  # Your GID: id -g
+      - ANILIST_CLIENT_ID=your_anilist_client_id
+      - ANILIST_CLIENT_SECRET=your_anilist_secret
+      - ANILIST_USERNAME=your_anilist_username
+      - MAL_CLIENT_ID=your_mal_client_id
+      - MAL_CLIENT_SECRET=your_mal_secret
+      # - WATCH_INTERVAL=12h  # Optional: enable watch mode
+    volumes:
+      - tokens:/home/appuser/.config/anilist-mal-sync
+    restart: unless-stopped
+
+volumes:
+  tokens:
 ```
 
 ### Step 3: Authenticate
 
 ```bash
-docker run --rm -p 18080:18080 \
-  -v $(pwd)/config.yaml:/etc/anilist-mal-sync/config.yaml:ro \
-  -v $(pwd)/tokens:/home/appuser/.config/anilist-mal-sync \
-  ghcr.io/bigspawn/anilist-mal-sync:latest login all
+docker-compose run --rm --service-ports sync login all
 ```
 
 Follow the URLs printed in terminal.
 
-### Step 4: Sync
+### Step 4: Run
 
 ```bash
-docker run --rm -p 18080:18080 \
-  -v $(pwd)/config.yaml:/etc/anilist-mal-sync/config.yaml:ro \
-  -v $(pwd)/tokens:/home/appuser/.config/anilist-mal-sync \
-  ghcr.io/bigspawn/anilist-mal-sync:latest sync
+docker-compose up -d
 ```
 
 Done!
@@ -83,7 +84,7 @@ Done!
 **Sync options:**
 | Short | Long | Description |
 |-------|------|-------------|
-| `-c` | `--config` | Path to config file (default: `config.yaml`) |
+| `-c` | `--config` | Path to config file (optional, uses env vars if not specified) |
 | `-f` | `--force` | Force sync all entries |
 | `-d` | `--dry-run` | Dry run without making changes |
 | | `--manga` | Sync manga instead of anime |
@@ -128,13 +129,23 @@ watch:
   interval: "24h"  # Sync interval for watch mode (1h-168h), can be overridden with --interval flag
 ```
 
-### Environment variables (optional)
+### Environment variables
 
-Override sensitive values:
-- `PORT` - OAuth server port (default: 18080)
-- `CLIENT_SECRET_ANILIST` - AniList client secret
-- `CLIENT_SECRET_MYANIMELIST` - MyAnimeList client secret
+Configuration can be provided entirely via environment variables (recommended for Docker):
+
+**Required:**
+- `ANILIST_CLIENT_ID` - AniList Client ID
+- `ANILIST_CLIENT_SECRET` - AniList Client Secret
+- `ANILIST_USERNAME` - AniList username
+- `MAL_CLIENT_ID` - MyAnimeList Client ID
+- `MAL_CLIENT_SECRET` - MyAnimeList Client Secret
+
+**Optional:**
+- `WATCH_INTERVAL` - Sync interval for watch mode (e.g., `12h`, `24h`)
+- `OAUTH_PORT` - OAuth server port (default: `18080`)
+- `OAUTH_REDIRECT_URI` - OAuth redirect URI (default: `http://localhost:18080/callback`)
 - `TOKEN_FILE_PATH` - Token file path (default: `~/.config/anilist-mal-sync/token.json`)
+- `PUID` / `PGID` - User/Group ID for Docker volume permissions
 
 ## Advanced
 
@@ -148,87 +159,48 @@ anilist-mal-sync sync
 
 ### Docker
 
-**Important:** For Docker, set `token_file_path: ""` in config.yaml to use the container's home directory.
+See [Quick Start](#quick-start-docker) for the recommended setup.
 
-**Pre-built image:**
+**Using config file instead of environment variables:**
+
 ```bash
-docker pull ghcr.io/bigspawn/anilist-mal-sync:latest
-
-# Create tokens directory
-mkdir -p tokens
-
-# Login
-docker run --rm \
-  -p 18080:18080 \
+docker run --rm -p 18080:18080 \
+  -e PUID=$(id -u) -e PGID=$(id -g) \
   -v $(pwd)/config.yaml:/etc/anilist-mal-sync/config.yaml:ro \
   -v $(pwd)/tokens:/home/appuser/.config/anilist-mal-sync \
-  ghcr.io/bigspawn/anilist-mal-sync:latest login all
-
-# Sync
-docker run --rm \
-  -p 18080:18080 \
-  -v $(pwd)/config.yaml:/etc/anilist-mal-sync/config.yaml:ro \
-  -v $(pwd)/tokens:/home/appuser/.config/anilist-mal-sync \
-  ghcr.io/bigspawn/anilist-mal-sync:latest sync
+  ghcr.io/bigspawn/anilist-mal-sync:latest -c /etc/anilist-mal-sync/config.yaml sync
 ```
 
-**Docker Compose:**
+### Watch mode
+
+Enable continuous sync by setting `WATCH_INTERVAL` environment variable:
+
 ```yaml
-version: '3'
-services:
-  anilist-mal-sync:
-    image: ghcr.io/bigspawn/anilist-mal-sync:latest
-    ports:
-      - "18080:18080"
-    volumes:
-      - ./config.yaml:/etc/anilist-mal-sync/config.yaml:ro
-      - ./tokens:/home/appuser/.config/anilist-mal-sync
+environment:
+  - WATCH_INTERVAL=12h  # Sync every 12 hours
 ```
 
-### Scheduling
-
-**Built-in watch mode (Docker-friendly):**
-
-Run continuous sync with Docker Compose. Set interval in `config.yaml`:
-```yaml
-version: '3'
-services:
-  sync:
-    image: ghcr.io/bigspawn/anilist-mal-sync:latest
-    command: ["watch"]
-    volumes:
-      - ./config.yaml:/etc/anilist-mal-sync/config.yaml:ro
-      - ./tokens:/home/appuser/.config/anilist-mal-sync
-    restart: unless-stopped
-```
-
-Or override with CLI flag:
-```yaml
-command: ["watch", "--interval=12h"]
-```
-
-**Interval limits:**
-- Minimum: 1 hour (to avoid API rate limits)
-- Maximum: 7 days
-- Format: `12h`, `24h`, `48h` (hours only)
-- Priority: CLI flag > Config file
-- Interval must be specified via one of these methods
-
-**Alternative: External schedulers**
-
-For non-Docker setups, use your system's scheduler:
-- **Linux/macOS**: cron or systemd timers
-- **Windows**: Task Scheduler
-
-Example cron entry (daily at 2 AM):
+Or run watch command manually:
 ```bash
+docker-compose run --rm sync watch --interval=12h
+```
+
+**Interval limits:** 1h - 168h (7 days)
+
+### Scheduling (non-Docker)
+
+Use your system's scheduler for periodic sync:
+
+```bash
+# Linux/macOS cron (daily at 2 AM)
 0 2 * * * /usr/local/bin/anilist-mal-sync sync
 ```
 
 ## Troubleshooting
 
-**"Config file not found"**
-- Ensure `config.yaml` exists in current directory or use `-c /path/to/config.yaml`
+**"Required environment variables not set"**
+- Set required env vars: `ANILIST_CLIENT_ID`, `ANILIST_CLIENT_SECRET`, `ANILIST_USERNAME`, `MAL_CLIENT_ID`, `MAL_CLIENT_SECRET`
+- Or use config file with `-c /path/to/config.yaml`
 
 **Authentication fails**
 - Check redirect URL matches exactly: `http://localhost:18080/callback`

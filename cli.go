@@ -23,8 +23,7 @@ func NewCLI() *cli.Command {
 	configFlag := &cli.StringFlag{
 		Name:    "config",
 		Aliases: []string{"c"},
-		Usage:   "path to config file",
-		Value:   "config.yaml",
+		Usage:   "path to config file (optional, uses env vars if not specified)",
 	}
 	forceSyncFlag := &cli.BoolFlag{
 		Name:    "force",
