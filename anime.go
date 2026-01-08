@@ -215,6 +215,48 @@ func (a Anime) SameTitleWithTarget(t Target) bool {
 	return true
 }
 
+// IsPotentiallyIncorrectMatch checks if a match might be incorrect
+// Returns true if the match should be rejected
+func (a Anime) IsPotentiallyIncorrectMatch(t Target) bool {
+	b, ok := t.(Anime)
+	if !ok {
+		return false
+	}
+
+	// If source has a valid MAL ID that matches, trust it
+	srcID := a.IDMal
+	tgtID := b.IDMal
+	if srcID > 0 && srcID == tgtID {
+		return false // Valid MAL ID match
+	}
+
+	// Check episode count mismatch
+	// If source has 0/unknown episodes but target has many (> 4)
+	if (a.NumEpisodes == 0 || a.NumEpisodes == 1) && b.NumEpisodes > 4 {
+		// Check if titles are actually different (not just one being a substring)
+		if !a.identicalTitleMatch(b) {
+			return true // Likely incorrect match
+		}
+	}
+
+	return false
+}
+
+// identicalTitleMatch checks if titles are truly identical (not just similar)
+func (a Anime) identicalTitleMatch(b Anime) bool {
+	// Exact match on any title field
+	if a.TitleEN != "" && a.TitleEN == b.TitleEN {
+		return true
+	}
+	if a.TitleJP != "" && a.TitleJP == b.TitleJP {
+		return true
+	}
+	if a.TitleRomaji != "" && a.TitleRomaji == b.TitleRomaji {
+		return true
+	}
+	return false
+}
+
 func (a Anime) GetUpdateOptions() []mal.UpdateMyAnimeListStatusOption {
 	st, err := a.Status.GetMalStatus()
 	if err != nil {

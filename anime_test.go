@@ -136,3 +136,120 @@ func TestAnime_SameTypeWithTarget(t *testing.T) {
 		})
 	}
 }
+
+func TestAnime_IsPotentiallyIncorrectMatch(t *testing.T) {
+	tests := []struct {
+		name     string
+		source   Anime
+		target   Anime
+		expected bool // true = should reject
+	}{
+		{
+			name: "Special (0 eps) vs TV series (13 eps) - different titles",
+			source: Anime{
+				TitleJP:     "ガールズバンドクライ なぁ、未来。",
+				NumEpisodes: 0,
+				IDMal:       0,
+			},
+			target: Anime{
+				TitleJP:     "ガールズバンドクライ",
+				NumEpisodes: 13,
+				IDMal:       55102,
+			},
+			expected: true, // Should reject
+		},
+		{
+			name: "Special (1 ep) vs TV series (13 eps) - different titles",
+			source: Anime{
+				TitleJP:     "ガールズバンドクライ なぁ、未来。",
+				NumEpisodes: 1,
+				IDMal:       0,
+			},
+			target: Anime{
+				TitleJP:     "ガールズバンドクライ",
+				NumEpisodes: 13,
+				IDMal:       55102,
+			},
+			expected: true, // Should reject
+		},
+		{
+			name: "Same MAL ID - should not reject",
+			source: Anime{
+				TitleJP:     "Girls Band Cry",
+				NumEpisodes: 0,
+				IDMal:       55102,
+			},
+			target: Anime{
+				TitleJP:     "Girls Band Cry",
+				NumEpisodes: 13,
+				IDMal:       55102,
+			},
+			expected: false, // Should NOT reject (valid MAL ID match)
+		},
+		{
+			name: "Identical titles - should not reject",
+			source: Anime{
+				TitleJP:     "Girls Band Cry",
+				NumEpisodes: 0,
+				IDMal:       0,
+			},
+			target: Anime{
+				TitleJP:     "Girls Band Cry",
+				NumEpisodes: 13,
+				IDMal:       55102,
+			},
+			expected: false, // Should NOT reject (exact title match)
+		},
+		{
+			name: "Both have few episodes - should not reject",
+			source: Anime{
+				TitleJP:     "Special Episode",
+				NumEpisodes: 1,
+				IDMal:       0,
+			},
+			target: Anime{
+				TitleJP:     "Special Episode",
+				NumEpisodes: 2,
+				IDMal:       0,
+			},
+			expected: false, // Should NOT reject (both are specials)
+		},
+		{
+			name: "Source has 2 episodes - should not reject",
+			source: Anime{
+				TitleJP:     "Short OVA",
+				NumEpisodes: 2,
+				IDMal:       0,
+			},
+			target: Anime{
+				TitleJP:     "Short OVA",
+				NumEpisodes: 13,
+				IDMal:       12345,
+			},
+			expected: false, // Should NOT reject (source has > 1 episode)
+		},
+		{
+			name: "Target has 4 episodes or fewer - should not reject",
+			source: Anime{
+				TitleJP:     "Short Series",
+				NumEpisodes: 0,
+				IDMal:       0,
+			},
+			target: Anime{
+				TitleJP:     "Short Series",
+				NumEpisodes: 4,
+				IDMal:       12345,
+			},
+			expected: false, // Should NOT reject (target has <= 4 episodes)
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.source.IsPotentiallyIncorrectMatch(tt.target)
+			if result != tt.expected {
+				t.Errorf("IsPotentiallyIncorrectMatch() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}

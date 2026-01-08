@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"sort"
 )
 
@@ -62,6 +63,41 @@ func (s TitleStrategy) Name() string {
 	return "TitleStrategy"
 }
 
+// shouldRejectMatch checks if a potential match should be rejected
+// Returns true if the match should be rejected with appropriate logging
+func shouldRejectMatch(src Source, target Target, prefix string) bool {
+	// Check MAL ID mismatch
+	srcID := src.GetTargetID()
+	tgtID := target.GetTargetID()
+
+	if srcID > 0 && tgtID > 0 && srcID != tgtID {
+		DPrintf("[%s] Rejecting title match due to MAL ID mismatch: Source MAL ID: %d, Target MAL ID: %d",
+			prefix, srcID, tgtID)
+		DPrintf("[%s]   Source: %s", prefix, src.String())
+		DPrintf("[%s]   Target: %s", prefix, target.String())
+		return true
+	}
+
+	// Check for potentially incorrect matches (special vs series)
+	srcAnime, ok := src.(Anime)
+	if !ok {
+		return false
+	}
+
+	if srcAnime.IsPotentiallyIncorrectMatch(target) {
+		tgtAnime, _ := target.(Anime)
+		log.Printf("[%s] WARNING: Rejecting potential incorrect match (episode count mismatch)", prefix)
+		log.Printf("[%s]   Source: %s (IDMal: %d, Episodes: %d)",
+			prefix, src.String(), srcAnime.IDMal, srcAnime.NumEpisodes)
+		log.Printf("[%s]   Target: %s (IDMal: %d, Episodes: %d)",
+			prefix, target.String(), target.GetTargetID(), tgtAnime.NumEpisodes)
+		log.Printf("[%s]   This special episode will NOT be synced. Add to ignore list if needed.", prefix)
+		return true
+	}
+
+	return false
+}
+
 func (s TitleStrategy) FindTarget(_ context.Context, src Source, existingTargets map[TargetID]Target, prefix string) (Target, bool, error) {
 	srcTitle := src.GetTitle()
 
@@ -86,16 +122,9 @@ func (s TitleStrategy) FindTarget(_ context.Context, src Source, existingTargets
 
 	for _, target := range targetSlice {
 		if src.SameTitleWithTarget(target) && src.SameTypeWithTarget(target) {
-			// WARNING: Check for potential mismatches
-			srcID := src.GetTargetID()
-			tgtID := target.GetTargetID()
-
-			if srcID > 0 && tgtID > 0 && srcID != tgtID {
-				DPrintf("[%s] Rejecting title match due to MAL ID mismatch: Source MAL ID: %d, Target MAL ID: %d",
-					prefix, srcID, tgtID)
-				DPrintf("[%s]   Source: %s", prefix, src.String())
-				DPrintf("[%s]   Target: %s", prefix, target.String())
-				continue // Skip this target and try the next one
+			// Check for potential mismatches and reject if needed
+			if shouldRejectMatch(src, target, prefix) {
+				continue
 			}
 
 			DPrintf("[%s] Found target by title comparison (fuzzy match): '%s' -> '%s'",
@@ -211,6 +240,10 @@ func (s APISearchStrategy) FindTarget(
 
 	for _, tgt := range targets {
 		if existingTarget, exists := existingTargets[tgt.GetTargetID()]; exists {
+			// Check for potential mismatches before accepting API search result
+			if shouldRejectMatch(src, existingTarget, prefix) {
+				continue
+			}
 			DPrintf("[%s] Found target by API name search in user's list: %s", prefix, tgt.GetTitle())
 			return existingTarget, true, nil
 		}
