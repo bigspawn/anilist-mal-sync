@@ -121,6 +121,10 @@ func overrideConfigFromEnv(cfg *Config) {
 		cfg.TokenFilePath = tokenFilePath
 	}
 
+	if tokenFilePath := os.Getenv("TOKEN_FILE_PATH"); tokenFilePath != "" {
+		cfg.TokenFilePath = tokenFilePath
+	}
+
 	if cfg.TokenFilePath == "" {
 		cfg.TokenFilePath = os.ExpandEnv("$HOME/.config/anilist-mal-sync/token.json")
 	}
