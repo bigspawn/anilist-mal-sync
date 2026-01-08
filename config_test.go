@@ -105,9 +105,11 @@ oauth:
 anilist:
   client_id: "test_id"
   client_secret: "default_secret"
+  username: "ani_user"
 myanimelist:
   client_id: "mal_id"
   client_secret: "default_mal_secret"
+  username: "mal_user"
 `
 	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
 		t.Fatalf("failed to write config file: %v", err)
@@ -135,6 +137,69 @@ myanimelist:
 
 	if config.MyAnimeList.ClientSecret != "env_mal_secret" {
 		t.Errorf("MyAnimeList.ClientSecret = %v, want env_mal_secret (env override)", config.MyAnimeList.ClientSecret)
+	}
+}
+
+func TestLoadConfigFromFile_EnvOverride_MAL_USERNAME(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	// Create config file WITHOUT myanimelist.username
+	configContent := `
+oauth:
+  port: "18080"
+anilist:
+  client_id: "test_id"
+  client_secret: "default_secret"
+  username: "ani_user"
+myanimelist:
+  client_id: "mal_id"
+  client_secret: "default_mal_secret"
+`
+	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	// Set MAL_USERNAME via env
+	t.Setenv("MAL_USERNAME", "env_mal_user")
+
+	config, err := loadConfigFromFile(configPath)
+	if err != nil {
+		t.Fatalf("loadConfigFromFile() error = %v", err)
+	}
+
+	if config.MyAnimeList.Username != "env_mal_user" {
+		t.Errorf("MyAnimeList.Username = %v, want env_mal_user (env override)", config.MyAnimeList.Username)
+	}
+}
+
+func TestLoadConfigFromFile_MissingMALUsername(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	// Config file WITHOUT myanimelist.username
+	configContent := `
+oauth:
+  port: "18080"
+anilist:
+  client_id: "test_id"
+  client_secret: "test_secret"
+  username: "test_user"
+myanimelist:
+  client_id: "mal_id"
+  client_secret: "mal_secret"
+`
+	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	_, err := loadConfigFromFile(configPath)
+	if err == nil {
+		t.Error("loadConfigFromFile() should return error when MAL_USERNAME is missing")
+	}
+
+	if !strings.Contains(err.Error(), "myanimelist.username") {
+		t.Errorf("Error should mention myanimelist.username, got: %v", err)
 	}
 }
 
@@ -325,5 +390,54 @@ func TestWatchConfig_GetInterval_Invalid(t *testing.T) {
 	_, err := w.GetInterval()
 	if err == nil {
 		t.Fatal("GetInterval() expected error, got nil")
+	}
+}
+
+func TestLoadConfigFromEnv_MissingRequiredFields(t *testing.T) {
+	tests := []struct {
+		name           string
+		setAnilistID   bool
+		setAnilistUser bool
+		setMALID       bool
+		setMALUser     bool
+		wantErr        bool
+	}{
+		{"All valid", true, true, true, true, false},
+		{"Missing MAL_USERNAME", true, true, true, false, true},
+		{"Missing ANILIST_USERNAME", true, false, true, true, true},
+		{"Missing MAL_CLIENT_ID", true, true, false, true, true},
+		{"Missing ANILIST_CLIENT_ID", false, true, true, true, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Clear all env vars first
+			t.Setenv("ANILIST_CLIENT_ID", "")
+			t.Setenv("ANILIST_USERNAME", "")
+			t.Setenv("MAL_CLIENT_ID", "")
+			t.Setenv("MAL_USERNAME", "")
+
+			if tt.setAnilistID {
+				t.Setenv("ANILIST_CLIENT_ID", "test_id")
+			}
+			if tt.setAnilistUser {
+				t.Setenv("ANILIST_USERNAME", "ani_user")
+			}
+			if tt.setMALID {
+				t.Setenv("MAL_CLIENT_ID", "mal_id")
+			}
+			if tt.setMALUser {
+				t.Setenv("MAL_USERNAME", "mal_user")
+			}
+
+			cfg := loadConfigFromEnv()
+
+			// Manually validate like loadConfigFromFile does
+			err := validateConfig(cfg)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateConfig() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }

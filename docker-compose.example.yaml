@@ -14,6 +14,7 @@ services:
       - ANILIST_USERNAME=your_anilist_username
       - MAL_CLIENT_ID=your_mal_client_id
       - MAL_CLIENT_SECRET=your_mal_secret
+      - MAL_USERNAME=your_mal_username
       # Optional: Watch mode interval (e.g., 12h, 1h, 30m)
       # - WATCH_INTERVAL=12h
     volumes:

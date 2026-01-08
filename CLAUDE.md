@@ -205,6 +205,7 @@ The application can be configured via environment variables (recommended for Doc
 - `ANILIST_USERNAME` - AniList username
 - `MAL_CLIENT_ID` - MyAnimeList client ID
 - `MAL_CLIENT_SECRET` - MyAnimeList client secret
+- `MAL_USERNAME` - MyAnimeList username
 
 **Optional environment variables:**
 - `WATCH_INTERVAL` - Sync interval for watch mode (e.g., `12h`)

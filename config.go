@@ -58,6 +58,7 @@ func loadConfigFromEnv() Config {
 		MyAnimeList: SiteConfig{
 			ClientID:     os.Getenv("MAL_CLIENT_ID"),
 			ClientSecret: os.Getenv("MAL_CLIENT_SECRET"),
+			Username:     os.Getenv("MAL_USERNAME"),
 		},
 		TokenFilePath: getEnvOrDefault("TOKEN_FILE_PATH", os.ExpandEnv("$HOME/.config/anilist-mal-sync/token.json")),
 		Watch: WatchConfig{
@@ -106,6 +107,10 @@ func overrideConfigFromEnv(cfg *Config) {
 		cfg.MyAnimeList.ClientID = clientID
 	}
 
+	if username := os.Getenv("MAL_USERNAME"); username != "" {
+		cfg.MyAnimeList.Username = username
+	}
+
 	// Support both new and old env var names for backward compatibility
 	if clientSecret := os.Getenv("MAL_CLIENT_SECRET"); clientSecret != "" {
 		cfg.MyAnimeList.ClientSecret = clientSecret
@@ -126,12 +131,20 @@ func overrideConfigFromEnv(cfg *Config) {
 	}
 }
 
+func validateConfig(cfg Config) error {
+	if cfg.Anilist.ClientID == "" || cfg.Anilist.Username == "" ||
+		cfg.MyAnimeList.ClientID == "" || cfg.MyAnimeList.Username == "" {
+		return fmt.Errorf("required fields not set")
+	}
+	return nil
+}
+
 func loadConfigFromFile(filename string) (Config, error) {
 	// If no config file specified, load from environment variables only
 	if filename == "" {
 		cfg := loadConfigFromEnv()
-		if cfg.Anilist.ClientID == "" || cfg.MyAnimeList.ClientID == "" || cfg.Anilist.Username == "" {
-			return Config{}, fmt.Errorf("required environment variables not set (ANILIST_CLIENT_ID, ANILIST_USERNAME, MAL_CLIENT_ID)")
+		if err := validateConfig(cfg); err != nil {
+			return Config{}, fmt.Errorf("required environment variables not set (ANILIST_CLIENT_ID, ANILIST_USERNAME, MAL_CLIENT_ID, MAL_USERNAME)")
 		}
 		return cfg, nil
 	}
@@ -144,7 +157,7 @@ func loadConfigFromFile(filename string) (Config, error) {
 		if os.IsNotExist(err) {
 			cfg := loadConfigFromEnv()
 			// Validate that required fields are set
-			if cfg.Anilist.ClientID == "" || cfg.MyAnimeList.ClientID == "" {
+			if err := validateConfig(cfg); err != nil {
 				// Print help message to stderr
 				fmt.Fprintln(os.Stderr, getConfigHelp(filename))
 				return Config{}, fmt.Errorf("config file not found and required environment variables not set: %w", err)
@@ -164,6 +177,11 @@ func loadConfigFromFile(filename string) (Config, error) {
 
 	// Environment variables override file values
 	overrideConfigFromEnv(&cfg)
+
+	// Validate required fields
+	if err := validateConfig(cfg); err != nil {
+		return Config{}, fmt.Errorf("required fields not set (anilist.client_id, anilist.username, myanimelist.client_id, myanimelist.username)")
+	}
 
 	return cfg, nil
 }
