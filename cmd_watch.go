@@ -76,9 +76,11 @@ func runWatch(ctx context.Context, cmd *cli.Command) error {
 		if err := app.Run(ctx); err != nil {
 			return fmt.Errorf("initial sync failed: %w", err)
 		}
-		log.Printf("Initial sync completed, starting watch mode")
+		nextTime := time.Now().Add(interval)
+		log.Printf("Initial sync completed, starting watch mode - next sync in %v at %s", interval, nextTime.Format("2006-01-02 15:04:05"))
 	} else {
-		log.Printf("Starting watch mode: sync every %v", interval)
+		nextTime := time.Now().Add(interval)
+		log.Printf("Starting watch mode: next sync in %v at %s", interval, nextTime.Format("2006-01-02 15:04:05"))
 	}
 
 	ticker := time.NewTicker(interval)
@@ -91,7 +93,8 @@ func runWatch(ctx context.Context, cmd *cli.Command) error {
 			if err := app.Run(ctx); err != nil {
 				log.Printf("Sync error: %v", err)
 			} else {
-				log.Printf("Sync completed")
+				nextTime := time.Now().Add(interval)
+				log.Printf("Sync completed - next sync in %v at %s", interval, nextTime.Format("2006-01-02 15:04:05"))
 			}
 		case <-ctx.Done():
 			log.Printf("Watch mode stopped")
