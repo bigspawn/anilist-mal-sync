@@ -1,4 +1,4 @@
-# anilist-mal-sync [![Build Status](https://github.com/bigspawn/anilist-mal-sync/workflows/go/badge.svg)](https://github.com/bigspawn/anilist-mal-sync/actions)
+# anilist-mal-sync [![Build Status](https://github.com/bigspawn/anilist-mal-sync/workflows/go/badge.svg)](https://github.com/bigspawn/anilist-mal-sync/actions) [![codecov](https://codecov.io/gh/bigspawn/anilist-mal-sync/branch/main/graph/badge.svg)](https://codecov.io/gh/bigspawn/anilist-mal-sync)
 
 > **Note:** This project is under development. Feedback, suggestions, and issues are highly appreciated!
 
