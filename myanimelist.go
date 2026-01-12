@@ -90,6 +90,11 @@ func (c *MyAnimeListClient) UpdateAnimeByIDAndOptions(ctx context.Context, id in
 		return nil
 	}
 
+	// Log update details for debugging
+	if *verbose {
+		log.Printf("[DEBUG] Updating MAL ID %d with opts: %+v", id, opts)
+	}
+
 	return retryWithBackoff(ctx, func() error {
 		_, _, err := c.c.Anime.UpdateMyListStatus(ctx, id, opts...)
 		if err != nil {
