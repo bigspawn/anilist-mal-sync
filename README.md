@@ -158,6 +158,7 @@ Configuration can be provided entirely via environment variables (recommended fo
 
 **Optional:**
 - `WATCH_INTERVAL` - Sync interval for watch mode (e.g., `12h`, `24h`)
+- `HTTP_TIMEOUT` - HTTP client timeout for API requests (default: `30s`, e.g., `10s`, `1m`)
 - `OAUTH_PORT` - OAuth server port (default: `18080`)
 - `OAUTH_REDIRECT_URI` - OAuth redirect URI (default: `http://localhost:18080/callback`)
 - `TOKEN_FILE_PATH` - Token file path (default: `~/.config/anilist-mal-sync/token.json`)

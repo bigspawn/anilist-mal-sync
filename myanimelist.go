@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/nstratos/go-myanimelist/mal"
 	"golang.org/x/oauth2"
@@ -28,30 +29,34 @@ var mangaFields = mal.Fields{
 }
 
 type MyAnimeListClient struct {
-	c *mal.Client
-
-	username string
+	c           *mal.Client
+	username    string
+	httpTimeout time.Duration
 }
 
-func NewMyAnimeListClient(ctx context.Context, oauth *OAuth, username string) *MyAnimeListClient {
+func NewMyAnimeListClient(ctx context.Context, oauth *OAuth, username string, httpTimeout time.Duration) *MyAnimeListClient {
 	httpClient := oauth2.NewClient(ctx, oauth.TokenSource(ctx))
 	httpClient.Transport = newLoggingRoundTripper(httpClient.Transport)
 
 	client := mal.NewClient(httpClient)
 
-	return &MyAnimeListClient{c: client, username: username}
+	return &MyAnimeListClient{c: client, username: username, httpTimeout: httpTimeout}
 }
 
 func (c *MyAnimeListClient) GetUserAnimeList(ctx context.Context) ([]mal.UserAnime, error) {
-	return fetchAllPages(ctx, "MAL get user anime list", func(ctx context.Context, offset int) ([]mal.UserAnime, *mal.Response, error) {
-		return c.c.User.AnimeList(ctx, c.username, animeFields, mal.Offset(offset), mal.Limit(100))
-	})
+	return fetchAllPages(
+		ctx,
+		"MAL get user anime list",
+		c.httpTimeout,
+		func(ctx context.Context, offset int) ([]mal.UserAnime, *mal.Response, error) {
+			return c.c.User.AnimeList(ctx, c.username, animeFields, mal.Offset(offset), mal.Limit(100))
+		})
 }
 
 func (c *MyAnimeListClient) GetAnimesByName(ctx context.Context, name string) ([]mal.Anime, error) {
 	var result []mal.Anime
 	err := retryWithBackoff(ctx, func() error {
-		ctx, cancel := withTimeout(ctx)
+		ctx, cancel := withTimeout(ctx, c.httpTimeout)
 		defer cancel()
 		list, _, e := c.c.Anime.List(ctx, name, animeFields, mal.Limit(3))
 		if e != nil {
@@ -74,7 +79,7 @@ func (c *MyAnimeListClient) GetAnimeByID(ctx context.Context, id int) (*mal.Anim
 
 	var result *mal.Anime
 	err := retryWithBackoff(ctx, func() error {
-		ctx, cancel := withTimeout(ctx)
+		ctx, cancel := withTimeout(ctx, c.httpTimeout)
 		defer cancel()
 		anime, _, e := c.c.Anime.Details(ctx, id, animeFields)
 		if e != nil {
@@ -108,15 +113,19 @@ func (c *MyAnimeListClient) UpdateAnimeByIDAndOptions(ctx context.Context, id in
 }
 
 func (c *MyAnimeListClient) GetUserMangaList(ctx context.Context) ([]mal.UserManga, error) {
-	return fetchAllPages(ctx, "MAL get user manga list", func(ctx context.Context, offset int) ([]mal.UserManga, *mal.Response, error) {
-		return c.c.User.MangaList(ctx, c.username, mangaFields, mal.Offset(offset), mal.Limit(100))
-	})
+	return fetchAllPages(
+		ctx,
+		"MAL get user manga list",
+		c.httpTimeout,
+		func(ctx context.Context, offset int) ([]mal.UserManga, *mal.Response, error) {
+			return c.c.User.MangaList(ctx, c.username, mangaFields, mal.Offset(offset), mal.Limit(100))
+		})
 }
 
 func (c *MyAnimeListClient) GetMangasByName(ctx context.Context, name string) ([]mal.Manga, error) {
 	var result []mal.Manga
 	err := retryWithBackoff(ctx, func() error {
-		ctx, cancel := withTimeout(ctx)
+		ctx, cancel := withTimeout(ctx, c.httpTimeout)
 		defer cancel()
 		l, _, e := c.c.Manga.List(ctx, name, mangaFields, mal.Limit(10))
 		if e != nil {
@@ -139,7 +148,7 @@ func (c *MyAnimeListClient) GetMangaByID(ctx context.Context, id int) (*mal.Mang
 
 	var result *mal.Manga
 	err := retryWithBackoff(ctx, func() error {
-		ctx, cancel := withTimeout(ctx)
+		ctx, cancel := withTimeout(ctx, c.httpTimeout)
 		defer cancel()
 		m, _, e := c.c.Manga.Details(ctx, id, mangaFields)
 		if e != nil {
@@ -225,6 +234,7 @@ func NewMyAnimeListOAuthWithoutInit(config Config) (*OAuth, error) {
 func fetchAllPages[T any](
 	ctx context.Context,
 	operationName string,
+	timeout time.Duration,
 	fetch func(ctx context.Context, offset int) ([]T, *mal.Response, error),
 ) ([]T, error) {
 	var result []T
@@ -236,7 +246,7 @@ func fetchAllPages[T any](
 		var resp *mal.Response
 
 		err := retryWithBackoff(ctx, func() error {
-			ctx, cancel := withTimeout(ctx)
+			ctx, cancel := withTimeout(ctx, timeout)
 			defer cancel()
 			var e error
 			items, resp, e = fetch(ctx, offset)

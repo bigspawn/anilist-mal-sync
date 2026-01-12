@@ -16,3 +16,7 @@ myanimelist:
 token_file_path: "" # Absolute path to token file, empty string use default path.
 watch:
   interval: "24h" # Sync interval for watch mode (1h-168h). Can be overridden with --interval flag.
+# HTTP client timeout for API requests (default: 30s).
+# Can be overridden with HTTP_TIMEOUT environment variable.
+# Examples: "10s", "30s", "1m", "5m"
+http_timeout: "30s"

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -36,12 +37,27 @@ func (w *WatchConfig) GetInterval() (time.Duration, error) {
 	return time.ParseDuration(w.Interval)
 }
 
+// GetHTTPTimeout parses the http_timeout string into a duration.
+// Returns 30s as default if not specified or invalid.
+func (c *Config) GetHTTPTimeout() time.Duration {
+	if c.HTTPTimeout == "" {
+		return 30 * time.Second // default
+	}
+	dur, err := time.ParseDuration(c.HTTPTimeout)
+	if err != nil {
+		log.Printf("Invalid http_timeout format '%s', using default 30s: %v", c.HTTPTimeout, err)
+		return 30 * time.Second
+	}
+	return dur
+}
+
 type Config struct {
 	OAuth         OAuthConfig `yaml:"oauth"`
 	Anilist       SiteConfig  `yaml:"anilist"`
 	MyAnimeList   SiteConfig  `yaml:"myanimelist"`
 	TokenFilePath string      `yaml:"token_file_path"`
 	Watch         WatchConfig `yaml:"watch"`
+	HTTPTimeout   string      `yaml:"http_timeout"`
 }
 
 // loadConfigFromEnv loads configuration from environment variables
@@ -74,6 +90,7 @@ func loadConfigFromEnv() (Config, error) {
 		Watch: WatchConfig{
 			Interval: os.Getenv("WATCH_INTERVAL"),
 		},
+		HTTPTimeout: getEnvOrDefault("HTTP_TIMEOUT", "30s"),
 	}
 	return cfg, nil
 }
@@ -101,6 +118,7 @@ func overrideConfigFromEnv(cfg *Config) {
 	overrideAnilistFromEnv(&cfg.Anilist)
 	overrideMyAnimeListFromEnv(&cfg.MyAnimeList)
 	overrideWatchFromEnv(&cfg.Watch)
+	overrideHTTPTimeoutFromEnv(cfg)
 	overrideTokenPathFromEnv(cfg)
 }
 
@@ -163,6 +181,12 @@ func overrideTokenPathFromEnv(cfg *Config) {
 
 	if cfg.TokenFilePath == "" {
 		cfg.TokenFilePath = getDefaultTokenPathOrEmpty()
+	}
+}
+
+func overrideHTTPTimeoutFromEnv(cfg *Config) {
+	if timeout := os.Getenv("HTTP_TIMEOUT"); timeout != "" {
+		cfg.HTTPTimeout = timeout
 	}
 }
 
