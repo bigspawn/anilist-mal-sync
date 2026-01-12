@@ -77,3 +77,8 @@ func retryWithBackoff(ctx context.Context, operation func() error, operationName
 		},
 	)
 }
+
+// withTimeout adds a 10-second timeout to the context for API calls
+func withTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(ctx, 10*time.Second)
+}

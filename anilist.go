@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"time"
 
 	"github.com/rl404/verniy"
 	"golang.org/x/oauth2"
@@ -20,7 +19,6 @@ type AnilistClient struct {
 
 func NewAnilistClient(ctx context.Context, oauth *OAuth, username string) *AnilistClient {
 	httpClient := oauth2.NewClient(ctx, oauth.TokenSource(ctx))
-	httpClient.Timeout = 10 * time.Minute
 
 	v := verniy.New()
 	v.Http = *httpClient
@@ -32,6 +30,8 @@ func (c *AnilistClient) GetUserAnimeList(ctx context.Context) ([]verniy.MediaLis
 	var result []verniy.MediaListGroup
 
 	err := retryWithBackoff(ctx, func() error {
+		ctx, cancel := withTimeout(ctx)
+		defer cancel()
 		mediaListGroups, e := c.c.GetUserAnimeListWithContext(ctx, c.username,
 			verniy.MediaListGroupFieldStatus,
 			verniy.MediaListGroupFieldEntries(
@@ -69,6 +69,8 @@ func (c *AnilistClient) GetUserMangaList(ctx context.Context) ([]verniy.MediaLis
 	var result []verniy.MediaListGroup
 
 	err := retryWithBackoff(ctx, func() error {
+		ctx, cancel := withTimeout(ctx)
+		defer cancel()
 		mediaListGroups, e := c.c.GetUserMangaListWithContext(ctx, c.username,
 			verniy.MediaListGroupFieldName,
 			verniy.MediaListGroupFieldStatus,
@@ -188,6 +190,8 @@ func (c *AnilistClient) UpdateAnimeEntry(
 	ctx context.Context, mediaID int, status string, progress int, score int, prefix string,
 ) error {
 	return retryWithBackoff(ctx, func() error {
+		ctx, cancel := withTimeout(ctx)
+		defer cancel()
 		mutation := `
 			mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $score: Float) {
 				SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, score: $score) {
@@ -255,6 +259,8 @@ func (c *AnilistClient) UpdateMangaEntry(
 	prefix string,
 ) error {
 	return retryWithBackoff(ctx, func() error {
+		ctx, cancel := withTimeout(ctx)
+		defer cancel()
 		mutation := `
 			mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $progressVolumes: Int, $score: Float) {
 				SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, progressVolumes: $progressVolumes, score: $score) {
@@ -318,6 +324,8 @@ func (c *AnilistClient) GetAnimeByID(ctx context.Context, id int, prefix string)
 	var result *verniy.Media
 
 	err := retryWithBackoff(ctx, func() error {
+		ctx, cancel := withTimeout(ctx)
+		defer cancel()
 		media, e := c.c.GetAnimeWithContext(ctx, id,
 			verniy.MediaFieldID,
 			verniy.MediaFieldIDMAL,
@@ -345,6 +353,8 @@ func (c *AnilistClient) GetAnimesByName(ctx context.Context, name string, prefix
 	var result []verniy.Media
 
 	err := retryWithBackoff(ctx, func() error {
+		ctx, cancel := withTimeout(ctx)
+		defer cancel()
 		page, e := c.c.SearchAnimeWithContext(ctx, verniy.PageParamMedia{Search: name}, 1, 10,
 			verniy.MediaFieldID,
 			verniy.MediaFieldIDMAL,
@@ -372,6 +382,8 @@ func (c *AnilistClient) GetAnimeByMALID(ctx context.Context, malID int, prefix s
 	var result *verniy.Media
 
 	err := retryWithBackoff(ctx, func() error {
+		ctx, cancel := withTimeout(ctx)
+		defer cancel()
 		page, e := c.c.SearchAnimeWithContext(ctx, verniy.PageParamMedia{IDMAL: malID}, 1, 1,
 			verniy.MediaFieldID,
 			verniy.MediaFieldIDMAL,
@@ -402,6 +414,8 @@ func (c *AnilistClient) GetMangaByID(ctx context.Context, id int, prefix string)
 	var result *verniy.Media
 
 	err := retryWithBackoff(ctx, func() error {
+		ctx, cancel := withTimeout(ctx)
+		defer cancel()
 		media, e := c.c.GetMangaWithContext(ctx, id,
 			verniy.MediaFieldID,
 			verniy.MediaFieldIDMAL,
@@ -430,6 +444,8 @@ func (c *AnilistClient) GetMangasByName(ctx context.Context, name string, prefix
 	var result []verniy.Media
 
 	err := retryWithBackoff(ctx, func() error {
+		ctx, cancel := withTimeout(ctx)
+		defer cancel()
 		page, e := c.c.SearchMangaWithContext(ctx, verniy.PageParamMedia{Search: name}, 1, 10,
 			verniy.MediaFieldID,
 			verniy.MediaFieldIDMAL,
@@ -459,6 +475,8 @@ func (c *AnilistClient) GetMangaByMALID(ctx context.Context, malID int, prefix s
 	var result *verniy.Media
 
 	err := retryWithBackoff(ctx, func() error {
+		ctx, cancel := withTimeout(ctx)
+		defer cancel()
 		page, e := c.c.SearchMangaWithContext(ctx, verniy.PageParamMedia{IDMAL: malID}, 1, 1,
 			verniy.MediaFieldID,
 			verniy.MediaFieldIDMAL,
@@ -491,6 +509,8 @@ func (c *AnilistClient) GetUserScoreFormat(ctx context.Context) (verniy.ScoreFor
 	var result *verniy.User
 
 	err := retryWithBackoff(ctx, func() error {
+		ctx, cancel := withTimeout(ctx)
+		defer cancel()
 		user, e := c.c.GetUserWithContext(ctx, c.username,
 			verniy.UserFieldMediaListOptions(
 				verniy.MediaListOptionsFieldScoreFormat,

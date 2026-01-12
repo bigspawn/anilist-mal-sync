@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"time"
 
 	"github.com/nstratos/go-myanimelist/mal"
 	"golang.org/x/oauth2"
@@ -36,7 +35,6 @@ type MyAnimeListClient struct {
 
 func NewMyAnimeListClient(ctx context.Context, oauth *OAuth, username string) *MyAnimeListClient {
 	httpClient := oauth2.NewClient(ctx, oauth.TokenSource(ctx))
-	httpClient.Timeout = 10 * time.Minute
 
 	client := mal.NewClient(httpClient)
 
@@ -44,32 +42,28 @@ func NewMyAnimeListClient(ctx context.Context, oauth *OAuth, username string) *M
 }
 
 func (c *MyAnimeListClient) GetUserAnimeList(ctx context.Context) ([]mal.UserAnime, error) {
-	var userAnimeList []mal.UserAnime
-	var offset int
-	for {
-		list, resp, err := c.c.User.AnimeList(ctx, c.username, animeFields, mal.Offset(offset), mal.Limit(100))
-		if err != nil {
-			return nil, err
-		}
-
-		userAnimeList = append(userAnimeList, list...)
-
-		if resp.NextOffset == 0 {
-			break
-		}
-
-		offset = resp.NextOffset
-	}
-	return userAnimeList, nil
+	return fetchAllPages(ctx, "MAL get user anime list", func(ctx context.Context, offset int) ([]mal.UserAnime, *mal.Response, error) {
+		return c.c.User.AnimeList(ctx, c.username, animeFields, mal.Offset(offset), mal.Limit(100))
+	})
 }
 
 func (c *MyAnimeListClient) GetAnimesByName(ctx context.Context, name string) ([]mal.Anime, error) {
-	animeList, _, err := c.c.Anime.List(ctx, name, animeFields, mal.Limit(3))
+	var result []mal.Anime
+	err := retryWithBackoff(ctx, func() error {
+		ctx, cancel := withTimeout(ctx)
+		defer cancel()
+		list, _, e := c.c.Anime.List(ctx, name, animeFields, mal.Limit(3))
+		if e != nil {
+			return e
+		}
+		result = list
+		return nil
+	}, fmt.Sprintf("MAL search anime by name: %s", name))
 	if err != nil {
 		return nil, err
 	}
 
-	return animeList, nil
+	return result, nil
 }
 
 func (c *MyAnimeListClient) GetAnimeByID(ctx context.Context, id int) (*mal.Anime, error) {
@@ -77,12 +71,22 @@ func (c *MyAnimeListClient) GetAnimeByID(ctx context.Context, id int) (*mal.Anim
 		return nil, errEmptyMalID
 	}
 
-	anime, _, err := c.c.Anime.Details(ctx, id, animeFields)
+	var result *mal.Anime
+	err := retryWithBackoff(ctx, func() error {
+		ctx, cancel := withTimeout(ctx)
+		defer cancel()
+		anime, _, e := c.c.Anime.Details(ctx, id, animeFields)
+		if e != nil {
+			return e
+		}
+		result = anime
+		return nil
+	}, fmt.Sprintf("MAL get anime by ID: %d", id))
 	if err != nil {
 		return nil, err
 	}
 
-	return anime, nil
+	return result, nil
 }
 
 func (c *MyAnimeListClient) UpdateAnimeByIDAndOptions(ctx context.Context, id int, opts []mal.UpdateMyAnimeListStatusOption) error {
@@ -105,32 +109,28 @@ func (c *MyAnimeListClient) UpdateAnimeByIDAndOptions(ctx context.Context, id in
 }
 
 func (c *MyAnimeListClient) GetUserMangaList(ctx context.Context) ([]mal.UserManga, error) {
-	var userMangaList []mal.UserManga
-	var offset int
-	for {
-		list, resp, err := c.c.User.MangaList(ctx, c.username, mangaFields, mal.Offset(offset), mal.Limit(100))
-		if err != nil {
-			return nil, err
-		}
-
-		userMangaList = append(userMangaList, list...)
-
-		if resp.NextOffset == 0 {
-			break
-		}
-
-		offset = resp.NextOffset
-	}
-	return userMangaList, nil
+	return fetchAllPages(ctx, "MAL get user manga list", func(ctx context.Context, offset int) ([]mal.UserManga, *mal.Response, error) {
+		return c.c.User.MangaList(ctx, c.username, mangaFields, mal.Offset(offset), mal.Limit(100))
+	})
 }
 
 func (c *MyAnimeListClient) GetMangasByName(ctx context.Context, name string) ([]mal.Manga, error) {
-	l, _, err := c.c.Manga.List(ctx, name, mangaFields, mal.Limit(10))
+	var result []mal.Manga
+	err := retryWithBackoff(ctx, func() error {
+		ctx, cancel := withTimeout(ctx)
+		defer cancel()
+		l, _, e := c.c.Manga.List(ctx, name, mangaFields, mal.Limit(10))
+		if e != nil {
+			return e
+		}
+		result = l
+		return nil
+	}, fmt.Sprintf("MAL search manga by name: %s", name))
 	if err != nil {
 		return nil, err
 	}
 
-	return l, nil
+	return result, nil
 }
 
 func (c *MyAnimeListClient) GetMangaByID(ctx context.Context, id int) (*mal.Manga, error) {
@@ -138,12 +138,22 @@ func (c *MyAnimeListClient) GetMangaByID(ctx context.Context, id int) (*mal.Mang
 		return nil, errEmptyMalID
 	}
 
-	m, _, err := c.c.Manga.Details(ctx, id, mangaFields)
+	var result *mal.Manga
+	err := retryWithBackoff(ctx, func() error {
+		ctx, cancel := withTimeout(ctx)
+		defer cancel()
+		m, _, e := c.c.Manga.Details(ctx, id, mangaFields)
+		if e != nil {
+			return e
+		}
+		result = m
+		return nil
+	}, fmt.Sprintf("MAL get manga by ID: %d", id))
 	if err != nil {
 		return nil, err
 	}
 
-	return m, nil
+	return result, nil
 }
 
 func (c *MyAnimeListClient) UpdateMangaByIDAndOptions(ctx context.Context, id int, opts []mal.UpdateMyMangaListStatusOption) error {
@@ -208,4 +218,51 @@ func NewMyAnimeListOAuthWithoutInit(config Config) (*OAuth, error) {
 		},
 		config.TokenFilePath,
 	)
+}
+
+// fetchAllPages fetches all pages from a paginated MAL API endpoint using retry logic with timeout.
+// The fetch function should return a page of items along with the pagination response.
+// Verbose logs are printed to show pagination progress.
+func fetchAllPages[T any](
+	ctx context.Context,
+	operationName string,
+	fetch func(ctx context.Context, offset int) ([]T, *mal.Response, error),
+) ([]T, error) {
+	var result []T
+	offset := 0
+	pageNum := 1
+
+	for {
+		var items []T
+		var resp *mal.Response
+
+		err := retryWithBackoff(ctx, func() error {
+			ctx, cancel := withTimeout(ctx)
+			defer cancel()
+			var e error
+			items, resp, e = fetch(ctx, offset)
+			return e
+		}, fmt.Sprintf("%s (page %d, offset: %d)", operationName, pageNum, offset))
+		if err != nil {
+			return nil, err
+		}
+
+		if *verbose {
+			log.Printf("[DEBUG] %s: fetched page %d with %d items (next offset: %d)", operationName, pageNum, len(items), resp.NextOffset)
+		}
+
+		result = append(result, items...)
+
+		if resp.NextOffset == 0 {
+			if *verbose {
+				log.Printf("[DEBUG] %s: finished pagination, total %d items across %d page(s)", operationName, len(result), pageNum)
+			}
+			break
+		}
+
+		offset = resp.NextOffset
+		pageNum++
+	}
+
+	return result, nil
 }
