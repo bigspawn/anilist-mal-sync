@@ -60,11 +60,15 @@ func loadConfigFromEnv() (Config, error) {
 			ClientID:     os.Getenv("ANILIST_CLIENT_ID"),
 			ClientSecret: os.Getenv("ANILIST_CLIENT_SECRET"),
 			Username:     os.Getenv("ANILIST_USERNAME"),
+			AuthURL:      "https://anilist.co/api/v2/oauth/authorize",
+			TokenURL:     "https://anilist.co/api/v2/oauth/token",
 		},
 		MyAnimeList: SiteConfig{
 			ClientID:     os.Getenv("MAL_CLIENT_ID"),
 			ClientSecret: os.Getenv("MAL_CLIENT_SECRET"),
 			Username:     os.Getenv("MAL_USERNAME"),
+			AuthURL:      "https://myanimelist.net/v1/oauth2/authorize",
+			TokenURL:     "https://myanimelist.net/v1/oauth2/token",
 		},
 		TokenFilePath: getEnvOrDefault("TOKEN_FILE_PATH", tokenPath),
 		Watch: WatchConfig{
