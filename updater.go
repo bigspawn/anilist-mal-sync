@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"strings"
 )
@@ -31,6 +32,7 @@ type Updater struct {
 	Statistics    *Statistics
 	IgnoreTitles  map[string]struct{}
 	StrategyChain *StrategyChain
+	Logger        *Logger
 
 	UpdateTargetBySourceFunc func(context.Context, TargetID, Source) error
 }
@@ -42,32 +44,45 @@ func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target) {
 	}
 
 	var statusStr string
+	processedCount := 0
+
 	for _, src := range srcs {
 		// Check for context cancellation
 		select {
 		case <-ctx.Done():
-			log.Printf("[%s] Context cancelled, stopping sync", u.Prefix)
+			u.Logger.Warn("[%s] Context cancelled, stopping sync", u.Prefix)
 			return
 		default:
 		}
 
 		if src.GetStatusString() == "" {
-			DPrintf("[%s] Skipping source with empty status: %s", u.Prefix, src.String())
+			u.Logger.Debug("[%s] Skipping source with empty status: %s", u.Prefix, src.String())
 			continue
 		}
 
-		u.Statistics.TotalCount++
+		u.Statistics.IncrementTotal()
+		processedCount++
 
+		// Show status transitions
 		if statusStr != src.GetStatusString() {
 			statusStr = src.GetStatusString()
-			log.Printf("[%s] Processing for status: %s", u.Prefix, statusStr)
+			u.Logger.Stage("[%s] Processing %s...", u.Prefix, statusStr)
 		}
 
-		DPrintf("[%s] Processing for: %s", u.Prefix, src.String())
+		// Show progress (overwrites previous line)
+		u.Logger.Progress(processedCount, len(srcs), statusStr)
 
+		u.Logger.Debug("[%s] Processing: %s", u.Prefix, src.String())
+
+		// Check ignore list
 		if _, ok := u.IgnoreTitles[strings.ToLower(src.GetTitle())]; ok {
-			log.Printf("[%s] Ignoring entry: %s", u.Prefix, src.GetTitle())
-			u.Statistics.SkippedCount++
+			u.Logger.Debug("[%s] Ignoring entry: %s", u.Prefix, src.GetTitle())
+			u.Statistics.RecordSkip(UpdateResult{
+				Title:      src.GetTitle(),
+				Status:     src.GetStatusString(),
+				Skipped:    true,
+				SkipReason: "in ignore list",
+			})
 			continue
 		}
 
@@ -78,38 +93,50 @@ func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target) {
 func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts map[TargetID]Target) {
 	tgtID := src.GetTargetID()
 
-	if !(*forceSync) { // filter sources by different progress with targets
+	if !(*forceSync) {
 		// Use strategy chain to find target
 		tgt, err := u.StrategyChain.FindTarget(ctx, src, tgts, u.Prefix)
 		if err != nil {
-			log.Printf("[%s] Error finding target: %v", u.Prefix, err)
-			u.Statistics.SkippedCount++
+			u.Logger.Debug("[%s] Error finding target: %v", u.Prefix, err)
+			u.Statistics.RecordSkip(UpdateResult{
+				Title:      src.GetTitle(),
+				Status:     src.GetStatusString(),
+				Skipped:    true,
+				SkipReason: "target not found",
+			})
 			return
 		}
 
-		DPrintf("[%s] Target: %s", u.Prefix, tgt.String())
+		u.Logger.Debug("[%s] Target: %s", u.Prefix, tgt.String())
 
 		if src.SameProgressWithTarget(tgt) {
-			u.Statistics.SkippedCount++
+			u.Logger.Debug("[%s] No changes needed, skipping", u.Prefix)
+			u.Statistics.RecordSkip(UpdateResult{
+				Title:      src.GetTitle(),
+				Status:     src.GetStatusString(),
+				Skipped:    true,
+				SkipReason: "no changes",
+			})
 			return
 		}
 
-		log.Printf("[%s] Src title: %s", u.Prefix, src.GetTitle())
-		log.Printf("[%s] Tgt title: %s", u.Prefix, tgt.GetTitle())
-		log.Printf("[%s] Progress is not same, need to update: %s", u.Prefix, src.GetStringDiffWithTarget(tgt))
+		// Debug logging for verbose mode - details of source and target
+		u.Logger.Debug("[%s] Source: %s", u.Prefix, src.GetTitle())
+		u.Logger.Debug("[%s] Target: %s", u.Prefix, tgt.GetTitle())
+		u.Logger.Debug("[%s] Diff: %s", u.Prefix, src.GetStringDiffWithTarget(tgt))
 
 		tgtID = tgt.GetTargetID()
 	}
 
-	if *dryRun { // skip update if dry run
-		log.Printf("[%s] Dry run: Skipping update for %s", u.Prefix, src.GetTitle())
+	if *dryRun {
+		u.Logger.Info("[%s] Dry run: Skipping update for %s", u.Prefix, src.GetTitle())
 		return
 	}
 
 	// Check for context cancellation before update operation
 	select {
 	case <-ctx.Done():
-		log.Printf("[%s] Context cancelled before update", u.Prefix)
+		u.Logger.Warn("[%s] Context cancelled before update", u.Prefix)
 		return
 	default:
 	}
@@ -118,19 +145,38 @@ func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts ma
 }
 
 func (u *Updater) updateTarget(ctx context.Context, id TargetID, src Source) {
-	DPrintf("[%s] Updating %s", u.Prefix, src.GetTitle())
+	u.Logger.Debug("[%s] Updating %s", u.Prefix, src.GetTitle())
 
 	if err := u.UpdateTargetBySourceFunc(ctx, id, src); err != nil {
-		log.Printf("[%s] Error updating target: %s: %v", u.Prefix, src.GetTitle(), err)
+		u.Statistics.RecordError(UpdateResult{
+			Title:  src.GetTitle(),
+			Status: src.GetStatusString(),
+			Error:  err,
+		})
+		u.Logger.Debug("[%s] Error updating %s: %v", u.Prefix, src.GetTitle(), err)
 		return
 	}
 
-	log.Printf("[%s] Updated %s (ID: %d)", u.Prefix, src.GetTitle(), id)
+	// Generate concise update message
+	detail := generateUpdateDetail(src)
 
-	u.Statistics.UpdatedCount++
+	u.Statistics.RecordUpdate(UpdateResult{
+		Title:  src.GetTitle(),
+		Detail: detail,
+		Status: src.GetStatusString(),
+	})
+
+	// Single-line success message (replaces 3-4 lines)
+	u.Logger.InfoUpdate(src.GetTitle(), detail)
+}
+
+// generateUpdateDetail generates a concise update detail string
+func generateUpdateDetail(src Source) string {
+	return fmt.Sprintf("(ID: %d)", src.GetTargetID())
 }
 
 func DPrintf(format string, v ...any) {
+	// Keep for backward compatibility - will be replaced with logger
 	if !(*verbose) {
 		return
 	}
