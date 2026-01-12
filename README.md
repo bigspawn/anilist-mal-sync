@@ -61,6 +61,18 @@ Follow the URLs printed in terminal.
 
 ### Step 4: Run
 
+#### Step 4.1: Run dry-run mode
+
+First, run dry-run mode to preview what will be synced without making actual changes.
+
+```bash
+docker-compose run --rm --service-ports sync sync --dry-run
+```
+
+#### Step 4.2: Run real synchronization
+
+After a successful dry-run, you can start the service with real sync:
+
 ```bash
 docker-compose up -d
 ```
