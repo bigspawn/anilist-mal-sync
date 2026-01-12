@@ -1156,3 +1156,134 @@ func TestInitToken_ContextCancelled(t *testing.T) {
 		t.Logf("InitToken() returned error (may be expected): %v", err)
 	}
 }
+
+// =============================================================================
+// Suite 6: Integration Tests - OAuth URL Defaults via Public API
+// =============================================================================
+
+func TestGetAuthURL_EnvConfigIncludesHost(t *testing.T) {
+	tests := []struct {
+		name         string
+		siteConfig   SiteConfig
+		expectedHost string
+		expectedPath string
+	}{
+		{
+			name: "AniList URL has correct host",
+			siteConfig: SiteConfig{
+				ClientID:     "test_id",
+				ClientSecret: "test_secret",
+				AuthURL:      "https://anilist.co/api/v2/oauth/authorize",
+				TokenURL:     "https://anilist.co/api/v2/oauth/token",
+			},
+			expectedHost: "anilist.co",
+			expectedPath: "/api/v2/oauth/authorize",
+		},
+		{
+			name: "MyAnimeList URL has correct host",
+			siteConfig: SiteConfig{
+				ClientID:     "test_id",
+				ClientSecret: "test_secret",
+				AuthURL:      "https://myanimelist.net/v1/oauth2/authorize",
+				TokenURL:     "https://myanimelist.net/v1/oauth2/token",
+			},
+			expectedHost: "myanimelist.net",
+			expectedPath: "/v1/oauth2/authorize",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			tokenPath := filepath.Join(tmpDir, "token.json")
+
+			oauth, err := NewOAuth(tt.siteConfig, "http://localhost:18080/callback", "test", []oauth2.AuthCodeOption{}, tokenPath)
+			if err != nil {
+				t.Fatalf("NewOAuth() error = %v", err)
+			}
+
+			authURL := oauth.GetAuthURL()
+
+			// Parse URL to verify structure
+			parsedURL, err := url.Parse(authURL)
+			if err != nil {
+				t.Fatalf("failed to parse auth URL: %v", err)
+			}
+
+			// Verify scheme and host (the bug was missing host)
+			if parsedURL.Scheme != "https" {
+				t.Errorf("URL scheme = %v, want https", parsedURL.Scheme)
+			}
+			if parsedURL.Host != tt.expectedHost {
+				t.Errorf("URL host = %v, want %v", parsedURL.Host, tt.expectedHost)
+			}
+			if parsedURL.Path != tt.expectedPath {
+				t.Errorf("URL path = %v, want %v", parsedURL.Path, tt.expectedPath)
+			}
+
+			// Verify URL doesn't start with '?' (the bug symptom from #26)
+			if strings.HasPrefix(authURL, "?") {
+				t.Errorf("authURL starts with '?', indicates missing host: %s", authURL)
+			}
+
+			// Verify URL contains expected prefix
+			if !strings.HasPrefix(authURL, tt.siteConfig.AuthURL) {
+				t.Errorf("authURL should start with %s, got: %s", tt.siteConfig.AuthURL, authURL)
+			}
+		})
+	}
+}
+
+func TestNewOAuth_EnvConfigEndpoints(t *testing.T) {
+	tests := []struct {
+		name             string
+		siteConfig       SiteConfig
+		expectedAuthURL  string
+		expectedTokenURL string
+	}{
+		{
+			name: "AniList endpoints configured correctly",
+			siteConfig: SiteConfig{
+				ClientID:     "test_id",
+				ClientSecret: "test_secret",
+				AuthURL:      "https://anilist.co/api/v2/oauth/authorize",
+				TokenURL:     "https://anilist.co/api/v2/oauth/token",
+			},
+			expectedAuthURL:  "https://anilist.co/api/v2/oauth/authorize",
+			expectedTokenURL: "https://anilist.co/api/v2/oauth/token",
+		},
+		{
+			name: "MyAnimeList endpoints configured correctly",
+			siteConfig: SiteConfig{
+				ClientID:     "test_id",
+				ClientSecret: "test_secret",
+				AuthURL:      "https://myanimelist.net/v1/oauth2/authorize",
+				TokenURL:     "https://myanimelist.net/v1/oauth2/token",
+			},
+			expectedAuthURL:  "https://myanimelist.net/v1/oauth2/authorize",
+			expectedTokenURL: "https://myanimelist.net/v1/oauth2/token",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			tokenPath := filepath.Join(tmpDir, "token.json")
+
+			oauth, err := NewOAuth(tt.siteConfig, "http://localhost:18080/callback", "test", []oauth2.AuthCodeOption{}, tokenPath)
+			if err != nil {
+				t.Fatalf("NewOAuth() error = %v", err)
+			}
+
+			// Verify Endpoint.AuthURL matches config
+			if oauth.Config.Endpoint.AuthURL != tt.expectedAuthURL {
+				t.Errorf("Endpoint.AuthURL = %v, want %v", oauth.Config.Endpoint.AuthURL, tt.expectedAuthURL)
+			}
+
+			// Verify Endpoint.TokenURL matches config
+			if oauth.Config.Endpoint.TokenURL != tt.expectedTokenURL {
+				t.Errorf("Endpoint.TokenURL = %v, want %v", oauth.Config.Endpoint.TokenURL, tt.expectedTokenURL)
+			}
+		})
+	}
+}

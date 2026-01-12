@@ -534,3 +534,520 @@ func TestLoadConfigFromEnv_CustomTokenPath(t *testing.T) {
 		t.Errorf("loadConfigFromEnv() TokenFilePath = %s, expected %s", cfg.TokenFilePath, customPath)
 	}
 }
+
+// =============================================================================
+// Suite 1: OAuth URL Defaults
+// =============================================================================
+
+func TestLoadConfigFromEnv_OAuthURLsHaveDefaults(t *testing.T) {
+	// Set required env vars
+	t.Setenv("ANILIST_CLIENT_ID", "test_anilist_id")
+	t.Setenv("ANILIST_USERNAME", "test_user")
+	t.Setenv("MAL_CLIENT_ID", "test_mal_id")
+	t.Setenv("MAL_USERNAME", "mal_user")
+
+	cfg, err := loadConfigFromEnv()
+	if err != nil {
+		t.Fatalf("loadConfigFromEnv() failed: %v", err)
+	}
+
+	// Verify AniList OAuth URLs
+	expectedAnilistAuthURL := "https://anilist.co/api/v2/oauth/authorize" // #nosec G101
+	expectedAnilistTokenURL := "https://anilist.co/api/v2/oauth/token"    // #nosec G101
+
+	if cfg.Anilist.AuthURL != expectedAnilistAuthURL {
+		t.Errorf("Anilist.AuthURL = %v, want %v", cfg.Anilist.AuthURL, expectedAnilistAuthURL)
+	}
+	if cfg.Anilist.TokenURL != expectedAnilistTokenURL {
+		t.Errorf("Anilist.TokenURL = %v, want %v", cfg.Anilist.TokenURL, expectedAnilistTokenURL)
+	}
+
+	// Verify MAL OAuth URLs
+	expectedMALAuthURL := "https://myanimelist.net/v1/oauth2/authorize" // #nosec G101
+	expectedMALTokenURL := "https://myanimelist.net/v1/oauth2/token"    // #nosec G101
+
+	if cfg.MyAnimeList.AuthURL != expectedMALAuthURL {
+		t.Errorf("MyAnimeList.AuthURL = %v, want %v", cfg.MyAnimeList.AuthURL, expectedMALAuthURL)
+	}
+	if cfg.MyAnimeList.TokenURL != expectedMALTokenURL {
+		t.Errorf("MyAnimeList.TokenURL = %v, want %v", cfg.MyAnimeList.TokenURL, expectedMALTokenURL)
+	}
+}
+
+// =============================================================================
+// Suite 2: Required Fields - Single Missing
+// =============================================================================
+
+func TestLoadConfigFromEnv_MissingAnilistClientID(t *testing.T) {
+	t.Setenv("ANILIST_CLIENT_ID", "")
+	t.Setenv("ANILIST_USERNAME", "test_user")
+	t.Setenv("MAL_CLIENT_ID", "mal_id")
+	t.Setenv("MAL_USERNAME", "mal_user")
+
+	cfg, err := loadConfigFromEnv()
+	if err != nil {
+		t.Fatalf("loadConfigFromEnv() failed: %v", err)
+	}
+
+	err = validateConfig(cfg)
+	if err == nil {
+		t.Error("validateConfig() should return error when ANILIST_CLIENT_ID is missing")
+	}
+}
+
+func TestLoadConfigFromEnv_MissingAnilistUsername(t *testing.T) {
+	t.Setenv("ANILIST_CLIENT_ID", "test_id")
+	t.Setenv("ANILIST_USERNAME", "")
+	t.Setenv("MAL_CLIENT_ID", "mal_id")
+	t.Setenv("MAL_USERNAME", "mal_user")
+
+	cfg, err := loadConfigFromEnv()
+	if err != nil {
+		t.Fatalf("loadConfigFromEnv() failed: %v", err)
+	}
+
+	err = validateConfig(cfg)
+	if err == nil {
+		t.Error("validateConfig() should return error when ANILIST_USERNAME is missing")
+	}
+}
+
+func TestLoadConfigFromEnv_MissingMALClientID(t *testing.T) {
+	t.Setenv("ANILIST_CLIENT_ID", "test_id")
+	t.Setenv("ANILIST_USERNAME", "test_user")
+	t.Setenv("MAL_CLIENT_ID", "")
+	t.Setenv("MAL_USERNAME", "mal_user")
+
+	cfg, err := loadConfigFromEnv()
+	if err != nil {
+		t.Fatalf("loadConfigFromEnv() failed: %v", err)
+	}
+
+	err = validateConfig(cfg)
+	if err == nil {
+		t.Error("validateConfig() should return error when MAL_CLIENT_ID is missing")
+	}
+}
+
+func TestLoadConfigFromEnv_MissingMALUsername(t *testing.T) {
+	t.Setenv("ANILIST_CLIENT_ID", "test_id")
+	t.Setenv("ANILIST_USERNAME", "test_user")
+	t.Setenv("MAL_CLIENT_ID", "mal_id")
+	t.Setenv("MAL_USERNAME", "")
+
+	cfg, err := loadConfigFromEnv()
+	if err != nil {
+		t.Fatalf("loadConfigFromEnv() failed: %v", err)
+	}
+
+	err = validateConfig(cfg)
+	if err == nil {
+		t.Error("validateConfig() should return error when MAL_USERNAME is missing")
+	}
+}
+
+// =============================================================================
+// Suite 3: Required Fields - Multiple Missing
+// =============================================================================
+
+func TestLoadConfigFromEnv_AllRequiredFieldsMissing(t *testing.T) {
+	t.Setenv("ANILIST_CLIENT_ID", "")
+	t.Setenv("ANILIST_USERNAME", "")
+	t.Setenv("MAL_CLIENT_ID", "")
+	t.Setenv("MAL_USERNAME", "")
+
+	cfg, err := loadConfigFromEnv()
+	if err != nil {
+		t.Fatalf("loadConfigFromEnv() failed: %v", err)
+	}
+
+	err = validateConfig(cfg)
+	if err == nil {
+		t.Error("validateConfig() should return error when all required fields are missing")
+	}
+}
+
+func TestLoadConfigFromEnv_ThreeRequiredFieldsMissing(t *testing.T) {
+	tests := []struct {
+		name           string
+		setAnilistID   bool
+		setAnilistUser bool
+		setMALID       bool
+		setMALUser     bool
+	}{
+		{"Only ANILIST_CLIENT_ID set", true, false, false, false},
+		{"Only ANILIST_USERNAME set", false, true, false, false},
+		{"Only MAL_CLIENT_ID set", false, false, true, false},
+		{"Only MAL_USERNAME set", false, false, false, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("ANILIST_CLIENT_ID", "")
+			t.Setenv("ANILIST_USERNAME", "")
+			t.Setenv("MAL_CLIENT_ID", "")
+			t.Setenv("MAL_USERNAME", "")
+
+			if tt.setAnilistID {
+				t.Setenv("ANILIST_CLIENT_ID", "test_id")
+			}
+			if tt.setAnilistUser {
+				t.Setenv("ANILIST_USERNAME", "test_user")
+			}
+			if tt.setMALID {
+				t.Setenv("MAL_CLIENT_ID", "mal_id")
+			}
+			if tt.setMALUser {
+				t.Setenv("MAL_USERNAME", "mal_user")
+			}
+
+			cfg, err := loadConfigFromEnv()
+			if err != nil {
+				t.Fatalf("loadConfigFromEnv() failed: %v", err)
+			}
+
+			err = validateConfig(cfg)
+			if err == nil {
+				t.Error("validateConfig() should return error when 3 of 4 required fields are missing")
+			}
+		})
+	}
+}
+
+func TestLoadConfigFromEnv_TwoRequiredFieldsMissing(t *testing.T) {
+	tests := []struct {
+		name           string
+		setAnilistID   bool
+		setAnilistUser bool
+		setMALID       bool
+		setMALUser     bool
+	}{
+		{"ANILIST_CLIENT_ID + ANILIST_USERNAME missing", false, false, true, true},
+		{"ANILIST_CLIENT_ID + MAL_CLIENT_ID missing", false, true, false, true},
+		{"ANILIST_CLIENT_ID + MAL_USERNAME missing", false, true, true, false},
+		{"ANILIST_USERNAME + MAL_CLIENT_ID missing", true, false, false, true},
+		{"ANILIST_USERNAME + MAL_USERNAME missing", true, false, true, false},
+		{"MAL_CLIENT_ID + MAL_USERNAME missing", true, true, false, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("ANILIST_CLIENT_ID", "")
+			t.Setenv("ANILIST_USERNAME", "")
+			t.Setenv("MAL_CLIENT_ID", "")
+			t.Setenv("MAL_USERNAME", "")
+
+			if tt.setAnilistID {
+				t.Setenv("ANILIST_CLIENT_ID", "test_id")
+			}
+			if tt.setAnilistUser {
+				t.Setenv("ANILIST_USERNAME", "test_user")
+			}
+			if tt.setMALID {
+				t.Setenv("MAL_CLIENT_ID", "mal_id")
+			}
+			if tt.setMALUser {
+				t.Setenv("MAL_USERNAME", "mal_user")
+			}
+
+			cfg, err := loadConfigFromEnv()
+			if err != nil {
+				t.Fatalf("loadConfigFromEnv() failed: %v", err)
+			}
+
+			err = validateConfig(cfg)
+			if err == nil {
+				t.Error("validateConfig() should return error when 2 of 4 required fields are missing")
+			}
+		})
+	}
+}
+
+func TestLoadConfigFromEnv_OneSiteConfigMissing(t *testing.T) {
+	tests := []struct {
+		name           string
+		setAnilistID   bool
+		setAnilistUser bool
+		setMALID       bool
+		setMALUser     bool
+		expectError    bool
+	}{
+		{"All AniList missing (MAL set)", false, false, true, true, true},
+		{"All MAL missing (AniList set)", true, true, false, false, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("ANILIST_CLIENT_ID", "")
+			t.Setenv("ANILIST_USERNAME", "")
+			t.Setenv("MAL_CLIENT_ID", "")
+			t.Setenv("MAL_USERNAME", "")
+
+			if tt.setAnilistID {
+				t.Setenv("ANILIST_CLIENT_ID", "test_id")
+			}
+			if tt.setAnilistUser {
+				t.Setenv("ANILIST_USERNAME", "test_user")
+			}
+			if tt.setMALID {
+				t.Setenv("MAL_CLIENT_ID", "mal_id")
+			}
+			if tt.setMALUser {
+				t.Setenv("MAL_USERNAME", "mal_user")
+			}
+
+			cfg, err := loadConfigFromEnv()
+			if err != nil {
+				t.Fatalf("loadConfigFromEnv() failed: %v", err)
+			}
+
+			err = validateConfig(cfg)
+			if (err != nil) != tt.expectError {
+				t.Errorf("validateConfig() error = %v, expectError %v", err, tt.expectError)
+			}
+		})
+	}
+}
+
+// =============================================================================
+// Suite 4: Optional Fields
+// =============================================================================
+
+func TestLoadConfigFromEnv_NoOptionalFields(t *testing.T) {
+	// Set only required fields
+	t.Setenv("ANILIST_CLIENT_ID", "test_id")
+	t.Setenv("ANILIST_USERNAME", "test_user")
+	t.Setenv("MAL_CLIENT_ID", "mal_id")
+	t.Setenv("MAL_USERNAME", "mal_user")
+
+	// Clear optional fields
+	t.Setenv("ANILIST_CLIENT_SECRET", "")
+	t.Setenv("MAL_CLIENT_SECRET", "")
+	t.Setenv("OAUTH_PORT", "")
+	t.Setenv("OAUTH_REDIRECT_URI", "")
+	t.Setenv("WATCH_INTERVAL", "")
+
+	cfg, err := loadConfigFromEnv()
+	if err != nil {
+		t.Fatalf("loadConfigFromEnv() failed: %v", err)
+	}
+
+	// Verify defaults
+	if cfg.OAuth.Port != "18080" {
+		t.Errorf("OAuth.Port = %v, want 18080", cfg.OAuth.Port)
+	}
+	if cfg.OAuth.RedirectURI != "http://localhost:18080/callback" {
+		t.Errorf("OAuth.RedirectURI = %v, want http://localhost:18080/callback", cfg.OAuth.RedirectURI)
+	}
+	if cfg.Anilist.ClientSecret != "" {
+		t.Errorf("Anilist.ClientSecret = %v, want empty", cfg.Anilist.ClientSecret)
+	}
+	if cfg.MyAnimeList.ClientSecret != "" {
+		t.Errorf("MyAnimeList.ClientSecret = %v, want empty", cfg.MyAnimeList.ClientSecret)
+	}
+	if cfg.Watch.Interval != "" {
+		t.Errorf("Watch.Interval = %v, want empty", cfg.Watch.Interval)
+	}
+	// TokenFilePath should have default value
+	if cfg.TokenFilePath == "" {
+		t.Error("TokenFilePath should have default value")
+	}
+}
+
+func TestLoadConfigFromEnv_AllOptionalFieldsSet(t *testing.T) {
+	// Set required fields
+	t.Setenv("ANILIST_CLIENT_ID", "test_id")
+	t.Setenv("ANILIST_USERNAME", "test_user")
+	t.Setenv("MAL_CLIENT_ID", "mal_id")
+	t.Setenv("MAL_USERNAME", "mal_user")
+
+	// Set all optional fields
+	t.Setenv("ANILIST_CLIENT_SECRET", "anilist_secret")
+	t.Setenv("MAL_CLIENT_SECRET", "mal_secret")
+	t.Setenv("OAUTH_PORT", "9999")
+	t.Setenv("OAUTH_REDIRECT_URI", "http://example.com/callback")
+	t.Setenv("WATCH_INTERVAL", "12h")
+	t.Setenv("TOKEN_FILE_PATH", "/custom/path/tokens.json")
+
+	cfg, err := loadConfigFromEnv()
+	if err != nil {
+		t.Fatalf("loadConfigFromEnv() failed: %v", err)
+	}
+
+	// Verify all values match env vars
+	if cfg.Anilist.ClientSecret != "anilist_secret" {
+		t.Errorf("Anilist.ClientSecret = %v, want anilist_secret", cfg.Anilist.ClientSecret)
+	}
+	if cfg.MyAnimeList.ClientSecret != "mal_secret" {
+		t.Errorf("MyAnimeList.ClientSecret = %v, want mal_secret", cfg.MyAnimeList.ClientSecret)
+	}
+	if cfg.OAuth.Port != "9999" {
+		t.Errorf("OAuth.Port = %v, want 9999", cfg.OAuth.Port)
+	}
+	if cfg.OAuth.RedirectURI != "http://example.com/callback" {
+		t.Errorf("OAuth.RedirectURI = %v, want http://example.com/callback", cfg.OAuth.RedirectURI)
+	}
+	if cfg.Watch.Interval != "12h" {
+		t.Errorf("Watch.Interval = %v, want 12h", cfg.Watch.Interval)
+	}
+	if cfg.TokenFilePath != "/custom/path/tokens.json" {
+		t.Errorf("TokenFilePath = %v, want /custom/path/tokens.json", cfg.TokenFilePath)
+	}
+}
+
+func TestLoadConfigFromEnv_AnilistClientSecretOptional(t *testing.T) {
+	t.Setenv("ANILIST_CLIENT_ID", "test_id")
+	t.Setenv("ANILIST_USERNAME", "test_user")
+	t.Setenv("MAL_CLIENT_ID", "mal_id")
+	t.Setenv("MAL_USERNAME", "mal_user")
+	t.Setenv("ANILIST_CLIENT_SECRET", "")
+
+	cfg, err := loadConfigFromEnv()
+	if err != nil {
+		t.Fatalf("loadConfigFromEnv() failed: %v", err)
+	}
+
+	// Should succeed with empty ClientSecret
+	err = validateConfig(cfg)
+	if err != nil {
+		t.Errorf("validateConfig() should succeed without ANILIST_CLIENT_SECRET: %v", err)
+	}
+	if cfg.Anilist.ClientSecret != "" {
+		t.Errorf("Anilist.ClientSecret = %v, want empty", cfg.Anilist.ClientSecret)
+	}
+}
+
+func TestLoadConfigFromEnv_MALClientSecretOptional(t *testing.T) {
+	t.Setenv("ANILIST_CLIENT_ID", "test_id")
+	t.Setenv("ANILIST_USERNAME", "test_user")
+	t.Setenv("MAL_CLIENT_ID", "mal_id")
+	t.Setenv("MAL_USERNAME", "mal_user")
+	t.Setenv("MAL_CLIENT_SECRET", "")
+
+	cfg, err := loadConfigFromEnv()
+	if err != nil {
+		t.Fatalf("loadConfigFromEnv() failed: %v", err)
+	}
+
+	// Should succeed with empty ClientSecret
+	err = validateConfig(cfg)
+	if err != nil {
+		t.Errorf("validateConfig() should succeed without MAL_CLIENT_SECRET: %v", err)
+	}
+	if cfg.MyAnimeList.ClientSecret != "" {
+		t.Errorf("MyAnimeList.ClientSecret = %v, want empty", cfg.MyAnimeList.ClientSecret)
+	}
+}
+
+// =============================================================================
+// Suite 5: Edge Cases
+// =============================================================================
+
+func TestLoadConfigFromEnv_PORTPrecedence(t *testing.T) {
+	t.Setenv("ANILIST_CLIENT_ID", "test_id")
+	t.Setenv("ANILIST_USERNAME", "test_user")
+	t.Setenv("MAL_CLIENT_ID", "mal_id")
+	t.Setenv("MAL_USERNAME", "mal_user")
+
+	// Set both PORT and OAUTH_PORT
+	t.Setenv("PORT", "9999")
+	t.Setenv("OAUTH_PORT", "8888")
+
+	cfg, err := loadConfigFromEnv()
+	if err != nil {
+		t.Fatalf("loadConfigFromEnv() failed: %v", err)
+	}
+
+	// OAUTH_PORT takes precedence (getEnvOrDefault checks OAUTH_PORT first)
+	if cfg.OAuth.Port != "8888" {
+		t.Errorf("OAuth.Port = %v, want 8888 (OAUTH_PORT takes precedence)", cfg.OAuth.Port)
+	}
+}
+
+func TestLoadConfigFromEnv_OnlyPORTSet(t *testing.T) {
+	t.Setenv("ANILIST_CLIENT_ID", "test_id")
+	t.Setenv("ANILIST_USERNAME", "test_user")
+	t.Setenv("MAL_CLIENT_ID", "mal_id")
+	t.Setenv("MAL_USERNAME", "mal_user")
+
+	// Set only PORT (not OAUTH_PORT)
+	t.Setenv("PORT", "7777")
+	t.Setenv("OAUTH_PORT", "")
+
+	cfg, err := loadConfigFromEnv()
+	if err != nil {
+		t.Fatalf("loadConfigFromEnv() failed: %v", err)
+	}
+
+	if cfg.OAuth.Port != "7777" {
+		t.Errorf("OAuth.Port = %v, want 7777", cfg.OAuth.Port)
+	}
+}
+
+func TestLoadConfigFromEnv_LegacyAnilistSecretFallback(t *testing.T) {
+	t.Setenv("ANILIST_CLIENT_ID", "test_id")
+	t.Setenv("ANILIST_USERNAME", "test_user")
+	t.Setenv("MAL_CLIENT_ID", "mal_id")
+	t.Setenv("MAL_USERNAME", "mal_user")
+
+	// Set only legacy env var (not the new one)
+	t.Setenv("ANILIST_CLIENT_SECRET", "")
+	t.Setenv("CLIENT_SECRET_ANILIST", "legacy_secret")
+
+	cfg, err := loadConfigFromEnv()
+	if err != nil {
+		t.Fatalf("loadConfigFromEnv() failed: %v", err)
+	}
+
+	// loadConfigFromEnv() does NOT support legacy fallback
+	// It only reads from ANILIST_CLIENT_SECRET directly
+	if cfg.Anilist.ClientSecret != "" {
+		t.Errorf("Anilist.ClientSecret = %v, want empty (loadConfigFromEnv doesn't support legacy fallback)", cfg.Anilist.ClientSecret)
+	}
+}
+
+func TestLoadConfigFromEnv_LegacyMALSecretFallback(t *testing.T) {
+	t.Setenv("ANILIST_CLIENT_ID", "test_id")
+	t.Setenv("ANILIST_USERNAME", "test_user")
+	t.Setenv("MAL_CLIENT_ID", "mal_id")
+	t.Setenv("MAL_USERNAME", "mal_user")
+
+	// Set only legacy env var (not the new one)
+	t.Setenv("MAL_CLIENT_SECRET", "")
+	t.Setenv("CLIENT_SECRET_MYANIMELIST", "legacy_secret")
+
+	cfg, err := loadConfigFromEnv()
+	if err != nil {
+		t.Fatalf("loadConfigFromEnv() failed: %v", err)
+	}
+
+	// loadConfigFromEnv() does NOT support legacy fallback
+	// It only reads from MAL_CLIENT_SECRET directly
+	if cfg.MyAnimeList.ClientSecret != "" {
+		t.Errorf("MyAnimeList.ClientSecret = %v, want empty (loadConfigFromEnv doesn't support legacy fallback)", cfg.MyAnimeList.ClientSecret)
+	}
+}
+
+func TestLoadConfigFromEnv_NewSecretPrecedence(t *testing.T) {
+	t.Setenv("ANILIST_CLIENT_ID", "test_id")
+	t.Setenv("ANILIST_USERNAME", "test_user")
+	t.Setenv("MAL_CLIENT_ID", "mal_id")
+	t.Setenv("MAL_USERNAME", "mal_user")
+
+	// Set only new env vars (legacy not set)
+	t.Setenv("ANILIST_CLIENT_SECRET", "new_secret")
+	t.Setenv("MAL_CLIENT_SECRET", "new_mal_secret")
+
+	cfg, err := loadConfigFromEnv()
+	if err != nil {
+		t.Fatalf("loadConfigFromEnv() failed: %v", err)
+	}
+
+	// Should use the new value
+	if cfg.Anilist.ClientSecret != "new_secret" {
+		t.Errorf("Anilist.ClientSecret = %v, want new_secret", cfg.Anilist.ClientSecret)
+	}
+	if cfg.MyAnimeList.ClientSecret != "new_mal_secret" {
+		t.Errorf("MyAnimeList.ClientSecret = %v, want new_mal_secret", cfg.MyAnimeList.ClientSecret)
+	}
+}
