@@ -447,15 +447,13 @@ func newAnimeFromMalAnime(malAnime mal.Anime) (Anime, error) {
 	}
 
 	// Log MAL API response for debugging
-	if *verbose {
-		log.Printf("[DEBUG] MAL API response for %s (ID %d): status=%s, score=%d, progress=%d, start=%s, end=%s",
-			titleEN, malAnime.ID,
-			malAnime.MyListStatus.Status,
-			malAnime.MyListStatus.Score,
-			malAnime.MyListStatus.NumEpisodesWatched,
-			malAnime.MyListStatus.StartDate,
-			malAnime.MyListStatus.FinishDate)
-	}
+	DPrintf("[DEBUG] MAL API response for %s (ID %d): status=%s, score=%d, progress=%d, start=%s, end=%s",
+		titleEN, malAnime.ID,
+		malAnime.MyListStatus.Status,
+		malAnime.MyListStatus.Score,
+		malAnime.MyListStatus.NumEpisodesWatched,
+		malAnime.MyListStatus.StartDate,
+		malAnime.MyListStatus.FinishDate)
 
 	// In reverse sync mode, we need to leave AniList ID as 0 so the updater can find it by name
 	anilistID := -1
