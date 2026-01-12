@@ -364,6 +364,7 @@ func (a *App) performSync(ctx context.Context, mediaType string, reverse bool, u
 
 	updater.Update(ctx, srcs, tgts)
 	updater.Statistics.Print(updater.Prefix)
+	updater.Statistics.Reset()
 
 	return nil
 }
