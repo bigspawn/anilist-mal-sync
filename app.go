@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/rl404/verniy"
 )
@@ -23,39 +22,39 @@ type App struct {
 
 // NewApp creates a new App instance with configured clients and updaters
 func NewApp(ctx context.Context, config Config) (*App, error) {
+	LogStage(ctx, "Initializing...")
+
 	oauthMAL, err := NewMyAnimeListOAuth(ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating mal oauth: %w", err)
 	}
-
-	log.Println("Got MAL token")
+	LogDebug(ctx, "Got MAL token")
 
 	malClient := NewMyAnimeListClient(ctx, oauthMAL, config.MyAnimeList.Username, config.GetHTTPTimeout())
-
-	log.Println("MAL client created")
+	LogDebug(ctx, "MAL client created")
 
 	oauthAnilist, err := NewAnilistOAuth(ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating anilist oauth: %w", err)
 	}
-
-	log.Println("Got Anilist token")
+	LogDebug(ctx, "Got Anilist token")
 
 	anilistClient := NewAnilistClient(ctx, oauthAnilist, config.Anilist.Username, config.GetHTTPTimeout())
-
-	log.Println("Anilist client created")
+	LogDebug(ctx, "Anilist client created")
 
 	scoreFormat, err := anilistClient.GetUserScoreFormat(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error getting user score format: %w", err)
 	}
-	log.Printf("AniList score format: %s", scoreFormat)
+	LogDebug(ctx, "AniList score format: %s", scoreFormat)
 
 	// Create updaters using helper functions
-	animeUpdater := newAnimeUpdater(malClient)
-	mangaUpdater := newMangaUpdater(malClient)
-	reverseAnimeUpdater := newReverseAnimeUpdater(anilistClient, scoreFormat)
-	reverseMangaUpdater := newReverseMangaUpdater(anilistClient, scoreFormat)
+	animeUpdater := newAnimeUpdater(ctx, malClient)
+	mangaUpdater := newMangaUpdater(ctx, malClient)
+	reverseAnimeUpdater := newReverseAnimeUpdater(ctx, anilistClient, scoreFormat)
+	reverseMangaUpdater := newReverseMangaUpdater(ctx, anilistClient, scoreFormat)
+
+	LogInfoSuccess(ctx, "Initialization complete")
 
 	return &App{
 		config:              config,
@@ -71,10 +70,12 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 
 // Helper functions to create updaters - reduces NewApp complexity
 
-func newAnimeUpdater(malClient *MyAnimeListClient) *Updater {
+//nolint:dupl // Similar structure to newMangaUpdater (anime vs manga)
+func newAnimeUpdater(ctx context.Context, malClient *MyAnimeListClient) *Updater {
+	logger := LoggerFromContext(ctx)
 	return &Updater{
 		Prefix:     "AniList to MAL Anime",
-		Statistics: new(Statistics),
+		Statistics: NewStatistics(logger),
 		IgnoreTitles: map[string]struct{}{
 			"scott pilgrim takes off":       {},
 			"bocchi the rock! recap part 2": {},
@@ -116,11 +117,16 @@ func newAnimeUpdater(malClient *MyAnimeListClient) *Updater {
 	}
 }
 
-func newMangaUpdater(malClient *MyAnimeListClient) *Updater {
+//nolint:dupl // Similar structure to newAnimeUpdater (manga vs anime)
+func newMangaUpdater(ctx context.Context, malClient *MyAnimeListClient) *Updater {
+	logger := LoggerFromContext(ctx)
 	return &Updater{
-		Prefix:       "AniList to MAL Manga",
-		Statistics:   new(Statistics),
-		IgnoreTitles: map[string]struct{}{},
+		Prefix:     "AniList to MAL Manga",
+		Statistics: NewStatistics(logger),
+		IgnoreTitles: map[string]struct{}{
+			"scott pilgrim takes off":       {},
+			"bocchi the rock! recap part 2": {},
+		},
 		StrategyChain: NewStrategyChain(
 			IDStrategy{},
 			TitleStrategy{},
@@ -159,11 +165,15 @@ func newMangaUpdater(malClient *MyAnimeListClient) *Updater {
 }
 
 //nolint:dupl // Similar structure to newReverseMangaUpdater (anime vs manga)
-func newReverseAnimeUpdater(anilistClient *AnilistClient, scoreFormat verniy.ScoreFormat) *Updater {
+func newReverseAnimeUpdater(ctx context.Context, anilistClient *AnilistClient, scoreFormat verniy.ScoreFormat) *Updater {
+	logger := LoggerFromContext(ctx)
 	return &Updater{
-		Prefix:       "MAL to AniList Anime",
-		Statistics:   new(Statistics),
-		IgnoreTitles: map[string]struct{}{},
+		Prefix:     "MAL to AniList Anime",
+		Statistics: NewStatistics(logger),
+		IgnoreTitles: map[string]struct{}{
+			"scott pilgrim takes off":       {},
+			"bocchi the rock! recap part 2": {},
+		},
 		StrategyChain: NewStrategyChain(
 			IDStrategy{},
 			TitleStrategy{},
@@ -222,11 +232,15 @@ func newReverseAnimeUpdater(anilistClient *AnilistClient, scoreFormat verniy.Sco
 }
 
 //nolint:dupl // Similar structure to newReverseAnimeUpdater (manga vs anime)
-func newReverseMangaUpdater(anilistClient *AnilistClient, scoreFormat verniy.ScoreFormat) *Updater {
+func newReverseMangaUpdater(ctx context.Context, anilistClient *AnilistClient, scoreFormat verniy.ScoreFormat) *Updater {
+	logger := LoggerFromContext(ctx)
 	return &Updater{
-		Prefix:       "MAL to AniList Manga",
-		Statistics:   new(Statistics),
-		IgnoreTitles: map[string]struct{}{},
+		Prefix:     "MAL to AniList Manga",
+		Statistics: NewStatistics(logger),
+		IgnoreTitles: map[string]struct{}{
+			"scott pilgrim takes off":       {},
+			"bocchi the rock! recap part 2": {},
+		},
 		StrategyChain: NewStrategyChain(
 			IDStrategy{},
 			TitleStrategy{},
@@ -383,7 +397,7 @@ func (a *App) fetchData(ctx context.Context, mediaType string, fromAnilist bool,
 // these flows separate for clarity and to make each sync direction easier
 // to reason about, even though this may trigger dupl linter warnings.
 func (a *App) fetchFromAnilistToMAL(ctx context.Context, mediaType string, prefix string) ([]Source, []Target, error) {
-	log.Printf("[%s] Fetching AniList...", prefix)
+	LogDebug(ctx, "[%s] Fetching AniList...", prefix)
 
 	if mediaType == "anime" {
 		srcList, err := a.anilist.GetUserAnimeList(ctx)
@@ -391,7 +405,7 @@ func (a *App) fetchFromAnilistToMAL(ctx context.Context, mediaType string, prefi
 			return nil, nil, fmt.Errorf("error getting user anime list from anilist: %w", err)
 		}
 
-		log.Printf("[%s] Fetching MAL...", prefix)
+		LogDebug(ctx, "[%s] Fetching MAL...", prefix)
 		tgtList, err := a.mal.GetUserAnimeList(ctx)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error getting user anime list from mal: %w", err)
@@ -400,8 +414,7 @@ func (a *App) fetchFromAnilistToMAL(ctx context.Context, mediaType string, prefi
 		srcs := newSourcesFromAnimes(newAnimesFromMediaListGroups(srcList, a.anilistScoreFormat))
 		tgts := newTargetsFromAnimes(newAnimesFromMalUserAnimes(tgtList))
 
-		log.Printf("[%s] Got %d from AniList", prefix, len(srcs))
-		log.Printf("[%s] Got %d from Mal", prefix, len(tgts))
+		LogDebug(ctx, "[%s] Got %d from AniList, %d from MAL", prefix, len(srcs), len(tgts))
 
 		return srcs, tgts, nil
 	}
@@ -412,7 +425,7 @@ func (a *App) fetchFromAnilistToMAL(ctx context.Context, mediaType string, prefi
 		return nil, nil, fmt.Errorf("error getting user manga list from anilist: %w", err)
 	}
 
-	log.Printf("[%s] Fetching MAL...", prefix)
+	LogDebug(ctx, "[%s] Fetching MAL...", prefix)
 	tgtList, err := a.mal.GetUserMangaList(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error getting user manga list from mal: %w", err)
@@ -421,8 +434,7 @@ func (a *App) fetchFromAnilistToMAL(ctx context.Context, mediaType string, prefi
 	srcs := newSourcesFromMangas(newMangasFromMediaListGroups(srcList, a.anilistScoreFormat))
 	tgts := newTargetsFromMangas(newMangasFromMalUserMangas(tgtList))
 
-	log.Printf("[%s] Got %d from AniList", prefix, len(srcs))
-	log.Printf("[%s] Got %d from Mal", prefix, len(tgts))
+	LogDebug(ctx, "[%s] Got %d from AniList, %d from MAL", prefix, len(srcs), len(tgts))
 
 	return srcs, tgts, nil
 }
@@ -431,7 +443,7 @@ func (a *App) fetchFromAnilistToMAL(ctx context.Context, mediaType string, prefi
 // The structure of this function intentionally mirrors fetchFromAnilistToMAL
 // to keep the two sync directions explicit and symmetrical.
 func (a *App) fetchFromMALToAnilist(ctx context.Context, mediaType string, prefix string) ([]Source, []Target, error) {
-	log.Printf("[%s] Fetching MAL...", prefix)
+	LogDebug(ctx, "[%s] Fetching MAL...", prefix)
 
 	if mediaType == "anime" {
 		srcList, err := a.mal.GetUserAnimeList(ctx)
@@ -439,7 +451,7 @@ func (a *App) fetchFromMALToAnilist(ctx context.Context, mediaType string, prefi
 			return nil, nil, fmt.Errorf("error getting user anime list from mal: %w", err)
 		}
 
-		log.Printf("[%s] Fetching AniList...", prefix)
+		LogDebug(ctx, "[%s] Fetching AniList...", prefix)
 		tgtList, err := a.anilist.GetUserAnimeList(ctx)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error getting user anime list from anilist: %w", err)
@@ -448,8 +460,7 @@ func (a *App) fetchFromMALToAnilist(ctx context.Context, mediaType string, prefi
 		srcs := newSourcesFromAnimes(newAnimesFromMalUserAnimes(srcList))
 		tgts := newTargetsFromAnimes(newAnimesFromMediaListGroups(tgtList, a.anilistScoreFormat))
 
-		log.Printf("[%s] Got %d from MAL", prefix, len(srcs))
-		log.Printf("[%s] Got %d from AniList", prefix, len(tgts))
+		LogDebug(ctx, "[%s] Got %d from MAL, %d from AniList", prefix, len(srcs), len(tgts))
 
 		return srcs, tgts, nil
 	}
@@ -460,7 +471,7 @@ func (a *App) fetchFromMALToAnilist(ctx context.Context, mediaType string, prefi
 		return nil, nil, fmt.Errorf("error getting user manga list from mal: %w", err)
 	}
 
-	log.Printf("[%s] Fetching AniList...", prefix)
+	LogDebug(ctx, "[%s] Fetching AniList...", prefix)
 	tgtList, err := a.anilist.GetUserMangaList(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error getting user manga list from anilist: %w", err)
@@ -469,8 +480,7 @@ func (a *App) fetchFromMALToAnilist(ctx context.Context, mediaType string, prefi
 	srcs := newSourcesFromMangas(newMangasFromMalUserMangas(srcList))
 	tgts := newTargetsFromMangas(newMangasFromMediaListGroups(tgtList, a.anilistScoreFormat))
 
-	log.Printf("[%s] Got %d from MAL", prefix, len(srcs))
-	log.Printf("[%s] Got %d from AniList", prefix, len(tgts))
+	LogDebug(ctx, "[%s] Got %d from MAL, %d from AniList", prefix, len(srcs), len(tgts))
 
 	return srcs, tgts, nil
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -154,4 +155,93 @@ func isTerminal() bool {
 	// Simple check - if stdout is a terminal
 	fileInfo, _ := os.Stdout.Stat()
 	return (fileInfo.Mode() & os.ModeCharDevice) != 0
+}
+
+// contextKey is a custom type for context keys to avoid collisions
+type contextKey string
+
+const loggerKey contextKey = "logger"
+
+// WithContext returns a new context with the logger embedded
+func (l *Logger) WithContext(ctx context.Context) context.Context {
+	return context.WithValue(ctx, loggerKey, l)
+}
+
+// LoggerFromContext retrieves the logger from the context
+// Returns nil if no logger is set in the context
+func LoggerFromContext(ctx context.Context) *Logger {
+	if logger, ok := ctx.Value(loggerKey).(*Logger); ok {
+		return logger
+	}
+	return nil
+}
+
+// LogInfo logs an informational message using the logger from context
+func LogInfo(ctx context.Context, format string, args ...interface{}) {
+	if logger := LoggerFromContext(ctx); logger != nil {
+		logger.Info(format, args...)
+	}
+}
+
+// LogInfoSuccess logs a success message using the logger from context
+func LogInfoSuccess(ctx context.Context, format string, args ...interface{}) {
+	if logger := LoggerFromContext(ctx); logger != nil {
+		logger.InfoSuccess(format, args...)
+	}
+}
+
+// LogInfoUpdate logs an update operation using the logger from context
+func LogInfoUpdate(ctx context.Context, title, detail string) {
+	if logger := LoggerFromContext(ctx); logger != nil {
+		logger.InfoUpdate(title, detail)
+	}
+}
+
+// LogWarn logs a warning using the logger from context
+func LogWarn(ctx context.Context, format string, args ...interface{}) {
+	if logger := LoggerFromContext(ctx); logger != nil {
+		logger.Warn(format, args...)
+	}
+}
+
+// LogError logs an error using the logger from context
+func LogError(ctx context.Context, format string, args ...interface{}) {
+	if logger := LoggerFromContext(ctx); logger != nil {
+		logger.Error(format, args...)
+	}
+}
+
+// LogDebug logs debug information using the logger from context
+func LogDebug(ctx context.Context, format string, args ...interface{}) {
+	if logger := LoggerFromContext(ctx); logger != nil {
+		logger.Debug(format, args...)
+	}
+}
+
+// LogDebugDecision logs decision logic using the logger from context
+func LogDebugDecision(ctx context.Context, format string, args ...interface{}) {
+	if logger := LoggerFromContext(ctx); logger != nil {
+		logger.DebugDecision(format, args...)
+	}
+}
+
+// LogDebugHTTP logs HTTP requests/responses using the logger from context
+func LogDebugHTTP(ctx context.Context, format string, args ...interface{}) {
+	if logger := LoggerFromContext(ctx); logger != nil {
+		logger.DebugHTTP(format, args...)
+	}
+}
+
+// LogStage logs a high-level stage using the logger from context
+func LogStage(ctx context.Context, format string, args ...interface{}) {
+	if logger := LoggerFromContext(ctx); logger != nil {
+		logger.Stage(format, args...)
+	}
+}
+
+// LogProgress logs sync progress using the logger from context
+func LogProgress(ctx context.Context, current, total int, status string) {
+	if logger := LoggerFromContext(ctx); logger != nil {
+		logger.Progress(current, total, status)
+	}
 }

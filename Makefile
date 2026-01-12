@@ -58,7 +58,7 @@ install:
 
 # Build the application
 build:
-	go build -o $(BINARY_NAME) ./cmd/main.go
+	go build -o $(BINARY_NAME) .
 
 # Run sync in dry-run mode (reads ANILIST_MAL_SYNC_CONFIG from .env file)
 dry-run:
