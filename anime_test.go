@@ -2,6 +2,7 @@ package main
 
 import (
 	"testing"
+	"time"
 )
 
 func TestAnime_SameTypeWithTarget(t *testing.T) {
@@ -249,6 +250,90 @@ func TestAnime_IsPotentiallyIncorrectMatch(t *testing.T) {
 			result := tt.source.IsPotentiallyIncorrectMatch(tt.target)
 			if result != tt.expected {
 				t.Errorf("IsPotentiallyIncorrectMatch() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestAnime_GetUpdateOptions(t *testing.T) {
+	date1 := time.Date(2024, 12, 18, 0, 0, 0, 0, time.UTC)
+	date2 := time.Date(2024, 12, 19, 0, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name     string
+		anime    Anime
+		wantOpts int
+	}{
+		{
+			name: "nil dates - only 3 options",
+			anime: Anime{
+				Status:   StatusCompleted,
+				Score:    8,
+				Progress: 13,
+			},
+			wantOpts: 3, // status, score, progress only
+		},
+		{
+			name: "with started at - 4 options",
+			anime: Anime{
+				Status:    StatusCompleted,
+				Score:     8,
+				Progress:  13,
+				StartedAt: &date1,
+			},
+			wantOpts: 4,
+		},
+		{
+			name: "completed with both dates - 5 options",
+			anime: Anime{
+				Status:     StatusCompleted,
+				Score:      8,
+				Progress:   13,
+				StartedAt:  &date1,
+				FinishedAt: &date2,
+			},
+			wantOpts: 5,
+		},
+		{
+			name: "watching with dates - only started included",
+			anime: Anime{
+				Status:     StatusWatching,
+				Score:      8,
+				Progress:   13,
+				StartedAt:  &date1,
+				FinishedAt: &date2,
+			},
+			wantOpts: 4, // finish date ignored for non-completed
+		},
+		{
+			name: "plan to watch with dates - only started included",
+			anime: Anime{
+				Status:     StatusPlanToWatch,
+				Score:      0,
+				Progress:   0,
+				StartedAt:  &date1,
+				FinishedAt: &date2,
+			},
+			wantOpts: 4, // finish date ignored for non-completed
+		},
+		{
+			name: "on hold with both dates - only started included",
+			anime: Anime{
+				Status:     StatusOnHold,
+				Score:      7,
+				Progress:   5,
+				StartedAt:  &date1,
+				FinishedAt: &date2,
+			},
+			wantOpts: 4, // finish date ignored for non-completed
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := tt.anime.GetUpdateOptions()
+			if len(opts) != tt.wantOpts {
+				t.Errorf("GetUpdateOptions() returned %d options, want %d", len(opts), tt.wantOpts)
 			}
 		})
 	}

@@ -8,6 +8,12 @@ type Statistics struct {
 	TotalCount   int
 }
 
+func (s *Statistics) Reset() {
+	s.UpdatedCount = 0
+	s.SkippedCount = 0
+	s.TotalCount = 0
+}
+
 func (s Statistics) Print(prefix string) {
 	log.Printf("[%s] Updated %d out of %d\n", prefix, s.UpdatedCount, s.TotalCount)
 	log.Printf("[%s] Skipped %d\n", prefix, s.SkippedCount)

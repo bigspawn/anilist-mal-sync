@@ -125,7 +125,7 @@ func (u *Updater) updateTarget(ctx context.Context, id TargetID, src Source) {
 		return
 	}
 
-	log.Printf("[%s] Updated %s", u.Prefix, src.GetTitle())
+	log.Printf("[%s] Updated %s (ID: %d)", u.Prefix, src.GetTitle(), id)
 
 	u.Statistics.UpdatedCount++
 }
