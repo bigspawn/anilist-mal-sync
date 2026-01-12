@@ -19,6 +19,7 @@ type AnilistClient struct {
 
 func NewAnilistClient(ctx context.Context, oauth *OAuth, username string) *AnilistClient {
 	httpClient := oauth2.NewClient(ctx, oauth.TokenSource(ctx))
+	httpClient.Transport = newLoggingRoundTripper(httpClient.Transport)
 
 	v := verniy.New()
 	v.Http = *httpClient

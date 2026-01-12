@@ -35,6 +35,7 @@ type MyAnimeListClient struct {
 
 func NewMyAnimeListClient(ctx context.Context, oauth *OAuth, username string) *MyAnimeListClient {
 	httpClient := oauth2.NewClient(ctx, oauth.TokenSource(ctx))
+	httpClient.Transport = newLoggingRoundTripper(httpClient.Transport)
 
 	client := mal.NewClient(httpClient)
 
@@ -95,9 +96,7 @@ func (c *MyAnimeListClient) UpdateAnimeByIDAndOptions(ctx context.Context, id in
 	}
 
 	// Log update details for debugging
-	if *verbose {
-		log.Printf("[DEBUG] Updating MAL ID %d with opts: %+v", id, opts)
-	}
+	DPrintf("[DEBUG] Updating MAL ID %d with opts: %+v", id, opts)
 
 	return retryWithBackoff(ctx, func() error {
 		_, _, err := c.c.Anime.UpdateMyListStatus(ctx, id, opts...)
@@ -247,16 +246,12 @@ func fetchAllPages[T any](
 			return nil, err
 		}
 
-		if *verbose {
-			log.Printf("[DEBUG] %s: fetched page %d with %d items (next offset: %d)", operationName, pageNum, len(items), resp.NextOffset)
-		}
+		DPrintf("[DEBUG] %s: fetched page %d with %d items (next offset: %d)", operationName, pageNum, len(items), resp.NextOffset)
 
 		result = append(result, items...)
 
 		if resp.NextOffset == 0 {
-			if *verbose {
-				log.Printf("[DEBUG] %s: finished pagination, total %d items across %d page(s)", operationName, len(result), pageNum)
-			}
+			DPrintf("[DEBUG] %s: finished pagination, total %d items across %d page(s)", operationName, len(result), pageNum)
 			break
 		}
 

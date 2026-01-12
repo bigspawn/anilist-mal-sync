@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/urfave/cli/v3"
@@ -91,15 +92,17 @@ func RunCLI() error {
 
 	cmd := NewCLI()
 
-	// Run and show help on error (except for config errors which have their own help)
+	// Run and show help only for CLI usage errors
 	if err := cmd.Run(ctx, os.Args); err != nil {
-		// Don't show help for:
-		// - Config errors (they already show helpful instructions)
-		// - Cancellation errors (user pressed Ctrl+C)
-		if !IsConfigNotFoundError(err) && !IsCancellationError(err) {
+		// Show help only for CLI usage errors (unknown command, invalid flags)
+		// Don't show help for runtime errors (network, API, etc.)
+		if IsCLIUsageError(err) {
 			fmt.Fprintf(os.Stderr, "\nError: %v\n\n", err)
 			//nolint:gosec // G104: best effort help display
 			cli.ShowAppHelp(cmd) //nolint:errcheck // best effort help display
+		} else if !IsConfigNotFoundError(err) && !IsCancellationError(err) {
+			// For other errors, just print the error message
+			fmt.Fprintf(os.Stderr, "\nError: %v\n\n", err)
 		}
 		return fmt.Errorf("command failed")
 	}
@@ -113,4 +116,35 @@ func IsCancellationError(err error) bool {
 		return false
 	}
 	return errors.Is(err, context.Canceled)
+}
+
+// IsCLIUsageError checks if error is related to incorrect CLI usage
+func IsCLIUsageError(err error) bool {
+	if err == nil {
+		return false
+	}
+	// Check for unknown command error (from Action at line 80)
+	// CLI usage errors typically start with "unknown command:" or flag errors
+	// Runtime errors typically contain "run app:", "error syncing", "error getting", etc.
+	errMsg := err.Error()
+	if strings.HasPrefix(errMsg, "unknown command:") {
+		return true
+	}
+	// If error contains runtime error indicators, it's not a CLI usage error
+	runtimeIndicators := []string{
+		"run app:",
+		"error syncing",
+		"error getting",
+		"error loading",
+		"error creating",
+		"context deadline exceeded",
+		"connection refused",
+		"no such host",
+	}
+	for _, indicator := range runtimeIndicators {
+		if strings.Contains(errMsg, indicator) {
+			return false
+		}
+	}
+	return false
 }
