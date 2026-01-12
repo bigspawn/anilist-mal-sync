@@ -22,7 +22,10 @@ func (m *MockSource) GetStatusString() string {
 
 func (m *MockSource) GetTargetID() TargetID {
 	args := m.Called()
-	return args.Get(0).(TargetID)
+	if val, ok := args.Get(0).(TargetID); ok {
+		return val
+	}
+	return 0
 }
 
 func (m *MockSource) GetSourceID() int {
@@ -67,7 +70,10 @@ type MockTarget struct {
 
 func (m *MockTarget) GetTargetID() TargetID {
 	args := m.Called()
-	return args.Get(0).(TargetID)
+	if val, ok := args.Get(0).(TargetID); ok {
+		return val
+	}
+	return 0
 }
 
 func (m *MockTarget) GetTitle() string {
@@ -196,7 +202,7 @@ func TestStatistics_NoResetAccumulationBug(t *testing.T) {
 
 	// Second iteration - WITHOUT Reset(), counters accumulate (bug)
 	updater.Statistics.TotalCount += 5
-	updater.Statistics.UpdatedCount += 1
+	updater.Statistics.UpdatedCount++
 	updater.Statistics.SkippedCount += 4
 
 	// BUG: Shows 15 total instead of 5 for current iteration

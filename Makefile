@@ -1,4 +1,7 @@
-.PHONY: build test lint fmt check clean install hooks-install hooks-uninstall
+.PHONY: build test lint fmt check clean install hooks-install hooks-uninstall dry-run
+
+# Load .env file if exists
+-include .env
 
 BINARY_NAME=anilist-mal-sync
 LINT_VERSION=v2.2.2
@@ -56,6 +59,14 @@ install:
 # Build the application
 build:
 	go build -o $(BINARY_NAME) ./cmd/main.go
+
+# Run sync in dry-run mode (reads ANILIST_MAL_SYNC_CONFIG from .env file)
+dry-run:
+	@if [ -n "$(ANILIST_MAL_SYNC_CONFIG)" ]; then \
+		go run . -c "$(ANILIST_MAL_SYNC_CONFIG)" sync -d --verbose; \
+	else \
+		go run . sync -d --verbose; \
+	fi
 
 # Run tests
 test:
@@ -123,6 +134,7 @@ help:
 	@echo "Available commands:"
 	@echo "  install          - Install all development tools (brew + go install)"
 	@echo "  build            - Build the application"
+	@echo "  dry-run          - Run sync in dry-run mode (reads ANILIST_MAL_SYNC_CONFIG from .env)"
 	@echo "  test             - Run tests"
 	@echo "  fmt              - Format code with gofumpt"
 	@echo "  lint             - Run linter (golangci-lint $(LINT_VERSION))"
