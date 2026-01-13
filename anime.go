@@ -121,38 +121,24 @@ func (a Anime) SameProgressWithTarget(t Target) bool {
 	}
 
 	if a.Status != b.Status {
-		DPrintf("Status: %s != %s", a.Status, b.Status)
 		return false
 	}
 	if a.Score != b.Score {
-		DPrintf("Score: %d != %d", a.Score, b.Score)
 		return false
 	}
 	progress := a.Progress == b.Progress
 	if a.NumEpisodes == b.NumEpisodes {
-		DPrintf("Equal number of episodes: %d == %d", a.NumEpisodes, b.NumEpisodes)
-		DPrintf("Progress: %t", progress)
 		return progress
 	}
 	if a.NumEpisodes == 0 || b.NumEpisodes == 0 {
-		DPrintf("One of the anime has 0 episodes: %d, %d", a.NumEpisodes, b.NumEpisodes)
-		DPrintf("Progress: %t", progress)
 		return progress
 	}
 	if progress && (a.NumEpisodes-b.NumEpisodes != 0) {
-		DPrintf(
-			"Both anime have 0 progress but different number of episodes: %d, %d",
-			a.NumEpisodes, b.NumEpisodes,
-		)
 		return true
 	}
 
 	aa := (a.NumEpisodes - a.Progress)
 	bb := (b.NumEpisodes - b.Progress)
-
-	DPrintf("Number of episodes: %d, %d", a.NumEpisodes, b.NumEpisodes)
-	DPrintf("Progress: %d, %d", a.Progress, b.Progress)
-	DPrintf("Progress: %d == %d", aa, bb)
 
 	return aa == bb
 }
@@ -206,8 +192,6 @@ func (a Anime) SameTitleWithTarget(t Target) bool {
 
 		// Reject if difference is more than 20%
 		if percentDiff > 20.0 {
-			DPrintf("Episode count mismatch: %d vs %d (%.1f%% difference)",
-				a.NumEpisodes, b.NumEpisodes, percentDiff)
 			return false
 		}
 	}
@@ -445,15 +429,6 @@ func newAnimeFromMalAnime(malAnime mal.Anime) (Anime, error) {
 	if malAnime.AlternativeTitles.Ja != "" {
 		titleJP = malAnime.AlternativeTitles.Ja
 	}
-
-	// Log MAL API response for debugging
-	DPrintf("[DEBUG] MAL API response for %s (ID %d): status=%s, score=%d, progress=%d, start=%s, end=%s",
-		titleEN, malAnime.ID,
-		malAnime.MyListStatus.Status,
-		malAnime.MyListStatus.Score,
-		malAnime.MyListStatus.NumEpisodesWatched,
-		malAnime.MyListStatus.StartDate,
-		malAnime.MyListStatus.FinishDate)
 
 	// In reverse sync mode, we need to leave AniList ID as 0 so the updater can find it by name
 	anilistID := -1
