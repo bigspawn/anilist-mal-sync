@@ -174,7 +174,7 @@ func generateUpdateDetail(src Source) string {
 }
 
 // DPrintf is deprecated - use LogDebug with context instead
-func DPrintf(format string, v ...any) {
+func DPrintf(_ string, _ ...any) {
 	// Deprecated: use LogDebug(ctx, ...) instead
 	// This function is kept for backward compatibility but does nothing
 }
