@@ -135,17 +135,21 @@ func TestStatistics_PrintLogsCorrectly(t *testing.T) {
 	log.SetOutput(&buf)
 	defer log.SetOutput(os.Stderr)
 
-	stats := Statistics{
-		UpdatedCount: 42,
-		SkippedCount: 100,
-		TotalCount:   142,
-	}
+	logger := NewLogger(false)
+	logger.SetOutput(&buf)
+
+	stats := NewStatistics(logger)
+	stats.UpdatedCount = 42
+	stats.SkippedCount = 100
+	stats.TotalCount = 142
 
 	stats.Print("TestPrefix")
 
 	output := buf.String()
-	assert.Contains(t, output, "[TestPrefix] Updated 42 out of 142", "Print should log correct update info")
-	assert.Contains(t, output, "[TestPrefix] Skipped 100", "Print should log correct skip info")
+	assert.Contains(t, output, "=== TestPrefix: Sync Complete ===", "Print should log header")
+	assert.Contains(t, output, "Total items: 142", "Print should log total items")
+	assert.Contains(t, output, "✓ Updated: 42", "Print should log correct update info")
+	assert.Contains(t, output, "Skipped: 100", "Print should log correct skip info")
 }
 
 func TestStatistics_PrintWithZeroValues(t *testing.T) {
@@ -153,19 +157,23 @@ func TestStatistics_PrintWithZeroValues(t *testing.T) {
 	log.SetOutput(&buf)
 	defer log.SetOutput(os.Stderr)
 
-	stats := Statistics{}
+	logger := NewLogger(false)
+	logger.SetOutput(&buf)
+
+	stats := NewStatistics(logger)
 
 	stats.Print("EmptyTest")
 
 	output := buf.String()
-	assert.Contains(t, output, "[EmptyTest] Updated 0 out of 0")
-	assert.Contains(t, output, "[EmptyTest] Skipped 0")
+	assert.Contains(t, output, "=== EmptyTest: Sync Complete ===", "Print should log header")
+	assert.Contains(t, output, "✓ Updated: 0", "Print should log zero updated")
 }
 
 func TestStatistics_WatchModeFlow(t *testing.T) {
+	logger := NewLogger(false)
 	updater := &Updater{
 		Prefix:     "Test Watch Mode",
-		Statistics: &Statistics{},
+		Statistics: NewStatistics(logger),
 	}
 
 	// First iteration

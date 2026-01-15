@@ -42,6 +42,11 @@ func runWatch(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("error loading config: %w", err)
 	}
 
+	// Initialize logger (watch mode uses normal logging, verbose from sync not applicable here)
+	// and add to context
+	logger := NewLogger(false)
+	ctx = logger.WithContext(ctx)
+
 	// Create app for compatibility
 	app, err := NewApp(ctx, config)
 	if err != nil {

@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
 	"strings"
 	"time"
 
@@ -69,9 +68,9 @@ func retryWithBackoff(ctx context.Context, operation func() error, operationName
 				attemptCount++
 				if len(prefix) > 0 {
 					// Log retry attempt - VISIBLE to user (not verbose only)
-					log.Printf("[%s] Retry attempt %d for %s (waiting %v)...", prefix[0], attemptCount, operationName, duration)
+					LogWarn(ctx, "[%s] Retry attempt %d for %s (waiting %v)...", prefix[0], attemptCount, operationName, duration)
 				} else {
-					log.Printf("Retry attempt %d for %s (waiting %v)...", attemptCount, operationName, duration)
+					LogWarn(ctx, "Retry attempt %d for %s (waiting %v)...", attemptCount, operationName, duration)
 				}
 			}
 		},

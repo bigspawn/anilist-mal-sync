@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"sort"
 )
 
@@ -31,7 +30,7 @@ func (sc *StrategyChain) FindTarget(ctx context.Context, src Source, existingTar
 			return nil, fmt.Errorf("strategy %s failed: %w", strategy.Name(), err)
 		}
 		if found {
-			DPrintf("[%s] Found target using strategy: %s", prefix, strategy.Name())
+			LogDebugDecision(ctx, "[%s] Found target using strategy: %s", prefix, strategy.Name())
 			return target, nil
 		}
 	}
@@ -45,13 +44,13 @@ func (s IDStrategy) Name() string {
 	return "IDStrategy"
 }
 
-func (s IDStrategy) FindTarget(_ context.Context, src Source, existingTargets map[TargetID]Target, prefix string) (Target, bool, error) {
+func (s IDStrategy) FindTarget(ctx context.Context, src Source, existingTargets map[TargetID]Target, prefix string) (Target, bool, error) {
 	srcID := src.GetTargetID()
 	target, found := existingTargets[srcID]
 	if found {
-		DPrintf("[%s] Found target by ID %d (direct lookup in user's list): %s", prefix, srcID, target.GetTitle())
+		LogDebugDecision(ctx, "[%s] Found target by ID %d (direct lookup in user's list): %s", prefix, srcID, target.GetTitle())
 	} else if srcID > 0 {
-		DPrintf("[%s] Target ID %d not found in user's list (will try other strategies)", prefix, srcID)
+		LogDebugDecision(ctx, "[%s] Target ID %d not found in user's list (will try other strategies)", prefix, srcID)
 	}
 	return target, found, nil
 }
@@ -65,16 +64,16 @@ func (s TitleStrategy) Name() string {
 
 // shouldRejectMatch checks if a potential match should be rejected
 // Returns true if the match should be rejected with appropriate logging
-func shouldRejectMatch(src Source, target Target, prefix string) bool {
+func shouldRejectMatch(ctx context.Context, src Source, target Target, prefix string) bool {
 	// Check MAL ID mismatch
 	srcID := src.GetTargetID()
 	tgtID := target.GetTargetID()
 
 	if srcID > 0 && tgtID > 0 && srcID != tgtID {
-		DPrintf("[%s] Rejecting title match due to MAL ID mismatch: Source MAL ID: %d, Target MAL ID: %d",
+		LogDebugDecision(ctx, "[%s] Rejecting title match due to MAL ID mismatch: Source MAL ID: %d, Target MAL ID: %d",
 			prefix, srcID, tgtID)
-		DPrintf("[%s]   Source: %s", prefix, src.String())
-		DPrintf("[%s]   Target: %s", prefix, target.String())
+		LogDebugDecision(ctx, "[%s]   Source: %s", prefix, src.String())
+		LogDebugDecision(ctx, "[%s]   Target: %s", prefix, target.String())
 		return true
 	}
 
@@ -86,19 +85,24 @@ func shouldRejectMatch(src Source, target Target, prefix string) bool {
 
 	if srcAnime.IsPotentiallyIncorrectMatch(target) {
 		tgtAnime, _ := target.(Anime)
-		log.Printf("[%s] WARNING: Rejecting potential incorrect match (episode count mismatch)", prefix)
-		log.Printf("[%s]   Source: %s (IDMal: %d, Episodes: %d)",
+		LogWarn(ctx, "[%s] WARNING: Rejecting potential incorrect match (episode count mismatch)", prefix)
+		LogWarn(ctx, "[%s]   Source: %s (IDMal: %d, Episodes: %d)",
 			prefix, src.String(), srcAnime.IDMal, srcAnime.NumEpisodes)
-		log.Printf("[%s]   Target: %s (IDMal: %d, Episodes: %d)",
+		LogWarn(ctx, "[%s]   Target: %s (IDMal: %d, Episodes: %d)",
 			prefix, target.String(), target.GetTargetID(), tgtAnime.NumEpisodes)
-		log.Printf("[%s]   This special episode will NOT be synced. Add to ignore list if needed.", prefix)
+		LogWarn(ctx, "[%s]   This special episode will NOT be synced. Add to ignore list if needed.", prefix)
 		return true
 	}
 
 	return false
 }
 
-func (s TitleStrategy) FindTarget(_ context.Context, src Source, existingTargets map[TargetID]Target, prefix string) (Target, bool, error) {
+func (s TitleStrategy) FindTarget(
+	ctx context.Context,
+	src Source,
+	existingTargets map[TargetID]Target,
+	prefix string,
+) (Target, bool, error) {
 	srcTitle := src.GetTitle()
 
 	targetSlice := make([]Target, 0, len(existingTargets))
@@ -116,24 +120,24 @@ func (s TitleStrategy) FindTarget(_ context.Context, src Source, existingTargets
 	}
 
 	if target, ok := byTitle[srcTitle]; ok {
-		DPrintf("[%s] Found target by exact title match: %s", prefix, srcTitle)
+		LogDebugDecision(ctx, "[%s] Found target by exact title match: %s", prefix, srcTitle)
 		return target, true, nil
 	}
 
 	for _, target := range targetSlice {
 		if src.SameTitleWithTarget(target) && src.SameTypeWithTarget(target) {
 			// Check for potential mismatches and reject if needed
-			if shouldRejectMatch(src, target, prefix) {
+			if shouldRejectMatch(ctx, src, target, prefix) {
 				continue
 			}
 
-			DPrintf("[%s] Found target by title comparison (fuzzy match): '%s' -> '%s'",
+			LogDebugDecision(ctx, "[%s] Found target by title comparison (fuzzy match): '%s' -> '%s'",
 				prefix, srcTitle, target.GetTitle())
 			return target, true, nil
 		}
 	}
 
-	DPrintf("[%s] No target found by title comparison: %s", prefix, srcTitle)
+	LogDebugDecision(ctx, "[%s] No target found by title comparison: %s", prefix, srcTitle)
 	return nil, false, nil
 }
 
@@ -164,7 +168,7 @@ func (s MALIDStrategy) FindTarget(
 		return nil, false, nil
 	}
 
-	DPrintf("[%s] Finding target by MAL ID (title match failed): %d", prefix, srcID)
+	LogDebugDecision(ctx, "[%s] Finding target by MAL ID (title match failed): %d", prefix, srcID)
 	target, err := s.GetTargetByMALIDFunc(ctx, srcID)
 	if err != nil {
 		return nil, false, fmt.Errorf("error getting target by MAL ID %d: %w", srcID, err)
@@ -176,17 +180,17 @@ func (s MALIDStrategy) FindTarget(
 
 	// Log if titles differ (this is why MAL ID search is useful)
 	if target.GetTitle() != src.GetTitle() {
-		DPrintf("[%s] MAL ID search matched different titles: '%s' (source) -> '%s' (target)",
+		LogDebugDecision(ctx, "[%s] MAL ID search matched different titles: '%s' (source) -> '%s' (target)",
 			prefix, src.GetTitle(), target.GetTitle())
 	}
 
 	tgtID := target.GetTargetID()
 	if existingTarget, exists := existingTargets[tgtID]; exists {
-		DPrintf("[%s] Found existing user target by MAL ID %d: %s", prefix, srcID, target.GetTitle())
+		LogDebugDecision(ctx, "[%s] Found existing user target by MAL ID %d: %s", prefix, srcID, target.GetTitle())
 		return existingTarget, true, nil
 	}
 
-	DPrintf("[%s] Found target by MAL ID %d: %s (using MAL ID lookup instead of title match)",
+	LogDebugDecision(ctx, "[%s] Found target by MAL ID %d: %s (using MAL ID lookup instead of title match)",
 		prefix, srcID, target.GetTitle())
 	return target, true, nil
 }
@@ -217,22 +221,22 @@ func (s APISearchStrategy) FindTarget(
 	tgtID := src.GetTargetID()
 
 	if tgtID > 0 {
-		DPrintf("[%s] Finding target by API ID (not in user's list): %d", prefix, tgtID)
+		LogDebugDecision(ctx, "[%s] Finding target by API ID (not in user's list): %d", prefix, tgtID)
 		target, err := s.GetTargetByIDFunc(ctx, tgtID)
 		if err != nil {
 			return nil, false, fmt.Errorf("error getting target by ID %d: %w", tgtID, err)
 		}
 
 		if existingTarget, exists := existingTargets[tgtID]; exists {
-			DPrintf("[%s] Found target by API ID lookup in user's list: %s", prefix, existingTarget.GetTitle())
+			LogDebugDecision(ctx, "[%s] Found target by API ID lookup in user's list: %s", prefix, existingTarget.GetTitle())
 			return existingTarget, true, nil
 		}
 
-		DPrintf("[%s] Found target by API ID lookup (not in user's list): %s", prefix, target.GetTitle())
+		LogDebugDecision(ctx, "[%s] Found target by API ID lookup (not in user's list): %s", prefix, target.GetTitle())
 		return target, true, nil
 	}
 
-	DPrintf("[%s] Finding target by API name search (ID lookup failed): %s", prefix, src.GetTitle())
+	LogDebugDecision(ctx, "[%s] Finding target by API name search (ID lookup failed): %s", prefix, src.GetTitle())
 	targets, err := s.GetTargetsByNameFunc(ctx, src.GetTitle())
 	if err != nil {
 		return nil, false, fmt.Errorf("error getting targets by name %s: %w", src.GetTitle(), err)
@@ -241,18 +245,18 @@ func (s APISearchStrategy) FindTarget(
 	for _, tgt := range targets {
 		if existingTarget, exists := existingTargets[tgt.GetTargetID()]; exists {
 			// Check for potential mismatches before accepting API search result
-			if shouldRejectMatch(src, existingTarget, prefix) {
+			if shouldRejectMatch(ctx, src, existingTarget, prefix) {
 				continue
 			}
-			DPrintf("[%s] Found target by API name search in user's list: %s", prefix, tgt.GetTitle())
+			LogDebugDecision(ctx, "[%s] Found target by API name search in user's list: %s", prefix, tgt.GetTitle())
 			return existingTarget, true, nil
 		}
 
 		if src.SameTypeWithTarget(tgt) {
-			DPrintf("[%s] Found target by API name search (not in user's list): %s", prefix, tgt.GetTitle())
+			LogDebugDecision(ctx, "[%s] Found target by API name search (not in user's list): %s", prefix, tgt.GetTitle())
 			return tgt, true, nil
 		}
-		DPrintf("[%s] Ignoring target by API name: %s (type mismatch)", prefix, tgt.GetTitle())
+		LogDebugDecision(ctx, "[%s] Ignoring target by API name: %s (type mismatch)", prefix, tgt.GetTitle())
 	}
 
 	return nil, false, nil
