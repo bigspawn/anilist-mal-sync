@@ -31,8 +31,9 @@ type Updater struct {
 	Statistics    *Statistics
 	IgnoreTitles  map[string]struct{}
 	StrategyChain *StrategyChain
-
-	UpdateTargetBySourceFunc func(context.Context, TargetID, Source) error
+	Service       MediaService // Replaces callback
+	ForceSync     bool         // Skip matching logic, force sync all
+	DryRun        bool         // Skip actual updates
 }
 
 func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target) {
@@ -94,7 +95,7 @@ func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target) {
 func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts map[TargetID]Target) {
 	tgtID := src.GetTargetID()
 
-	if !(*forceSync) {
+	if !u.ForceSync { // filter sources by different progress with targets
 		// Use strategy chain to find target
 		tgt, err := u.StrategyChain.FindTarget(ctx, src, tgts, u.Prefix)
 		if err != nil {
@@ -129,7 +130,7 @@ func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts ma
 		tgtID = tgt.GetTargetID()
 	}
 
-	if *dryRun {
+	if u.DryRun { // skip update if dry run
 		LogInfo(ctx, "[%s] Dry run: Skipping update for %s", u.Prefix, src.GetTitle())
 		return
 	}
@@ -148,7 +149,7 @@ func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts ma
 func (u *Updater) updateTarget(ctx context.Context, id TargetID, src Source) {
 	LogDebug(ctx, "[%s] Updating %s", u.Prefix, src.GetTitle())
 
-	if err := u.UpdateTargetBySourceFunc(ctx, id, src); err != nil {
+	if err := u.Service.Update(ctx, id, src, u.Prefix); err != nil {
 		u.Statistics.RecordError(UpdateResult{
 			Title:  src.GetTitle(),
 			Status: src.GetStatusString(),

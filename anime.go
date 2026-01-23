@@ -86,6 +86,16 @@ func (a Anime) GetTargetID() TargetID {
 	return TargetID(a.IDMal)
 }
 
+// GetAniListID returns the AniList ID
+func (a Anime) GetAniListID() TargetID {
+	return TargetID(a.IDAnilist)
+}
+
+// GetMALID returns the MAL ID
+func (a Anime) GetMALID() TargetID {
+	return TargetID(a.IDMal)
+}
+
 func (a Anime) GetSourceID() int {
 	if *reverseDirection {
 		return a.IDMal

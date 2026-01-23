@@ -7,15 +7,16 @@ import (
 
 // loggingRoundTripper wraps an http.RoundTripper and logs HTTP requests/responses in verbose mode.
 type loggingRoundTripper struct {
-	base http.RoundTripper
+	base    http.RoundTripper
+	verbose bool
 }
 
 // newLoggingRoundTripper creates a new logging round tripper.
-func newLoggingRoundTripper(base http.RoundTripper) http.RoundTripper {
+func newLoggingRoundTripper(base http.RoundTripper, verbose bool) http.RoundTripper {
 	if base == nil {
-		return &loggingRoundTripper{base: http.DefaultTransport}
+		return &loggingRoundTripper{base: http.DefaultTransport, verbose: verbose}
 	}
-	return &loggingRoundTripper{base: base}
+	return &loggingRoundTripper{base: base, verbose: verbose}
 }
 
 // RoundTrip executes a single HTTP transaction and logs the request/response.
