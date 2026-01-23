@@ -214,11 +214,17 @@ func (a Anime) IsPotentiallyIncorrectMatch(t Target) bool {
 		return false // Valid MAL ID match
 	}
 
+	// If source has no MAL ID but target does, and titles don't match exactly
+	// This prevents matching random specials/ovies with different titles
+	if srcID == 0 && tgtID > 0 && !a.IdenticalTitleMatch(b) {
+		return true // Likely incorrect match - different titles
+	}
+
 	// Check episode count mismatch
 	// If source has 0/unknown episodes but target has many (> 4)
 	if (a.NumEpisodes == 0 || a.NumEpisodes == 1) && b.NumEpisodes > 4 {
 		// Check if titles are actually different (not just one being a substring)
-		if !a.identicalTitleMatch(b) {
+		if !a.IdenticalTitleMatch(b) {
 			return true // Likely incorrect match
 		}
 	}
@@ -226,8 +232,8 @@ func (a Anime) IsPotentiallyIncorrectMatch(t Target) bool {
 	return false
 }
 
-// identicalTitleMatch checks if titles are truly identical (not just similar)
-func (a Anime) identicalTitleMatch(b Anime) bool {
+// IdenticalTitleMatch checks if titles are truly identical (not just similar)
+func (a Anime) IdenticalTitleMatch(b Anime) bool {
 	// Exact match on any title field
 	if a.TitleEN != "" && a.TitleEN == b.TitleEN {
 		return true
