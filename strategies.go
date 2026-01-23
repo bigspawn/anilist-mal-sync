@@ -1,5 +1,7 @@
 package main
 
+//go:generate mockgen -destination mock_strategy_test.go -package main -source=strategies.go
+
 import (
 	"context"
 	"fmt"

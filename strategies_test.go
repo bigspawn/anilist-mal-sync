@@ -2,46 +2,11 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"testing"
+
+	"go.uber.org/mock/gomock"
 )
-
-// mockMediaServiceWithMALID is a mock implementation of MediaServiceWithMALID for testing
-type mockMediaServiceWithMALID struct {
-	getByMALIDFunc func(ctx context.Context, malID int, prefix string) (Target, error)
-	getByIDFunc    func(ctx context.Context, id TargetID, prefix string) (Target, error)
-	getByNameFunc  func(ctx context.Context, name string, prefix string) ([]Target, error)
-	updateFunc     func(ctx context.Context, id TargetID, src Source, prefix string) error
-}
-
-func (m *mockMediaServiceWithMALID) GetByMALID(ctx context.Context, malID int, prefix string) (Target, error) {
-	if m.getByMALIDFunc != nil {
-		return m.getByMALIDFunc(ctx, malID, prefix)
-	}
-	return nil, errors.New("not implemented")
-}
-
-func (m *mockMediaServiceWithMALID) GetByID(ctx context.Context, id TargetID, prefix string) (Target, error) {
-	if m.getByIDFunc != nil {
-		return m.getByIDFunc(ctx, id, prefix)
-	}
-	return nil, errors.New("not implemented")
-}
-
-func (m *mockMediaServiceWithMALID) GetByName(ctx context.Context, name string, prefix string) ([]Target, error) {
-	if m.getByNameFunc != nil {
-		return m.getByNameFunc(ctx, name, prefix)
-	}
-	return nil, errors.New("not implemented")
-}
-
-func (m *mockMediaServiceWithMALID) Update(ctx context.Context, id TargetID, src Source, prefix string) error {
-	if m.updateFunc != nil {
-		return m.updateFunc(ctx, id, src, prefix)
-	}
-	return errors.New("not implemented")
-}
 
 // TestIDStrategy_FindsExistingTarget tests that IDStrategy finds targets by ID when they exist
 func TestIDStrategy_FindsExistingTarget(t *testing.T) {
@@ -374,6 +339,8 @@ func TestMALIDStrategy_FindsTargetByMALID(t *testing.T) {
 	reverseDirection = &trueVal
 
 	ctx := context.Background()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
 	// Source from MAL with IDMal set
 	source := Anime{
@@ -397,14 +364,8 @@ func TestMALIDStrategy_FindsTargetByMALID(t *testing.T) {
 		101206: apiTarget,
 	}
 
-	mockService := &mockMediaServiceWithMALID{
-		getByMALIDFunc: func(_ context.Context, malID int, _ string) (Target, error) {
-			if malID == 37341 {
-				return apiTarget, nil
-			}
-			return nil, errors.New("target not found")
-		},
-	}
+	mockService := NewMockMediaServiceWithMALID(ctrl)
+	mockService.EXPECT().GetByMALID(ctx, 37341, "[Test]").Return(apiTarget, nil)
 
 	strategy := MALIDStrategy{Service: mockService}
 
@@ -444,6 +405,8 @@ func TestMALIDStrategy_ReturnsExistingUserTarget(t *testing.T) {
 	reverseDirection = &trueVal
 
 	ctx := context.Background()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
 	source := Anime{
 		IDMal:       37341,
@@ -475,11 +438,8 @@ func TestMALIDStrategy_ReturnsExistingUserTarget(t *testing.T) {
 		101206: userTarget,
 	}
 
-	mockService := &mockMediaServiceWithMALID{
-		getByMALIDFunc: func(_ context.Context, _ int, _ string) (Target, error) {
-			return apiTarget, nil
-		},
-	}
+	mockService := NewMockMediaServiceWithMALID(ctrl)
+	mockService.EXPECT().GetByMALID(ctx, 37341, "[Test]").Return(apiTarget, nil)
 
 	strategy := MALIDStrategy{Service: mockService}
 
@@ -516,6 +476,8 @@ func TestMALIDStrategy_SkipsZeroMALID(t *testing.T) {
 	reverseDirection = &trueVal
 
 	ctx := context.Background()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
 	source := Anime{
 		IDMal:       0, // No MAL ID
@@ -526,12 +488,9 @@ func TestMALIDStrategy_SkipsZeroMALID(t *testing.T) {
 
 	existingTargets := map[TargetID]Target{}
 
-	mockService := &mockMediaServiceWithMALID{
-		getByMALIDFunc: func(_ context.Context, _ int, _ string) (Target, error) {
-			t.Error("GetByMALID should not be called when source ID is 0")
-			return nil, errors.New("should not be called")
-		},
-	}
+	mockService := NewMockMediaServiceWithMALID(ctrl)
+	// GetByMALID should not be called when source ID is 0
+	mockService.EXPECT().GetByMALID(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 	strategy := MALIDStrategy{Service: mockService}
 
@@ -560,6 +519,9 @@ func TestMALIDStrategy_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
 
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	source := Anime{
 		IDMal:       12345,
 		IDAnilist:   0,
@@ -569,12 +531,9 @@ func TestMALIDStrategy_ContextCancellation(t *testing.T) {
 
 	existingTargets := map[TargetID]Target{}
 
-	mockService := &mockMediaServiceWithMALID{
-		getByMALIDFunc: func(_ context.Context, _ int, _ string) (Target, error) {
-			t.Error("GetByMALID should not be called when context is cancelled")
-			return nil, errors.New("should not be called")
-		},
-	}
+	mockService := NewMockMediaServiceWithMALID(ctrl)
+	// GetByMALID should not be called when context is cancelled
+	mockService.EXPECT().GetByMALID(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 	strategy := MALIDStrategy{Service: mockService}
 
@@ -601,6 +560,8 @@ func TestMALIDStrategy_ErrorHandling(t *testing.T) {
 	reverseDirection = &trueVal
 
 	ctx := context.Background()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
 	source := Anime{
 		IDMal:       99999, // Non-existent MAL ID
@@ -611,11 +572,8 @@ func TestMALIDStrategy_ErrorHandling(t *testing.T) {
 
 	existingTargets := map[TargetID]Target{}
 
-	mockService := &mockMediaServiceWithMALID{
-		getByMALIDFunc: func(_ context.Context, malID int, _ string) (Target, error) {
-			return nil, fmt.Errorf("no anime found with MAL ID %d", malID)
-		},
-	}
+	mockService := NewMockMediaServiceWithMALID(ctrl)
+	mockService.EXPECT().GetByMALID(ctx, 99999, "[Test]").Return(nil, fmt.Errorf("no anime found with MAL ID %d", 99999))
 
 	strategy := MALIDStrategy{Service: mockService}
 

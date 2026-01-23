@@ -1,5 +1,7 @@
 package main
 
+//go:generate mockgen -destination mock_updater_test.go -package main -source=updater.go
+
 import (
 	"context"
 	"fmt"

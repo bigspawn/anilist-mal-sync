@@ -32,7 +32,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 	}
 	LogDebug(ctx, "Got MAL token")
 
-	malClient := NewMyAnimeListClient(ctx, oauthMAL, config.MyAnimeList.Username, config.GetHTTPTimeout())
+	malClient := NewMyAnimeListClient(ctx, oauthMAL, config.MyAnimeList.Username, config.GetHTTPTimeout(), *verbose)
 	LogDebug(ctx, "MAL client created")
 
 	oauthAnilist, err := NewAnilistOAuth(ctx, config)
@@ -41,7 +41,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 	}
 	LogDebug(ctx, "Got Anilist token")
 
-	anilistClient := NewAnilistClient(ctx, oauthAnilist, config.Anilist.Username, config.GetHTTPTimeout())
+	anilistClient := NewAnilistClient(ctx, oauthAnilist, config.Anilist.Username, config.GetHTTPTimeout(), *verbose)
 	LogDebug(ctx, "Anilist client created")
 
 	scoreFormat, err := anilistClient.GetUserScoreFormat(ctx)

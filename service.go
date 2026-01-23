@@ -1,5 +1,7 @@
 package main
 
+//go:generate mockgen -destination mock_service_test.go -package main -source=service.go
+
 import (
 	"context"
 	"fmt"
