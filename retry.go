@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
+	"fmt"
 	"strings"
 	"time"
 
@@ -49,6 +49,7 @@ func isRetryableError(err error) bool {
 
 // retryWithBackoff wraps an operation with exponential backoff for retrying transient errors
 func retryWithBackoff(ctx context.Context, operation func() error, operationName string, prefix ...string) error {
+	LogDebug(ctx, "%s...", operationName)
 	b := createBackoffPolicy()
 
 	var attemptCount int
@@ -61,7 +62,7 @@ func retryWithBackoff(ctx context.Context, operation func() error, operationName
 		return err
 	}
 
-	return backoff.RetryNotify(
+	err := backoff.RetryNotify(
 		retryableOperation,
 		backoff.WithContext(b, ctx),
 		func(err error, duration time.Duration) {
@@ -69,13 +70,17 @@ func retryWithBackoff(ctx context.Context, operation func() error, operationName
 				attemptCount++
 				if len(prefix) > 0 {
 					// Log retry attempt - VISIBLE to user (not verbose only)
-					log.Printf("[%s] Retry attempt %d for %s (waiting %v)...", prefix[0], attemptCount, operationName, duration)
+					LogWarn(ctx, "[%s] Retry attempt %d for %s (waiting %v)...", prefix[0], attemptCount, operationName, duration)
 				} else {
-					log.Printf("Retry attempt %d for %s (waiting %v)...", attemptCount, operationName, duration)
+					LogWarn(ctx, "Retry attempt %d for %s (waiting %v)...", attemptCount, operationName, duration)
 				}
 			}
 		},
 	)
+	if errors.Is(err, context.DeadlineExceeded) {
+		return fmt.Errorf("%s: request timed out", operationName)
+	}
+	return err
 }
 
 // withTimeout adds a timeout to the context for API calls

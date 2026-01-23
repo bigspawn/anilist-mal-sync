@@ -20,19 +20,21 @@ func newLoggingRoundTripper(base http.RoundTripper) http.RoundTripper {
 
 // RoundTrip executes a single HTTP transaction and logs the request/response.
 func (l *loggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	ctx := req.Context()
+
 	if *verbose {
-		DPrintf("[HTTP] %s %s", req.Method, req.URL)
+		LogDebugHTTP(ctx, "%s %s", req.Method, req.URL)
 		start := time.Now()
 
 		resp, err := l.base.RoundTrip(req)
 		elapsed := time.Since(start)
 
 		if err != nil {
-			DPrintf("[HTTP] %s %s failed: %v (took %v)", req.Method, req.URL, err, elapsed)
+			LogDebugHTTP(ctx, "%s %s failed: %v (took %v)", req.Method, req.URL, err, elapsed)
 			return nil, err
 		}
 
-		DPrintf("[HTTP] %s %s -> %d (took %v)", req.Method, req.URL, resp.StatusCode, elapsed)
+		LogDebugHTTP(ctx, "%s %s -> %d (took %v)", req.Method, req.URL, resp.StatusCode, elapsed)
 		return resp, nil
 	}
 

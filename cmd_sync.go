@@ -61,6 +61,10 @@ func runSync(ctx context.Context, cmd *cli.Command) error {
 	verbose = &verboseVal
 	reverseDirection = &reverseVal
 
+	// Initialize logger and add to context
+	logger := NewLogger(verboseVal)
+	ctx = logger.WithContext(ctx)
+
 	config, err := loadConfigFromFile(configPath)
 	if err != nil {
 		return fmt.Errorf("error loading config: %w", err)
