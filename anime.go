@@ -144,6 +144,7 @@ func (a Anime) SameProgressWithTarget(t Target) bool {
 }
 
 func (a Anime) SameTypeWithTarget(t Target) bool {
+	// Type assertion to ensure we're comparing with another Anime
 	b, ok := t.(Anime)
 	if !ok {
 		return false
