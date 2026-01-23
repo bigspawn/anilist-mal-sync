@@ -63,9 +63,9 @@ build:
 # Run sync in dry-run mode (reads ANILIST_MAL_SYNC_CONFIG from .env file)
 dry-run:
 	@if [ -n "$(ANILIST_MAL_SYNC_CONFIG)" ]; then \
-		go run . -c "$(ANILIST_MAL_SYNC_CONFIG)" sync -d --verbose; \
+		go run . -c "$(ANILIST_MAL_SYNC_CONFIG)" sync -d --verbose --all; \
 	else \
-		go run . sync -d --verbose; \
+		go run . sync -d --verbose --all; \
 	fi
 
 # Run tests
