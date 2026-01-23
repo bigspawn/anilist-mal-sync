@@ -85,8 +85,17 @@ func shouldRejectMatch(ctx context.Context, src Source, target Target, prefix st
 
 	if srcAnime.IsPotentiallyIncorrectMatch(target) {
 		tgtAnime, _ := target.(Anime)
-		LogWarn(ctx, "Skipping %q - episode count mismatch (%d vs %d)",
-			srcAnime.GetTitle(), srcAnime.NumEpisodes, tgtAnime.NumEpisodes)
+
+		// Determine the specific reason for rejection
+		reason := "unknown reason"
+		if srcAnime.IDMal == 0 && tgtAnime.IDMal > 0 && !srcAnime.IdenticalTitleMatch(tgtAnime) {
+			reason = "different titles (source has no MAL ID, target has different MAL ID)"
+		} else if (srcAnime.NumEpisodes == 0 || srcAnime.NumEpisodes == 1) && tgtAnime.NumEpisodes > 4 {
+			reason = "episode count mismatch (special vs series)"
+		}
+
+		LogWarn(ctx, "Skipping %q - %s (%d vs %d)",
+			srcAnime.GetTitle(), reason, srcAnime.NumEpisodes, tgtAnime.NumEpisodes)
 		return true
 	}
 
