@@ -140,19 +140,23 @@ func (l *Logger) Stage(format string, args ...interface{}) {
 
 // Progress logs sync progress (overwrites previous line in TTY, single line otherwise)
 func (l *Logger) Progress(current, total int, status string) {
-	if l.level >= LogLevelInfo {
-		if l.useColors {
-			// Terminal: overwrite line with carriage return
-			msg := fmt.Sprintf("[%d/%d] Processing %s...", current, total, status)
-			l.infoLog.Print("\r\033[K" + msg) // \033[K clears to end of line
-			if current == total {
-				l.infoLog.Println()
-			}
-		} else if current == total {
-			// Non-terminal (file/pipe): only show final message
+	if l.level < LogLevelInfo {
+		return
+	}
+
+	if !l.useColors {
+		// Non-terminal (file/pipe): only show final message
+		if current == total {
 			l.infoLog.Printf("Processed %d items\n", total)
 		}
-		// Non-terminal: skip intermediate progress updates entirely
+		return
+	}
+
+	// Terminal: overwrite line with carriage return
+	msg := fmt.Sprintf("[%d/%d] Processing %s...", current, total, status)
+	l.infoLog.Print("\r\033[K" + msg) // \033[K clears to end of line
+	if current == total {
+		l.infoLog.Println()
 	}
 }
 
