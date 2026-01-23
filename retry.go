@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -48,6 +49,7 @@ func isRetryableError(err error) bool {
 
 // retryWithBackoff wraps an operation with exponential backoff for retrying transient errors
 func retryWithBackoff(ctx context.Context, operation func() error, operationName string, prefix ...string) error {
+	LogDebug(ctx, "%s...", operationName)
 	b := createBackoffPolicy()
 
 	var attemptCount int
@@ -60,7 +62,7 @@ func retryWithBackoff(ctx context.Context, operation func() error, operationName
 		return err
 	}
 
-	return backoff.RetryNotify(
+	err := backoff.RetryNotify(
 		retryableOperation,
 		backoff.WithContext(b, ctx),
 		func(err error, duration time.Duration) {
@@ -75,6 +77,10 @@ func retryWithBackoff(ctx context.Context, operation func() error, operationName
 			}
 		},
 	)
+	if errors.Is(err, context.DeadlineExceeded) {
+		return fmt.Errorf("%s: request timed out", operationName)
+	}
+	return err
 }
 
 // withTimeout adds a timeout to the context for API calls

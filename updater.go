@@ -64,7 +64,10 @@ func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target) {
 		// Show status transitions
 		if statusStr != src.GetStatusString() {
 			statusStr = src.GetStatusString()
-			LogStage(ctx, "[%s] Processing %s...", u.Prefix, statusStr)
+			// Shorten prefix for cleaner output
+			shortPrefix := strings.TrimPrefix(u.Prefix, "AniList to MAL ")
+			shortPrefix = strings.TrimPrefix(shortPrefix, "MAL to AniList ")
+			LogStage(ctx, "[%s] Processing %s...", shortPrefix, statusStr)
 		}
 
 		// Show progress (overwrites previous line)

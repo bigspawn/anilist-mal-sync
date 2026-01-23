@@ -85,12 +85,8 @@ func shouldRejectMatch(ctx context.Context, src Source, target Target, prefix st
 
 	if srcAnime.IsPotentiallyIncorrectMatch(target) {
 		tgtAnime, _ := target.(Anime)
-		LogWarn(ctx, "[%s] WARNING: Rejecting potential incorrect match (episode count mismatch)", prefix)
-		LogWarn(ctx, "[%s]   Source: %s (IDMal: %d, Episodes: %d)",
-			prefix, src.String(), srcAnime.IDMal, srcAnime.NumEpisodes)
-		LogWarn(ctx, "[%s]   Target: %s (IDMal: %d, Episodes: %d)",
-			prefix, target.String(), target.GetTargetID(), tgtAnime.NumEpisodes)
-		LogWarn(ctx, "[%s]   This special episode will NOT be synced. Add to ignore list if needed.", prefix)
+		LogWarn(ctx, "Skipping %q - episode count mismatch (%d vs %d)",
+			srcAnime.GetTitle(), srcAnime.NumEpisodes, tgtAnime.NumEpisodes)
 		return true
 	}
 

@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -99,7 +100,10 @@ func (s *Statistics) Print(prefix string) {
 
 	// Header
 	s.logger.Info("")
-	s.logger.Stage("=== %s: Sync Complete ===", prefix)
+	// Shorten prefix for cleaner output
+	shortPrefix := strings.TrimPrefix(prefix, "AniList to MAL ")
+	shortPrefix = strings.TrimPrefix(shortPrefix, "MAL to AniList ")
+	s.logger.Stage("=== %s: Sync Complete ===", shortPrefix)
 
 	// Summary
 	s.logger.Info("Duration: %v", duration.Round(time.Millisecond))
