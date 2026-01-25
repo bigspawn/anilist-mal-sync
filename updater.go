@@ -162,7 +162,7 @@ func (u *Updater) updateTarget(ctx context.Context, id TargetID, src Source) {
 	}
 
 	// Generate concise update message
-	detail := generateUpdateDetail(src)
+	detail := generateUpdateDetail(src, id)
 
 	u.Statistics.RecordUpdate(UpdateResult{
 		Title:  src.GetTitle(),
@@ -175,8 +175,37 @@ func (u *Updater) updateTarget(ctx context.Context, id TargetID, src Source) {
 }
 
 // generateUpdateDetail generates a concise update detail string
-func generateUpdateDetail(src Source) string {
-	return fmt.Sprintf("(ID: %d)", src.GetTargetID())
+func generateUpdateDetail(src Source, tgtID TargetID) string {
+	// Try to get both MAL and AniList IDs from source
+	var malID, anilistID TargetID
+
+	// Use type assertion to get both IDs if available
+	if anime, ok := src.(Anime); ok {
+		malID = TargetID(anime.IDMal)
+		anilistID = TargetID(anime.IDAnilist)
+	} else if manga, ok := src.(Manga); ok {
+		malID = TargetID(manga.IDMal)
+		anilistID = TargetID(manga.IDAnilist)
+	}
+
+	// In reverse sync (MAL -> AniList), tgtID is the AniList ID
+	// In forward sync (AniList -> MAL), tgtID is the MAL ID
+	if *reverseDirection {
+		anilistID = tgtID // Use the found AniList ID
+	} else {
+		malID = tgtID // Use the found MAL ID
+	}
+
+	// Show both IDs if available and different
+	switch {
+	case malID > 0 && anilistID > 0 && malID != anilistID:
+		return fmt.Sprintf("(MAL: %d, AniList: %d)", malID, anilistID)
+	case anilistID > 0:
+		return fmt.Sprintf("(AniList: %d)", anilistID)
+	case malID > 0:
+		return fmt.Sprintf("(MAL: %d)", malID)
+	}
+	return fmt.Sprintf("(ID: %d)", tgtID)
 }
 
 // DPrintf is deprecated - use LogDebug with context instead
