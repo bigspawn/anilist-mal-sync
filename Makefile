@@ -1,4 +1,4 @@
-.PHONY: build test lint fmt check clean install hooks-install hooks-uninstall dry-run
+.PHONY: build test lint fmt check clean install hooks-install hooks-uninstall dry-run generate
 
 # Load .env file if exists
 -include .env
@@ -52,6 +52,7 @@ install:
 	@echo "Available commands:"
 	@echo "  make build    - Build the application"
 	@echo "  make test     - Run tests"
+	@echo "  make generate - Generate mocks"
 	@echo "  make fmt      - Format code"
 	@echo "  make lint     - Run linter"
 	@echo "  make clean    - Clean build artifacts"
@@ -72,6 +73,12 @@ dry-run:
 test:
 	go test ./... -v
 
+# Generate mocks using mockgen
+generate:
+	@echo "🔧 Generating mocks..."
+	@go generate ./...
+	@echo "✓ Mocks generated"
+
 # Format code with gofumpt
 fmt:
 	@echo "Formatting code with gofumpt..."
@@ -85,7 +92,7 @@ lint:
 	golangci-lint run --new
 
 # Run all checks (same as Git hooks: format + imports + lint + vet + test)
-check:
+check: generate
 	@echo "🔍 Running all checks..."
 	@echo ""
 	@echo "1️⃣  Formatting code with gofumpt..."
@@ -136,9 +143,10 @@ help:
 	@echo "  build            - Build the application"
 	@echo "  dry-run          - Run sync in dry-run mode (reads ANILIST_MAL_SYNC_CONFIG from .env)"
 	@echo "  test             - Run tests"
+	@echo "  generate         - Generate mocks using mockgen"
 	@echo "  fmt              - Format code with gofumpt"
 	@echo "  lint             - Run linter (golangci-lint $(LINT_VERSION))"
-	@echo "  check            - Run all checks (format + imports + lint + vet + test)"
+	@echo "  check            - Run all checks (generate + format + imports + lint + vet + test)"
 	@echo "  clean            - Remove build artifacts, temporary files and clean test cache"
 	@echo "  hooks-install    - Install Git hooks via Lefthook (auto-run lint/format on commit)"
 	@echo "  hooks-uninstall  - Uninstall Git hooks"

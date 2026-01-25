@@ -1,5 +1,7 @@
 package main
 
+//go:generate mockgen -destination mock_strategy_test.go -package main -source=strategies.go
+
 import (
 	"context"
 	"fmt"
@@ -148,7 +150,7 @@ func (s TitleStrategy) FindTarget(
 
 // MALIDStrategy finds targets by searching AniList using source MAL ID
 type MALIDStrategy struct {
-	GetTargetByMALIDFunc func(context.Context, int) (Target, error)
+	Service MediaServiceWithMALID
 }
 
 func (s MALIDStrategy) Name() string {
@@ -174,7 +176,7 @@ func (s MALIDStrategy) FindTarget(
 	}
 
 	LogDebugDecision(ctx, "[%s] Finding target by MAL ID (title match failed): %d", prefix, srcID)
-	target, err := s.GetTargetByMALIDFunc(ctx, srcID)
+	target, err := s.Service.GetByMALID(ctx, srcID, prefix)
 	if err != nil {
 		return nil, false, fmt.Errorf("error getting target by MAL ID %d: %w", srcID, err)
 	}
@@ -202,8 +204,7 @@ func (s MALIDStrategy) FindTarget(
 
 // APISearchStrategy finds targets by making API calls
 type APISearchStrategy struct {
-	GetTargetByIDFunc    func(context.Context, TargetID) (Target, error)
-	GetTargetsByNameFunc func(context.Context, string) ([]Target, error)
+	Service MediaService
 }
 
 func (s APISearchStrategy) Name() string {
@@ -227,7 +228,7 @@ func (s APISearchStrategy) FindTarget(
 
 	if tgtID > 0 {
 		LogDebugDecision(ctx, "[%s] Finding target by API ID (not in user's list): %d", prefix, tgtID)
-		target, err := s.GetTargetByIDFunc(ctx, tgtID)
+		target, err := s.Service.GetByID(ctx, tgtID, prefix)
 		if err != nil {
 			return nil, false, fmt.Errorf("error getting target by ID %d: %w", tgtID, err)
 		}
@@ -242,7 +243,7 @@ func (s APISearchStrategy) FindTarget(
 	}
 
 	LogDebugDecision(ctx, "[%s] Finding target by API name search (ID lookup failed): %s", prefix, src.GetTitle())
-	targets, err := s.GetTargetsByNameFunc(ctx, src.GetTitle())
+	targets, err := s.Service.GetByName(ctx, src.GetTitle(), prefix)
 	if err != nil {
 		return nil, false, fmt.Errorf("error getting targets by name %s: %w", src.GetTitle(), err)
 	}
