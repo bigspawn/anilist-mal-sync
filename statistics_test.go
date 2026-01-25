@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"log"
 	"os"
 	"testing"
@@ -60,13 +61,14 @@ func TestStatistics_PrintLogsCorrectly(t *testing.T) {
 
 	logger := NewLogger(false)
 	logger.SetOutput(&buf)
+	ctx := logger.WithContext(context.Background())
 
-	stats := NewStatistics(logger)
+	stats := NewStatistics()
 	stats.UpdatedCount = 42
 	stats.SkippedCount = 100
 	stats.TotalCount = 142
 
-	stats.Print("TestPrefix")
+	stats.Print(ctx, "TestPrefix")
 
 	output := buf.String()
 	assert.Contains(t, output, "=== TestPrefix: Sync Complete ===", "Print should log header")
@@ -82,10 +84,11 @@ func TestStatistics_PrintWithZeroValues(t *testing.T) {
 
 	logger := NewLogger(false)
 	logger.SetOutput(&buf)
+	ctx := logger.WithContext(context.Background())
 
-	stats := NewStatistics(logger)
+	stats := NewStatistics()
 
-	stats.Print("EmptyTest")
+	stats.Print(ctx, "EmptyTest")
 
 	output := buf.String()
 	assert.Contains(t, output, "=== EmptyTest: Sync Complete ===", "Print should log header")
@@ -93,10 +96,9 @@ func TestStatistics_PrintWithZeroValues(t *testing.T) {
 }
 
 func TestStatistics_WatchModeFlow(t *testing.T) {
-	logger := NewLogger(false)
 	updater := &Updater{
 		Prefix:     "Test Watch Mode",
-		Statistics: NewStatistics(logger),
+		Statistics: NewStatistics(),
 	}
 
 	// First iteration
@@ -220,7 +222,7 @@ func TestPerformSync_ResetsAfterPrint(t *testing.T) {
 	prefix := "Test Sync"
 
 	// Print first (before reset)
-	stats.Print(prefix)
+	stats.Print(context.Background(), prefix)
 	output := buf.String()
 
 	// Verify output contains the counts
@@ -237,7 +239,7 @@ func TestPerformSync_ResetsAfterPrint(t *testing.T) {
 
 	// If we print again, should show zeros
 	buf.Reset()
-	stats.Print(prefix)
+	stats.Print(context.Background(), prefix)
 	output = buf.String()
 
 	assert.Contains(t, output, "[Test Sync] Updated 0 out of 0")
@@ -296,4 +298,38 @@ func TestStatistics_WatchModeMultipleIterations(t *testing.T) {
 			assert.Equal(t, 0, updater.Statistics.TotalCount)
 		})
 	}
+}
+
+func TestStatistics_RecordSkipAndUpdate(t *testing.T) {
+	// This tests that RecordSkip() and RecordUpdate() work correctly
+	// with properly initialized Statistics
+	stats := NewStatistics()
+
+	stats.RecordSkip(UpdateResult{Title: "Test", Status: "watching", SkipReason: "test"})
+	assert.Equal(t, 1, stats.SkippedCount)
+	assert.Equal(t, 1, stats.StatusCounts["watching"])
+
+	stats.RecordUpdate(UpdateResult{Title: "Test2", Status: "completed"})
+	assert.Equal(t, 1, stats.UpdatedCount)
+	assert.Equal(t, 1, stats.StatusCounts["completed"])
+}
+
+func TestStatistics_RecordSkipPanicWithoutInit(t *testing.T) {
+	// This demonstrates the bug - using new(Statistics) causes panic
+	// because StatusCounts is nil
+	stats := &Statistics{} // or new(Statistics)
+
+	assert.Panics(t, func() {
+		stats.RecordSkip(UpdateResult{Title: "Test", Status: "watching"})
+	}, "RecordSkip should panic when StatusCounts is nil")
+}
+
+func TestStatistics_RecordUpdatePanicWithoutInit(t *testing.T) {
+	// This demonstrates the bug - using new(Statistics) causes panic
+	// because StatusCounts is nil
+	stats := new(Statistics)
+
+	assert.Panics(t, func() {
+		stats.RecordUpdate(UpdateResult{Title: "Test", Status: "completed"})
+	}, "RecordUpdate should panic when StatusCounts is nil")
 }

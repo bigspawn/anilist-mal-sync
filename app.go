@@ -66,7 +66,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 	animeUpdater := &Updater{
 		Prefix:       "AniList to MAL Anime",
 		Service:      malAnimeService,
-		Statistics:   new(Statistics),
+		Statistics:   NewStatistics(),
 		IgnoreTitles: defaultIgnoreTitles,
 		ForceSync:    *forceSync,
 		DryRun:       *dryRun,
@@ -80,7 +80,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 	mangaUpdater := &Updater{
 		Prefix:       "AniList to MAL Manga",
 		Service:      malMangaService,
-		Statistics:   new(Statistics),
+		Statistics:   NewStatistics(),
 		IgnoreTitles: map[string]struct{}{},
 		ForceSync:    *forceSync,
 		DryRun:       *dryRun,
@@ -94,7 +94,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 	reverseAnimeUpdater := &Updater{
 		Prefix:       "MAL to AniList Anime",
 		Service:      anilistAnimeService,
-		Statistics:   new(Statistics),
+		Statistics:   NewStatistics(),
 		IgnoreTitles: map[string]struct{}{},
 		ForceSync:    *forceSync,
 		DryRun:       *dryRun,
@@ -109,7 +109,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 	reverseMangaUpdater := &Updater{
 		Prefix:       "MAL to AniList Manga",
 		Service:      anilistMangaService,
-		Statistics:   new(Statistics),
+		Statistics:   NewStatistics(),
 		IgnoreTitles: map[string]struct{}{},
 		ForceSync:    *forceSync,
 		DryRun:       *dryRun,
@@ -213,7 +213,7 @@ func (a *App) performSync(ctx context.Context, mediaType string, reverse bool, u
 	}
 
 	updater.Update(ctx, srcs, tgts)
-	updater.Statistics.Print(updater.Prefix)
+	updater.Statistics.Print(ctx, updater.Prefix)
 	updater.Statistics.Reset()
 
 	return nil

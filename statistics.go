@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"sort"
 	"strings"
@@ -34,16 +35,13 @@ type Statistics struct {
 
 	// Status breakdown
 	StatusCounts map[string]int
-
-	logger *Logger
 }
 
 // NewStatistics creates a new statistics tracker
-func NewStatistics(logger *Logger) *Statistics {
+func NewStatistics() *Statistics {
 	return &Statistics{
 		StartTime:    time.Now(),
 		StatusCounts: make(map[string]int),
-		logger:       logger,
 	}
 }
 
@@ -87,41 +85,42 @@ func (s *Statistics) Reset() {
 }
 
 // Print outputs comprehensive statistics
-func (s *Statistics) Print(prefix string) {
+func (s *Statistics) Print(ctx context.Context, prefix string) {
 	s.EndTime = time.Now()
 	duration := s.EndTime.Sub(s.StartTime)
 
-	// If no logger set, use old behavior for backward compatibility
-	if s.logger == nil {
+	logger := LoggerFromContext(ctx)
+	if logger == nil {
+		// Fallback to old behavior for backward compatibility
 		log.Printf("[%s] Updated %d out of %d\n", prefix, s.UpdatedCount, s.TotalCount)
 		log.Printf("[%s] Skipped %d\n", prefix, s.SkippedCount)
 		return
 	}
 
 	// Header
-	s.logger.Info("")
+	logger.Info("")
 	// Shorten prefix for cleaner output
 	shortPrefix := strings.TrimPrefix(prefix, "AniList to MAL ")
 	shortPrefix = strings.TrimPrefix(shortPrefix, "MAL to AniList ")
-	s.logger.Stage("=== %s: Sync Complete ===", shortPrefix)
+	logger.Stage("=== %s: Sync Complete ===", shortPrefix)
 
 	// Summary
-	s.logger.Info("Duration: %v", duration.Round(time.Millisecond))
-	s.logger.Info("Total items: %d", s.TotalCount)
-	s.logger.InfoSuccess("Updated: %d", s.UpdatedCount)
+	logger.Info("Duration: %v", duration.Round(time.Millisecond))
+	logger.Info("Total items: %d", s.TotalCount)
+	logger.InfoSuccess("Updated: %d", s.UpdatedCount)
 
 	if s.SkippedCount > 0 {
-		s.logger.Info("Skipped: %d (no changes needed)", s.SkippedCount)
+		logger.Info("Skipped: %d (no changes needed)", s.SkippedCount)
 	}
 
 	if s.ErrorCount > 0 {
-		s.logger.Error("Errors: %d", s.ErrorCount)
+		logger.Error("Errors: %d", s.ErrorCount)
 	}
 
 	// Status breakdown
 	if len(s.StatusCounts) > 0 {
-		s.logger.Info("")
-		s.logger.Info("Status breakdown:")
+		logger.Info("")
+		logger.Info("Status breakdown:")
 
 		statuses := make([]string, 0, len(s.StatusCounts))
 		for status := range s.StatusCounts {
@@ -131,31 +130,31 @@ func (s *Statistics) Print(prefix string) {
 
 		for _, status := range statuses {
 			count := s.StatusCounts[status]
-			s.logger.Info("  %s: %d", status, count)
+			logger.Info("  %s: %d", status, count)
 		}
 	}
 
 	// Error details
 	if len(s.ErrorItems) > 0 {
-		s.logger.Info("")
+		logger.Info("")
 		for i, item := range s.ErrorItems {
-			s.logger.Error("Failed updates:")
-			s.logger.Error("  %d. %s: %v", i+1, item.Title, item.Error)
+			logger.Error("Failed updates:")
+			logger.Error("  %d. %s: %v", i+1, item.Title, item.Error)
 		}
 	}
 
 	// Skipped details (verbose only)
-	if len(s.SkippedItems) > 0 && s.logger.level >= LogLevelDebug {
-		s.logger.Info("")
-		s.logger.Debug("Skipped items:")
+	if len(s.SkippedItems) > 0 && logger.level >= LogLevelDebug {
+		logger.Info("")
+		logger.Debug("Skipped items:")
 		for i, item := range s.SkippedItems {
 			if item.SkipReason != "" {
-				s.logger.Debug("  %d. %s: %s", i+1, item.Title, item.SkipReason)
+				logger.Debug("  %d. %s: %s", i+1, item.Title, item.SkipReason)
 			} else {
-				s.logger.Debug("  %d. %s", i+1, item.Title)
+				logger.Debug("  %d. %s", i+1, item.Title)
 			}
 		}
 	}
 
-	s.logger.Info("")
+	logger.Info("")
 }
