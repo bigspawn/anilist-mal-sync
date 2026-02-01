@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/rl404/verniy"
 )
@@ -18,6 +19,8 @@ type App struct {
 	mangaUpdater        *Updater
 	reverseAnimeUpdater *Updater
 	reverseMangaUpdater *Updater
+
+	syncReport *SyncReport
 }
 
 // NewApp creates a new App instance with configured clients and updaters
@@ -132,14 +135,38 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		mangaUpdater:        mangaUpdater,
 		reverseAnimeUpdater: reverseAnimeUpdater,
 		reverseMangaUpdater: reverseMangaUpdater,
+		syncReport:          NewSyncReport(),
 	}, nil
 }
 
 func (a *App) Run(ctx context.Context) error {
+	startTime := time.Now()
+
+	var err error
 	if *reverseDirection {
-		return a.runReverseSync(ctx)
+		err = a.runReverseSync(ctx)
+	} else {
+		err = a.runNormalSync(ctx)
 	}
-	return a.runNormalSync(ctx)
+
+	// Collect statistics for global summary
+	var stats []*Statistics
+	if *reverseDirection {
+		stats = []*Statistics{
+			a.reverseAnimeUpdater.Statistics,
+			a.reverseMangaUpdater.Statistics,
+		}
+	} else {
+		stats = []*Statistics{
+			a.animeUpdater.Statistics,
+			a.mangaUpdater.Statistics,
+		}
+	}
+
+	// Print global summary
+	PrintGlobalSummary(ctx, stats, a.syncReport, time.Since(startTime))
+
+	return err
 }
 
 func (a *App) runNormalSync(ctx context.Context) error {
@@ -212,9 +239,10 @@ func (a *App) performSync(ctx context.Context, mediaType string, reverse bool, u
 		return err
 	}
 
-	updater.Update(ctx, srcs, tgts)
-	updater.Statistics.Print(ctx, updater.Prefix)
-	updater.Statistics.Reset()
+	// Pass syncReport to accumulate warnings
+	updater.Update(ctx, srcs, tgts, a.syncReport)
+
+	// Don't print individual stats or reset - global summary will be printed at the end
 
 	return nil
 }

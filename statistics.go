@@ -99,7 +99,6 @@ func (s *Statistics) Print(ctx context.Context, prefix string) {
 
 	// Header
 	logger.Info("")
-	// Shorten prefix for cleaner output
 	shortPrefix := strings.TrimPrefix(prefix, "AniList to MAL ")
 	shortPrefix = strings.TrimPrefix(shortPrefix, "MAL to AniList ")
 	logger.Stage("=== %s: Sync Complete ===", shortPrefix)
@@ -117,44 +116,184 @@ func (s *Statistics) Print(ctx context.Context, prefix string) {
 		logger.Error("Errors: %d", s.ErrorCount)
 	}
 
-	// Status breakdown
-	if len(s.StatusCounts) > 0 {
-		logger.Info("")
-		logger.Info("Status breakdown:")
+	s.printStatusBreakdown(logger)
+	s.printSkipReasons(logger)
+	s.printErrors(logger)
 
-		statuses := make([]string, 0, len(s.StatusCounts))
-		for status := range s.StatusCounts {
-			statuses = append(statuses, status)
-		}
-		sort.Strings(statuses)
+	logger.Info("")
+}
 
-		for _, status := range statuses {
-			count := s.StatusCounts[status]
-			logger.Info("  %s: %d", status, count)
-		}
-	}
-
-	// Error details
-	if len(s.ErrorItems) > 0 {
-		logger.Info("")
-		for i, item := range s.ErrorItems {
-			logger.Error("Failed updates:")
-			logger.Error("  %d. %s: %v", i+1, item.Title, item.Error)
-		}
-	}
-
-	// Skipped details (verbose only)
-	if len(s.SkippedItems) > 0 && logger.level >= LogLevelDebug {
-		logger.Info("")
-		logger.Debug("Skipped items:")
-		for i, item := range s.SkippedItems {
-			if item.SkipReason != "" {
-				logger.Debug("  %d. %s: %s", i+1, item.Title, item.SkipReason)
-			} else {
-				logger.Debug("  %d. %s", i+1, item.Title)
-			}
-		}
+func (s *Statistics) printStatusBreakdown(logger *Logger) {
+	if len(s.StatusCounts) == 0 {
+		return
 	}
 
 	logger.Info("")
+	logger.Info("Status breakdown:")
+
+	statuses := make([]string, 0, len(s.StatusCounts))
+	for status := range s.StatusCounts {
+		statuses = append(statuses, status)
+	}
+	sort.Strings(statuses)
+
+	for _, status := range statuses {
+		logger.Info("  %s: %d", status, s.StatusCounts[status])
+	}
+}
+
+func (s *Statistics) printSkipReasons(logger *Logger) {
+	if len(s.SkippedItems) == 0 {
+		return
+	}
+
+	byReason := groupSkipReasons(s.SkippedItems)
+
+	logger.Info("")
+	logger.Info("Skipped by reason:")
+	for _, reason := range sortedKeys(byReason) {
+		logger.Info("  %s: %d", reason, byReason[reason])
+	}
+
+	// Detailed list in verbose mode only
+	if logger.level >= LogLevelDebug {
+		s.printSkippedItemsDetail(logger)
+	}
+}
+
+func (s *Statistics) printSkippedItemsDetail(logger *Logger) {
+	logger.Debug("")
+	logger.Debug("Skipped items detail:")
+	for i, item := range s.SkippedItems {
+		reason := item.SkipReason
+		if reason == "" {
+			reason = "unspecified"
+		}
+		logger.Debug("  %d. %s: %s", i+1, item.Title, reason)
+	}
+}
+
+func (s *Statistics) printErrors(logger *Logger) {
+	if len(s.ErrorItems) == 0 {
+		return
+	}
+
+	logger.Info("")
+	logger.Error("Failed updates:")
+	for i, item := range s.ErrorItems {
+		logger.Error("  %d. %s: %v", i+1, item.Title, item.Error)
+	}
+}
+
+func groupSkipReasons(items []UpdateResult) map[string]int {
+	byReason := make(map[string]int)
+	for _, item := range items {
+		reason := item.SkipReason
+		if reason == "" {
+			reason = "unspecified"
+		}
+		byReason[reason]++
+	}
+	return byReason
+}
+
+// PrintGlobalSummary prints combined statistics for multiple sync operations
+func PrintGlobalSummary(ctx context.Context, stats []*Statistics, report *SyncReport, totalDuration time.Duration) {
+	logger := LoggerFromContext(ctx)
+	if logger == nil {
+		return
+	}
+
+	totals := aggregateStats(stats)
+
+	// Header
+	logger.Info("")
+	logger.Stage("=== Sync Complete ===")
+	logger.Info("Duration: %v", totalDuration.Round(time.Millisecond))
+	logger.Info("")
+	logger.Info("Total: %d | Updated: %d | Skipped: %d | Errors: %d",
+		totals.items, totals.updated, totals.skipped, totals.errors)
+
+	printGlobalSkipReasons(logger, totals.skipReasons)
+	printGlobalWarnings(logger, report)
+	printGlobalErrors(logger, totals.errorItems)
+}
+
+type aggregatedTotals struct {
+	items, updated, skipped, errors int
+	skipReasons                     map[string]int
+	errorItems                      []UpdateResult
+}
+
+func aggregateStats(stats []*Statistics) aggregatedTotals {
+	totals := aggregatedTotals{
+		skipReasons: make(map[string]int),
+	}
+
+	for _, s := range stats {
+		if s == nil {
+			continue
+		}
+		totals.items += s.TotalCount
+		totals.updated += s.UpdatedCount
+		totals.skipped += s.SkippedCount
+		totals.errors += s.ErrorCount
+
+		for reason, count := range groupSkipReasons(s.SkippedItems) {
+			totals.skipReasons[reason] += count
+		}
+		totals.errorItems = append(totals.errorItems, s.ErrorItems...)
+	}
+
+	return totals
+}
+
+func printGlobalSkipReasons(logger *Logger, skipReasons map[string]int) {
+	if len(skipReasons) == 0 {
+		return
+	}
+
+	logger.Info("")
+	logger.Info("Skipped by reason:")
+	for _, reason := range sortedKeys(skipReasons) {
+		logger.Info("  %s: %d", reason, skipReasons[reason])
+	}
+}
+
+func printGlobalWarnings(logger *Logger, report *SyncReport) {
+	if report == nil || !report.HasWarnings() {
+		return
+	}
+
+	logger.Info("")
+	logger.Warn("Warnings (%d):", len(report.Warnings))
+	for _, w := range report.Warnings {
+		if w.Detail != "" {
+			logger.Warn("  %q - %s %s", w.Title, w.Reason, w.Detail)
+		} else {
+			logger.Warn("  %q - %s", w.Title, w.Reason)
+		}
+	}
+}
+
+func printGlobalErrors(logger *Logger, errorItems []UpdateResult) {
+	if len(errorItems) == 0 {
+		return
+	}
+
+	logger.Info("")
+	logger.Error("Errors:")
+	for i, item := range errorItems {
+		logger.Error("  %d. %s: %v", i+1, item.Title, item.Error)
+	}
+}
+
+// sortedKeys returns sorted keys from a map
+func sortedKeys(m map[string]int) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }

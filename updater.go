@@ -38,7 +38,7 @@ type Updater struct {
 	DryRun        bool         // Skip actual updates
 }
 
-func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target) {
+func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target, report *SyncReport) {
 	tgtsByID := make(map[TargetID]Target, len(tgts))
 	for _, tgt := range tgts {
 		tgtsByID[tgt.GetTargetID()] = tgt
@@ -74,7 +74,7 @@ func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target) {
 		}
 
 		// Show progress (overwrites previous line)
-		LogProgress(ctx, processedCount, len(srcs), statusStr)
+		LogProgress(ctx, processedCount, len(srcs), statusStr, src.GetTitle())
 
 		LogDebug(ctx, "[%s] Processing: %s", u.Prefix, src.String())
 
@@ -90,16 +90,16 @@ func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target) {
 			continue
 		}
 
-		u.updateSourceByTargets(ctx, src, tgtsByID)
+		u.updateSourceByTargets(ctx, src, tgtsByID, report)
 	}
 }
 
-func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts map[TargetID]Target) {
+func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts map[TargetID]Target, report *SyncReport) {
 	tgtID := src.GetTargetID()
 
 	if !u.ForceSync { // filter sources by different progress with targets
 		// Use strategy chain to find target
-		tgt, err := u.StrategyChain.FindTarget(ctx, src, tgts, u.Prefix)
+		tgt, err := u.StrategyChain.FindTarget(ctx, src, tgts, u.Prefix, report)
 		if err != nil {
 			LogDebug(ctx, "[%s] Error finding target: %v", u.Prefix, err)
 			u.Statistics.RecordSkip(UpdateResult{
@@ -133,7 +133,12 @@ func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts ma
 	}
 
 	if u.DryRun { // skip update if dry run
-		LogInfo(ctx, "[%s] Dry run: Skipping update for %s", u.Prefix, src.GetTitle())
+		// Record in statistics for summary, don't log each item individually
+		u.Statistics.RecordUpdate(UpdateResult{
+			Title:  src.GetTitle(),
+			Status: src.GetStatusString(),
+			Detail: "dry run",
+		})
 		return
 	}
 

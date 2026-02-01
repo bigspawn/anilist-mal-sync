@@ -139,7 +139,7 @@ func (l *Logger) Stage(format string, args ...interface{}) {
 }
 
 // Progress logs sync progress (overwrites previous line in TTY, single line otherwise)
-func (l *Logger) Progress(current, total int, status string) {
+func (l *Logger) Progress(current, total int, status, title string) {
 	if l.level < LogLevelInfo {
 		return
 	}
@@ -152,8 +152,15 @@ func (l *Logger) Progress(current, total int, status string) {
 		return
 	}
 
+	// Truncate long titles to keep output readable
+	const maxTitleLen = 150
+	displayTitle := title
+	if len(displayTitle) > maxTitleLen {
+		displayTitle = displayTitle[:maxTitleLen-3] + "..."
+	}
+
 	// Terminal: overwrite line with carriage return
-	msg := fmt.Sprintf("[%d/%d] Processing %s...", current, total, status)
+	msg := fmt.Sprintf("[%d/%d] %s: %s", current, total, status, displayTitle)
 	l.infoLog.Print("\r\033[K" + msg) // \033[K clears to end of line
 	if current == total {
 		l.infoLog.Println()
@@ -250,8 +257,8 @@ func LogStage(ctx context.Context, format string, args ...interface{}) {
 }
 
 // LogProgress logs sync progress using the logger from context
-func LogProgress(ctx context.Context, current, total int, status string) {
+func LogProgress(ctx context.Context, current, total int, status, title string) {
 	if logger := LoggerFromContext(ctx); logger != nil {
-		logger.Progress(current, total, status)
+		logger.Progress(current, total, status, title)
 	}
 }

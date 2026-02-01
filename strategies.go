@@ -6,11 +6,12 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 )
 
 // TargetFindStrategy defines a strategy for finding targets
 type TargetFindStrategy interface {
-	FindTarget(ctx context.Context, src Source, existingTargets map[TargetID]Target, prefix string) (Target, bool, error)
+	FindTarget(ctx context.Context, src Source, existingTargets map[TargetID]Target, prefix string, report *SyncReport) (Target, bool, error)
 	Name() string
 }
 
@@ -25,9 +26,11 @@ func NewStrategyChain(strategies ...TargetFindStrategy) *StrategyChain {
 }
 
 // FindTarget executes strategies in order until one succeeds
-func (sc *StrategyChain) FindTarget(ctx context.Context, src Source, existingTargets map[TargetID]Target, prefix string) (Target, error) {
+func (sc *StrategyChain) FindTarget(
+	ctx context.Context, src Source, existingTargets map[TargetID]Target, prefix string, report *SyncReport,
+) (Target, error) {
 	for _, strategy := range sc.strategies {
-		target, found, err := strategy.FindTarget(ctx, src, existingTargets, prefix)
+		target, found, err := strategy.FindTarget(ctx, src, existingTargets, prefix, report)
 		if err != nil {
 			return nil, fmt.Errorf("strategy %s failed: %w", strategy.Name(), err)
 		}
@@ -46,7 +49,9 @@ func (s IDStrategy) Name() string {
 	return "IDStrategy"
 }
 
-func (s IDStrategy) FindTarget(ctx context.Context, src Source, existingTargets map[TargetID]Target, prefix string) (Target, bool, error) {
+func (s IDStrategy) FindTarget(
+	ctx context.Context, src Source, existingTargets map[TargetID]Target, prefix string, _ *SyncReport,
+) (Target, bool, error) {
 	srcID := src.GetTargetID()
 	target, found := existingTargets[srcID]
 	if found {
@@ -66,7 +71,7 @@ func (s TitleStrategy) Name() string {
 
 // shouldRejectMatch checks if a potential match should be rejected
 // Returns true if the match should be rejected with appropriate logging
-func shouldRejectMatch(ctx context.Context, src Source, target Target, prefix string) bool {
+func shouldRejectMatch(ctx context.Context, src Source, target Target, prefix string, report *SyncReport) bool {
 	// Check MAL ID mismatch
 	srcID := src.GetTargetID()
 	tgtID := target.GetTargetID()
@@ -96,8 +101,20 @@ func shouldRejectMatch(ctx context.Context, src Source, target Target, prefix st
 			reason = "episode count mismatch (special vs series)"
 		}
 
-		LogWarn(ctx, "Skipping %q - %s (%d vs %d)",
-			srcAnime.GetTitle(), reason, srcAnime.NumEpisodes, tgtAnime.NumEpisodes)
+		// Accumulate warning for deferred output instead of logging immediately
+		if report != nil {
+			mediaType := strings.TrimPrefix(prefix, "AniList to MAL ")
+			mediaType = strings.TrimPrefix(mediaType, "MAL to AniList ")
+			report.AddWarning(
+				srcAnime.GetTitle(),
+				reason,
+				fmt.Sprintf("(%d vs %d)", srcAnime.NumEpisodes, tgtAnime.NumEpisodes),
+				mediaType,
+			)
+		}
+
+		LogDebugDecision(ctx, "[%s] Rejecting potentially incorrect match: %q - %s (%d vs %d)",
+			prefix, srcAnime.GetTitle(), reason, srcAnime.NumEpisodes, tgtAnime.NumEpisodes)
 		return true
 	}
 
@@ -109,6 +126,7 @@ func (s TitleStrategy) FindTarget(
 	src Source,
 	existingTargets map[TargetID]Target,
 	prefix string,
+	report *SyncReport,
 ) (Target, bool, error) {
 	srcTitle := src.GetTitle()
 
@@ -134,7 +152,7 @@ func (s TitleStrategy) FindTarget(
 	for _, target := range targetSlice {
 		if src.SameTitleWithTarget(target) && src.SameTypeWithTarget(target) {
 			// Check for potential mismatches and reject if needed
-			if shouldRejectMatch(ctx, src, target, prefix) {
+			if shouldRejectMatch(ctx, src, target, prefix, report) {
 				continue
 			}
 
@@ -162,6 +180,7 @@ func (s MALIDStrategy) FindTarget(
 	src Source,
 	existingTargets map[TargetID]Target,
 	prefix string,
+	_ *SyncReport,
 ) (Target, bool, error) {
 	// Check for context cancellation before potentially long-running search
 	select {
@@ -216,6 +235,7 @@ func (s APISearchStrategy) FindTarget(
 	src Source,
 	existingTargets map[TargetID]Target,
 	prefix string,
+	report *SyncReport,
 ) (Target, bool, error) {
 	// Check for context cancellation before potentially long-running search
 	select {
@@ -251,7 +271,7 @@ func (s APISearchStrategy) FindTarget(
 	for _, tgt := range targets {
 		if existingTarget, exists := existingTargets[tgt.GetTargetID()]; exists {
 			// Check for potential mismatches before accepting API search result
-			if shouldRejectMatch(ctx, src, existingTarget, prefix) {
+			if shouldRejectMatch(ctx, src, existingTarget, prefix, report) {
 				continue
 			}
 			LogDebugDecision(ctx, "[%s] Found target by API name search in user's list: %s", prefix, tgt.GetTitle())

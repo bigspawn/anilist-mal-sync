@@ -41,9 +41,9 @@ func (m *MockTargetFindStrategy) EXPECT() *MockTargetFindStrategyMockRecorder {
 }
 
 // FindTarget mocks base method.
-func (m *MockTargetFindStrategy) FindTarget(ctx context.Context, src Source, existingTargets map[TargetID]Target, prefix string) (Target, bool, error) {
+func (m *MockTargetFindStrategy) FindTarget(ctx context.Context, src Source, existingTargets map[TargetID]Target, prefix string, report *SyncReport) (Target, bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FindTarget", ctx, src, existingTargets, prefix)
+	ret := m.ctrl.Call(m, "FindTarget", ctx, src, existingTargets, prefix, report)
 	ret0, _ := ret[0].(Target)
 	ret1, _ := ret[1].(bool)
 	ret2, _ := ret[2].(error)
@@ -51,9 +51,9 @@ func (m *MockTargetFindStrategy) FindTarget(ctx context.Context, src Source, exi
 }
 
 // FindTarget indicates an expected call of FindTarget.
-func (mr *MockTargetFindStrategyMockRecorder) FindTarget(ctx, src, existingTargets, prefix any) *gomock.Call {
+func (mr *MockTargetFindStrategyMockRecorder) FindTarget(ctx, src, existingTargets, prefix, report any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindTarget", reflect.TypeOf((*MockTargetFindStrategy)(nil).FindTarget), ctx, src, existingTargets, prefix)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindTarget", reflect.TypeOf((*MockTargetFindStrategy)(nil).FindTarget), ctx, src, existingTargets, prefix, report)
 }
 
 // Name mocks base method.

@@ -27,7 +27,7 @@ func TestIDStrategy_FindsExistingTarget(t *testing.T) {
 		},
 	}
 
-	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]")
+	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]", nil)
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -60,7 +60,7 @@ func TestIDStrategy_NotFoundInUserList(t *testing.T) {
 		},
 	}
 
-	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]")
+	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]", nil)
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -159,7 +159,7 @@ func TestTitleStrategy_ShouldRejectMismatchedMALIDs(t *testing.T) {
 				TargetID(tt.existingTarget.IDMal): tt.existingTarget,
 			}
 
-			target, found, err := strategy.FindTarget(ctx, tt.source, existingTargets, "[Test]")
+			target, found, err := strategy.FindTarget(ctx, tt.source, existingTargets, "[Test]", nil)
 			if err != nil {
 				t.Errorf("Expected no error, got %v", err)
 			}
@@ -261,7 +261,7 @@ func TestTitleStrategy_ShouldRejectLargeEpisodeCountDifference(t *testing.T) {
 				TargetID(tt.existingTarget.IDMal): tt.existingTarget,
 			}
 
-			target, found, err := strategy.FindTarget(ctx, tt.source, existingTargets, "[Test]")
+			target, found, err := strategy.FindTarget(ctx, tt.source, existingTargets, "[Test]", nil)
 			if err != nil {
 				t.Errorf("Expected no error, got %v", err)
 			}
@@ -316,7 +316,7 @@ func TestStrategyChain_Integration(t *testing.T) {
 		TitleStrategy{},
 	)
 
-	target, err := chain.FindTarget(ctx, source, existingTargets, "[Test]")
+	target, err := chain.FindTarget(ctx, source, existingTargets, "[Test]", nil)
 
 	// Expected behavior after fix: should return error (no target found)
 	// Current buggy behavior: returns main series (wrong match)
@@ -369,7 +369,7 @@ func TestMALIDStrategy_FindsTargetByMALID(t *testing.T) {
 
 	strategy := MALIDStrategy{Service: mockService}
 
-	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]")
+	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]", nil)
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -443,7 +443,7 @@ func TestMALIDStrategy_ReturnsExistingUserTarget(t *testing.T) {
 
 	strategy := MALIDStrategy{Service: mockService}
 
-	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]")
+	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]", nil)
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -494,7 +494,7 @@ func TestMALIDStrategy_SkipsZeroMALID(t *testing.T) {
 
 	strategy := MALIDStrategy{Service: mockService}
 
-	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]")
+	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]", nil)
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -537,7 +537,7 @@ func TestMALIDStrategy_ContextCancellation(t *testing.T) {
 
 	strategy := MALIDStrategy{Service: mockService}
 
-	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]")
+	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]", nil)
 	if err == nil {
 		t.Error("Expected context cancellation error, got nil")
 	}
@@ -577,7 +577,7 @@ func TestMALIDStrategy_ErrorHandling(t *testing.T) {
 
 	strategy := MALIDStrategy{Service: mockService}
 
-	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]")
+	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]", nil)
 	if err == nil {
 		t.Error("Expected error from API, got nil")
 	}
