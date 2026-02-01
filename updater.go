@@ -1,5 +1,7 @@
 package main
 
+//go:generate mockgen -destination mock_updater_test.go -package main -source=updater.go
+
 import (
 	"context"
 	"fmt"
@@ -31,11 +33,12 @@ type Updater struct {
 	Statistics    *Statistics
 	IgnoreTitles  map[string]struct{}
 	StrategyChain *StrategyChain
-
-	UpdateTargetBySourceFunc func(context.Context, TargetID, Source) error
+	Service       MediaService // Replaces callback
+	ForceSync     bool         // Skip matching logic, force sync all
+	DryRun        bool         // Skip actual updates
 }
 
-func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target) {
+func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target, report *SyncReport) {
 	tgtsByID := make(map[TargetID]Target, len(tgts))
 	for _, tgt := range tgts {
 		tgtsByID[tgt.GetTargetID()] = tgt
@@ -71,7 +74,7 @@ func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target) {
 		}
 
 		// Show progress (overwrites previous line)
-		LogProgress(ctx, processedCount, len(srcs), statusStr)
+		LogProgress(ctx, processedCount, len(srcs), statusStr, src.GetTitle())
 
 		LogDebug(ctx, "[%s] Processing: %s", u.Prefix, src.String())
 
@@ -87,16 +90,16 @@ func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target) {
 			continue
 		}
 
-		u.updateSourceByTargets(ctx, src, tgtsByID)
+		u.updateSourceByTargets(ctx, src, tgtsByID, report)
 	}
 }
 
-func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts map[TargetID]Target) {
+func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts map[TargetID]Target, report *SyncReport) {
 	tgtID := src.GetTargetID()
 
-	if !(*forceSync) {
+	if !u.ForceSync { // filter sources by different progress with targets
 		// Use strategy chain to find target
-		tgt, err := u.StrategyChain.FindTarget(ctx, src, tgts, u.Prefix)
+		tgt, err := u.StrategyChain.FindTarget(ctx, src, tgts, u.Prefix, report)
 		if err != nil {
 			LogDebug(ctx, "[%s] Error finding target: %v", u.Prefix, err)
 			u.Statistics.RecordSkip(UpdateResult{
@@ -129,8 +132,13 @@ func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts ma
 		tgtID = tgt.GetTargetID()
 	}
 
-	if *dryRun {
-		LogInfo(ctx, "[%s] Dry run: Skipping update for %s", u.Prefix, src.GetTitle())
+	if u.DryRun { // skip update if dry run
+		// Record in statistics for summary, don't log each item individually
+		u.Statistics.RecordUpdate(UpdateResult{
+			Title:  src.GetTitle(),
+			Status: src.GetStatusString(),
+			Detail: "dry run",
+		})
 		return
 	}
 
@@ -148,7 +156,7 @@ func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts ma
 func (u *Updater) updateTarget(ctx context.Context, id TargetID, src Source) {
 	LogDebug(ctx, "[%s] Updating %s", u.Prefix, src.GetTitle())
 
-	if err := u.UpdateTargetBySourceFunc(ctx, id, src); err != nil {
+	if err := u.Service.Update(ctx, id, src, u.Prefix); err != nil {
 		u.Statistics.RecordError(UpdateResult{
 			Title:  src.GetTitle(),
 			Status: src.GetStatusString(),
@@ -159,7 +167,7 @@ func (u *Updater) updateTarget(ctx context.Context, id TargetID, src Source) {
 	}
 
 	// Generate concise update message
-	detail := generateUpdateDetail(src)
+	detail := generateUpdateDetail(src, id)
 
 	u.Statistics.RecordUpdate(UpdateResult{
 		Title:  src.GetTitle(),
@@ -172,8 +180,37 @@ func (u *Updater) updateTarget(ctx context.Context, id TargetID, src Source) {
 }
 
 // generateUpdateDetail generates a concise update detail string
-func generateUpdateDetail(src Source) string {
-	return fmt.Sprintf("(ID: %d)", src.GetTargetID())
+func generateUpdateDetail(src Source, tgtID TargetID) string {
+	// Try to get both MAL and AniList IDs from source
+	var malID, anilistID TargetID
+
+	// Use type assertion to get both IDs if available
+	if anime, ok := src.(Anime); ok {
+		malID = TargetID(anime.IDMal)
+		anilistID = TargetID(anime.IDAnilist)
+	} else if manga, ok := src.(Manga); ok {
+		malID = TargetID(manga.IDMal)
+		anilistID = TargetID(manga.IDAnilist)
+	}
+
+	// In reverse sync (MAL -> AniList), tgtID is the AniList ID
+	// In forward sync (AniList -> MAL), tgtID is the MAL ID
+	if *reverseDirection {
+		anilistID = tgtID // Use the found AniList ID
+	} else {
+		malID = tgtID // Use the found MAL ID
+	}
+
+	// Show both IDs if available and different
+	switch {
+	case malID > 0 && anilistID > 0 && malID != anilistID:
+		return fmt.Sprintf("(MAL: %d, AniList: %d)", malID, anilistID)
+	case anilistID > 0:
+		return fmt.Sprintf("(AniList: %d)", anilistID)
+	case malID > 0:
+		return fmt.Sprintf("(MAL: %d)", malID)
+	}
+	return fmt.Sprintf("(ID: %d)", tgtID)
 }
 
 // DPrintf is deprecated - use LogDebug with context instead

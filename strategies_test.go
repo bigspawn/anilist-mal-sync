@@ -2,9 +2,10 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"testing"
+
+	"go.uber.org/mock/gomock"
 )
 
 // TestIDStrategy_FindsExistingTarget tests that IDStrategy finds targets by ID when they exist
@@ -26,7 +27,7 @@ func TestIDStrategy_FindsExistingTarget(t *testing.T) {
 		},
 	}
 
-	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]")
+	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]", nil)
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -59,7 +60,7 @@ func TestIDStrategy_NotFoundInUserList(t *testing.T) {
 		},
 	}
 
-	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]")
+	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]", nil)
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -158,7 +159,7 @@ func TestTitleStrategy_ShouldRejectMismatchedMALIDs(t *testing.T) {
 				TargetID(tt.existingTarget.IDMal): tt.existingTarget,
 			}
 
-			target, found, err := strategy.FindTarget(ctx, tt.source, existingTargets, "[Test]")
+			target, found, err := strategy.FindTarget(ctx, tt.source, existingTargets, "[Test]", nil)
 			if err != nil {
 				t.Errorf("Expected no error, got %v", err)
 			}
@@ -260,7 +261,7 @@ func TestTitleStrategy_ShouldRejectLargeEpisodeCountDifference(t *testing.T) {
 				TargetID(tt.existingTarget.IDMal): tt.existingTarget,
 			}
 
-			target, found, err := strategy.FindTarget(ctx, tt.source, existingTargets, "[Test]")
+			target, found, err := strategy.FindTarget(ctx, tt.source, existingTargets, "[Test]", nil)
 			if err != nil {
 				t.Errorf("Expected no error, got %v", err)
 			}
@@ -315,7 +316,7 @@ func TestStrategyChain_Integration(t *testing.T) {
 		TitleStrategy{},
 	)
 
-	target, err := chain.FindTarget(ctx, source, existingTargets, "[Test]")
+	target, err := chain.FindTarget(ctx, source, existingTargets, "[Test]", nil)
 
 	// Expected behavior after fix: should return error (no target found)
 	// Current buggy behavior: returns main series (wrong match)
@@ -338,6 +339,8 @@ func TestMALIDStrategy_FindsTargetByMALID(t *testing.T) {
 	reverseDirection = &trueVal
 
 	ctx := context.Background()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
 	// Source from MAL with IDMal set
 	source := Anime{
@@ -361,16 +364,12 @@ func TestMALIDStrategy_FindsTargetByMALID(t *testing.T) {
 		101206: apiTarget,
 	}
 
-	strategy := MALIDStrategy{
-		GetTargetByMALIDFunc: func(_ context.Context, malID int) (Target, error) {
-			if malID == 37341 {
-				return apiTarget, nil
-			}
-			return nil, errors.New("target not found")
-		},
-	}
+	mockService := NewMockMediaServiceWithMALID(ctrl)
+	mockService.EXPECT().GetByMALID(ctx, 37341, "[Test]").Return(apiTarget, nil)
 
-	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]")
+	strategy := MALIDStrategy{Service: mockService}
+
+	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]", nil)
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -406,6 +405,8 @@ func TestMALIDStrategy_ReturnsExistingUserTarget(t *testing.T) {
 	reverseDirection = &trueVal
 
 	ctx := context.Background()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
 	source := Anime{
 		IDMal:       37341,
@@ -437,13 +438,12 @@ func TestMALIDStrategy_ReturnsExistingUserTarget(t *testing.T) {
 		101206: userTarget,
 	}
 
-	strategy := MALIDStrategy{
-		GetTargetByMALIDFunc: func(_ context.Context, _ int) (Target, error) {
-			return apiTarget, nil
-		},
-	}
+	mockService := NewMockMediaServiceWithMALID(ctrl)
+	mockService.EXPECT().GetByMALID(ctx, 37341, "[Test]").Return(apiTarget, nil)
 
-	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]")
+	strategy := MALIDStrategy{Service: mockService}
+
+	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]", nil)
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -476,6 +476,8 @@ func TestMALIDStrategy_SkipsZeroMALID(t *testing.T) {
 	reverseDirection = &trueVal
 
 	ctx := context.Background()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
 	source := Anime{
 		IDMal:       0, // No MAL ID
@@ -486,14 +488,13 @@ func TestMALIDStrategy_SkipsZeroMALID(t *testing.T) {
 
 	existingTargets := map[TargetID]Target{}
 
-	strategy := MALIDStrategy{
-		GetTargetByMALIDFunc: func(_ context.Context, _ int) (Target, error) {
-			t.Error("GetTargetByMALIDFunc should not be called when source ID is 0")
-			return nil, errors.New("should not be called")
-		},
-	}
+	mockService := NewMockMediaServiceWithMALID(ctrl)
+	// GetByMALID should not be called when source ID is 0
+	mockService.EXPECT().GetByMALID(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
-	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]")
+	strategy := MALIDStrategy{Service: mockService}
+
+	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]", nil)
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
@@ -518,6 +519,9 @@ func TestMALIDStrategy_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
 
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	source := Anime{
 		IDMal:       12345,
 		IDAnilist:   0,
@@ -527,14 +531,13 @@ func TestMALIDStrategy_ContextCancellation(t *testing.T) {
 
 	existingTargets := map[TargetID]Target{}
 
-	strategy := MALIDStrategy{
-		GetTargetByMALIDFunc: func(_ context.Context, _ int) (Target, error) {
-			t.Error("GetTargetByMALIDFunc should not be called when context is cancelled")
-			return nil, errors.New("should not be called")
-		},
-	}
+	mockService := NewMockMediaServiceWithMALID(ctrl)
+	// GetByMALID should not be called when context is cancelled
+	mockService.EXPECT().GetByMALID(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
-	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]")
+	strategy := MALIDStrategy{Service: mockService}
+
+	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]", nil)
 	if err == nil {
 		t.Error("Expected context cancellation error, got nil")
 	}
@@ -557,6 +560,8 @@ func TestMALIDStrategy_ErrorHandling(t *testing.T) {
 	reverseDirection = &trueVal
 
 	ctx := context.Background()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
 	source := Anime{
 		IDMal:       99999, // Non-existent MAL ID
@@ -567,13 +572,12 @@ func TestMALIDStrategy_ErrorHandling(t *testing.T) {
 
 	existingTargets := map[TargetID]Target{}
 
-	strategy := MALIDStrategy{
-		GetTargetByMALIDFunc: func(_ context.Context, malID int) (Target, error) {
-			return nil, fmt.Errorf("no anime found with MAL ID %d", malID)
-		},
-	}
+	mockService := NewMockMediaServiceWithMALID(ctrl)
+	mockService.EXPECT().GetByMALID(ctx, 99999, "[Test]").Return(nil, fmt.Errorf("no anime found with MAL ID %d", 99999))
 
-	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]")
+	strategy := MALIDStrategy{Service: mockService}
+
+	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]", nil)
 	if err == nil {
 		t.Error("Expected error from API, got nil")
 	}

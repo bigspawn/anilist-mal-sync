@@ -18,9 +18,9 @@ type AnilistClient struct {
 	httpTimeout time.Duration
 }
 
-func NewAnilistClient(ctx context.Context, oauth *OAuth, username string, httpTimeout time.Duration) *AnilistClient {
+func NewAnilistClient(ctx context.Context, oauth *OAuth, username string, httpTimeout time.Duration, verbose bool) *AnilistClient {
 	httpClient := oauth2.NewClient(ctx, oauth.TokenSource(ctx))
-	httpClient.Transport = newLoggingRoundTripper(httpClient.Transport)
+	httpClient.Transport = newLoggingRoundTripper(httpClient.Transport, verbose)
 
 	v := verniy.New()
 	v.Http = *httpClient
