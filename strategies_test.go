@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -642,5 +643,268 @@ func TestManga_GetSourceID(t *testing.T) {
 	reverseDirection = &trueVal
 	if got := source.GetSourceID(); got != 11111 {
 		t.Errorf("Reverse sync: expected source ID 11111 (MAL), got %d", got)
+	}
+}
+
+// TestStrategy_Name tests the Name() method for all strategies
+func TestIDStrategy_Name(t *testing.T) {
+	strategy := IDStrategy{}
+	if got := strategy.Name(); got != "IDStrategy" {
+		t.Errorf("Name() = %v, want %v", got, "IDStrategy")
+	}
+}
+
+func TestTitleStrategy_Name(t *testing.T) {
+	strategy := TitleStrategy{}
+	if got := strategy.Name(); got != "TitleStrategy" {
+		t.Errorf("Name() = %v, want %v", got, "TitleStrategy")
+	}
+}
+
+func TestMALIDStrategy_Name(t *testing.T) {
+	strategy := MALIDStrategy{}
+	if got := strategy.Name(); got != "MALIDStrategy" {
+		t.Errorf("Name() = %v, want %v", got, "MALIDStrategy")
+	}
+}
+
+func TestAPISearchStrategy_Name(t *testing.T) {
+	strategy := APISearchStrategy{}
+	if got := strategy.Name(); got != "APISearchStrategy" {
+		t.Errorf("Name() = %v, want %v", got, "APISearchStrategy")
+	}
+}
+
+func TestStrategyChain_Name(t *testing.T) {
+	chain := NewStrategyChain(IDStrategy{}, TitleStrategy{})
+	// StrategyChain doesn't have a Name() method, but we can test it contains strategies
+	if len(chain.strategies) != 2 {
+		t.Errorf("StrategyChain should have 2 strategies, got %d", len(chain.strategies))
+	}
+}
+
+// TestAPISearchStrategy_FindTarget tests the APISearchStrategy
+func TestAPISearchStrategy_FindTarget(t *testing.T) {
+	tests := []struct {
+		name            string
+		source          Source
+		existingTargets map[TargetID]Target
+		setupMock       func(*MockMediaService)
+		expectFound     bool
+		expectError     bool
+	}{
+		{
+			name: "find by ID in user list",
+			source: Anime{
+				IDMal:       12345,
+				TitleEN:     "Test Anime",
+				NumEpisodes: 12,
+			},
+			existingTargets: map[TargetID]Target{
+				12345: Anime{
+					IDMal:       12345,
+					TitleEN:     "Test Anime",
+					NumEpisodes: 12,
+					Status:      StatusCompleted,
+				},
+			},
+			setupMock: func(m *MockMediaService) {
+				apiTarget := Anime{
+					IDMal:       12345,
+					TitleEN:     "Test Anime",
+					NumEpisodes: 12,
+				}
+				m.EXPECT().GetByID(gomock.Any(), TargetID(12345), "[Test]").Return(apiTarget, nil)
+			},
+			expectFound: true,
+			expectError: false,
+		},
+		{
+			name: "find by name search",
+			source: Anime{
+				IDMal:       0, // No ID
+				TitleEN:     "Test Anime",
+				NumEpisodes: 12,
+			},
+			existingTargets: map[TargetID]Target{},
+			setupMock: func(m *MockMediaService) {
+				searchResults := []Target{
+					Anime{
+						IDMal:       12345,
+						TitleEN:     "Test Anime",
+						NumEpisodes: 12,
+					},
+				}
+				m.EXPECT().GetByName(gomock.Any(), "Test Anime", "[Test]").Return(searchResults, nil)
+			},
+			expectFound: true,
+			expectError: false,
+		},
+		{
+			name: "API returns error",
+			source: Anime{
+				IDMal:       12345,
+				TitleEN:     "Test Anime",
+				NumEpisodes: 12,
+			},
+			existingTargets: map[TargetID]Target{},
+			setupMock: func(m *MockMediaService) {
+				m.EXPECT().GetByID(gomock.Any(), TargetID(12345), "[Test]").Return(nil, errors.New("API error"))
+			},
+			expectFound: false,
+			expectError: true, // APISearchStrategy returns error on API failure
+		},
+		{
+			name: "empty search results",
+			source: Anime{
+				IDMal:       0,
+				TitleEN:     "Non-existent Anime",
+				NumEpisodes: 12,
+			},
+			existingTargets: map[TargetID]Target{},
+			setupMock: func(m *MockMediaService) {
+				m.EXPECT().GetByName(gomock.Any(), "Non-existent Anime", "[Test]").Return([]Target{}, nil)
+			},
+			expectFound: false,
+			expectError: false,
+		},
+		{
+			name: "context cancelled",
+			source: Anime{
+				IDMal:       12345,
+				TitleEN:     "Test Anime",
+				NumEpisodes: 12,
+			},
+			existingTargets: map[TargetID]Target{},
+			setupMock: func(_ *MockMediaService) {
+				// No expectations - context is cancelled before any API call
+			},
+			expectFound: false,
+			expectError: true, // Context cancellation returns error
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			ctx := context.Background()
+			if tt.name == "context cancelled" {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+			}
+
+			mockService := NewMockMediaService(ctrl)
+			tt.setupMock(mockService)
+
+			strategy := APISearchStrategy{Service: mockService}
+			report := NewSyncReport()
+
+			target, found, err := strategy.FindTarget(ctx, tt.source, tt.existingTargets, "[Test]", report)
+
+			if tt.expectError {
+				if err == nil {
+					t.Error("Expected error, but got nil")
+				}
+			} else if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+
+			if tt.expectFound {
+				if !found {
+					t.Error("Expected to find target, but didn't")
+				}
+				if target == nil {
+					t.Error("Expected non-nil target when found")
+				}
+			} else if found {
+				t.Error("Expected not to find target, but did")
+			}
+		})
+	}
+}
+
+func TestAPISearchStrategy_FindTarget_SameTypeMatch(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	ctx := context.Background()
+
+	source := Anime{
+		IDMal:       0,
+		TitleEN:     "Test Anime",
+		NumEpisodes: 12,
+	}
+
+	existingTargets := map[TargetID]Target{}
+
+	mockService := NewMockMediaService(ctrl)
+
+	// Return search results that match by type
+	searchResult := Anime{
+		IDMal:       12345,
+		TitleEN:     "Test Anime",
+		NumEpisodes: 12,
+		Status:      StatusWatching,
+	}
+	mockService.EXPECT().GetByName(ctx, "Test Anime", "[Test]").Return([]Target{searchResult}, nil)
+
+	strategy := APISearchStrategy{Service: mockService}
+	report := NewSyncReport()
+
+	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]", report)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if !found {
+		t.Error("Expected to find target by type match, but didn't")
+	}
+
+	if target == nil {
+		t.Error("Expected non-nil target")
+	}
+}
+
+func TestAPISearchStrategy_FindTarget_IgnoresTypeMismatch(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	ctx := context.Background()
+
+	source := Anime{
+		IDMal:       0,
+		TitleEN:     "Test Anime",
+		NumEpisodes: 12,
+	}
+
+	existingTargets := map[TargetID]Target{}
+
+	mockService := NewMockMediaService(ctrl)
+
+	// Return search results with type mismatch (Manga instead of Anime)
+	searchResult := Manga{
+		IDMal:    12345,
+		TitleEN:  "Test Anime",
+		Chapters: 50,
+	}
+	mockService.EXPECT().GetByName(ctx, "Test Anime", "[Test]").Return([]Target{searchResult}, nil)
+
+	strategy := APISearchStrategy{Service: mockService}
+	report := NewSyncReport()
+
+	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]", report)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if found {
+		t.Error("Expected not to find target due to type mismatch, but did")
+	}
+
+	if target != nil {
+		t.Error("Expected nil target when not found")
 	}
 }

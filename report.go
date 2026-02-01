@@ -15,7 +15,9 @@ type Warning struct {
 
 // NewSyncReport creates a new sync report
 func NewSyncReport() *SyncReport {
-	return &SyncReport{}
+	return &SyncReport{
+		Warnings: []Warning{},
+	}
 }
 
 // AddWarning adds a warning to the report

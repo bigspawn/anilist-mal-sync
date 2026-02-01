@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -334,6 +335,597 @@ func TestAnime_GetUpdateOptions(t *testing.T) {
 			opts := tt.anime.GetUpdateOptions()
 			if len(opts) != tt.wantOpts {
 				t.Errorf("GetUpdateOptions() returned %d options, want %d", len(opts), tt.wantOpts)
+			}
+		})
+	}
+}
+
+func TestAnime_GetTargetID(t *testing.T) {
+	tests := []struct {
+		name         string
+		anime        Anime
+		reverse      bool
+		wantTargetID TargetID
+	}{
+		{
+			name: "normal sync returns MAL ID",
+			anime: Anime{
+				IDMal:     12345,
+				IDAnilist: 67890,
+			},
+			reverse:      false,
+			wantTargetID: 12345,
+		},
+		{
+			name: "reverse sync returns AniList ID",
+			anime: Anime{
+				IDMal:     12345,
+				IDAnilist: 67890,
+			},
+			reverse:      true,
+			wantTargetID: 67890,
+		},
+		{
+			name: "zero MAL ID in normal mode",
+			anime: Anime{
+				IDMal:     0,
+				IDAnilist: 67890,
+			},
+			reverse:      false,
+			wantTargetID: 0,
+		},
+		{
+			name: "zero AniList ID in reverse mode",
+			anime: Anime{
+				IDMal:     12345,
+				IDAnilist: 0,
+			},
+			reverse:      true,
+			wantTargetID: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			origReverse := reverseDirection
+			defer func() { reverseDirection = origReverse }()
+
+			reverseDirection = &tt.reverse
+			got := tt.anime.GetTargetID()
+			if got != tt.wantTargetID {
+				t.Errorf("GetTargetID() = %v, want %v", got, tt.wantTargetID)
+			}
+		})
+	}
+}
+
+func TestAnime_GetAniListID(t *testing.T) {
+	tests := []struct {
+		name  string
+		anime Anime
+		want  TargetID
+	}{
+		{
+			name: "returns AniList ID",
+			anime: Anime{
+				IDMal:     12345,
+				IDAnilist: 67890,
+			},
+			want: 67890,
+		},
+		{
+			name: "zero AniList ID",
+			anime: Anime{
+				IDMal:     12345,
+				IDAnilist: 0,
+			},
+			want: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.anime.GetAniListID()
+			if got != tt.want {
+				t.Errorf("GetAniListID() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAnime_GetMALID(t *testing.T) {
+	tests := []struct {
+		name  string
+		anime Anime
+		want  TargetID
+	}{
+		{
+			name: "returns MAL ID",
+			anime: Anime{
+				IDMal:     12345,
+				IDAnilist: 67890,
+			},
+			want: 12345,
+		},
+		{
+			name: "zero MAL ID",
+			anime: Anime{
+				IDMal:     0,
+				IDAnilist: 67890,
+			},
+			want: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.anime.GetMALID()
+			if got != tt.want {
+				t.Errorf("GetMALID() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAnime_GetStatusString(t *testing.T) {
+	tests := []struct {
+		name   string
+		status Status
+		want   string
+	}{
+		{
+			name:   "watching",
+			status: StatusWatching,
+			want:   "watching",
+		},
+		{
+			name:   "completed",
+			status: StatusCompleted,
+			want:   "completed",
+		},
+		{
+			name:   "on_hold",
+			status: StatusOnHold,
+			want:   "on_hold",
+		},
+		{
+			name:   "dropped",
+			status: StatusDropped,
+			want:   "dropped",
+		},
+		{
+			name:   "plan_to_watch",
+			status: StatusPlanToWatch,
+			want:   "plan_to_watch",
+		},
+		{
+			name:   "unknown",
+			status: StatusUnknown,
+			want:   "unknown",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			anime := Anime{Status: tt.status}
+			got := anime.GetStatusString()
+			if got != tt.want {
+				t.Errorf("GetStatusString() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAnime_SameProgressWithTarget(t *testing.T) {
+	tests := []struct {
+		name   string
+		source Anime
+		target Target
+		want   bool
+	}{
+		{
+			name: "identical progress",
+			source: Anime{
+				Status:   StatusWatching,
+				Score:    8,
+				Progress: 10,
+			},
+			target: Anime{
+				Status:   StatusWatching,
+				Score:    8,
+				Progress: 10,
+			},
+			want: true,
+		},
+		{
+			name: "different status",
+			source: Anime{
+				Status:   StatusWatching,
+				Score:    8,
+				Progress: 10,
+			},
+			target: Anime{
+				Status:   StatusCompleted,
+				Score:    8,
+				Progress: 10,
+			},
+			want: false,
+		},
+		{
+			name: "different score",
+			source: Anime{
+				Status:   StatusWatching,
+				Score:    8,
+				Progress: 10,
+			},
+			target: Anime{
+				Status:   StatusWatching,
+				Score:    9,
+				Progress: 10,
+			},
+			want: false,
+		},
+		{
+			name: "different progress",
+			source: Anime{
+				Status:   StatusWatching,
+				Score:    8,
+				Progress: 10,
+			},
+			target: Anime{
+				Status:   StatusWatching,
+				Score:    8,
+				Progress: 12,
+			},
+			want: false,
+		},
+		{
+			name: "same progress with different NumEpisodes",
+			source: Anime{
+				Status:      StatusWatching,
+				Score:       8,
+				Progress:    10,
+				NumEpisodes: 12,
+			},
+			target: Anime{
+				Status:      StatusWatching,
+				Score:       8,
+				Progress:    10,
+				NumEpisodes: 13,
+			},
+			want: true,
+		},
+		{
+			name: "zero NumEpisodes both",
+			source: Anime{
+				Status:      StatusWatching,
+				Score:       8,
+				Progress:    10,
+				NumEpisodes: 0,
+			},
+			target: Anime{
+				Status:      StatusWatching,
+				Score:       8,
+				Progress:    10,
+				NumEpisodes: 0,
+			},
+			want: true,
+		},
+		{
+			name: "relative progress same (10/12 vs 8/10)",
+			source: Anime{
+				Status:      StatusWatching,
+				Score:       8,
+				Progress:    10,
+				NumEpisodes: 12,
+			},
+			target: Anime{
+				Status:      StatusWatching,
+				Score:       8,
+				Progress:    8,
+				NumEpisodes: 10,
+			},
+			want: true,
+		},
+		{
+			name: "target is not Anime",
+			source: Anime{
+				Status:   StatusWatching,
+				Score:    8,
+				Progress: 10,
+			},
+			target: Manga{
+				Status:   "watching",
+				Score:    8,
+				Progress: 10,
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.source.SameProgressWithTarget(tt.target)
+			if got != tt.want {
+				t.Errorf("SameProgressWithTarget() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAnime_SameTitleWithTarget(t *testing.T) {
+	tests := []struct {
+		name   string
+		source Anime
+		target Target
+		want   bool
+	}{
+		{
+			name: "exact English title match",
+			source: Anime{
+				TitleEN: "Test Anime",
+			},
+			target: Anime{
+				TitleEN: "Test Anime",
+			},
+			want: true,
+		},
+		{
+			name: "exact Japanese title match",
+			source: Anime{
+				TitleJP: "テストアニメ",
+			},
+			target: Anime{
+				TitleJP: "テストアニメ",
+			},
+			want: true,
+		},
+		{
+			name: "exact Romaji title match",
+			source: Anime{
+				TitleRomaji: "Test Anime",
+			},
+			target: Anime{
+				TitleRomaji: "Test Anime",
+			},
+			want: true,
+		},
+		{
+			name: "different titles no match",
+			source: Anime{
+				TitleEN: "Anime A",
+			},
+			target: Anime{
+				TitleEN: "Anime B",
+			},
+			want: false,
+		},
+		{
+			name: "20% episode difference accepted",
+			source: Anime{
+				TitleEN:     "Test Anime",
+				NumEpisodes: 10,
+			},
+			target: Anime{
+				TitleEN:     "Test Anime",
+				NumEpisodes: 12,
+			},
+			want: true,
+		},
+		{
+			name: "more than 20% episode difference rejected",
+			source: Anime{
+				TitleEN:     "Test Anime",
+				NumEpisodes: 10,
+			},
+			target: Anime{
+				TitleEN:     "Test Anime",
+				NumEpisodes: 13,
+			},
+			want: false,
+		},
+		{
+			name: "zero NumEpisodes both accepted",
+			source: Anime{
+				TitleEN:     "Test Anime",
+				NumEpisodes: 0,
+			},
+			target: Anime{
+				TitleEN:     "Test Anime",
+				NumEpisodes: 0,
+			},
+			want: true,
+		},
+		{
+			name: "target is not Anime",
+			source: Anime{
+				TitleEN: "Test Anime",
+			},
+			target: Manga{
+				TitleEN: "Test Anime",
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.source.SameTitleWithTarget(tt.target)
+			if got != tt.want {
+				t.Errorf("SameTitleWithTarget() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAnime_IdenticalTitleMatch(t *testing.T) {
+	tests := []struct {
+		name   string
+		source Anime
+		target Anime
+		want   bool
+	}{
+		{
+			name: "exact English title match",
+			source: Anime{
+				TitleEN: "Test Anime",
+			},
+			target: Anime{
+				TitleEN: "Test Anime",
+			},
+			want: true,
+		},
+		{
+			name: "exact Japanese title match",
+			source: Anime{
+				TitleJP: "テストアニメ",
+			},
+			target: Anime{
+				TitleJP: "テストアニメ",
+			},
+			want: true,
+		},
+		{
+			name: "exact Romaji title match",
+			source: Anime{
+				TitleRomaji: "Test Anime",
+			},
+			target: Anime{
+				TitleRomaji: "Test Anime",
+			},
+			want: true,
+		},
+		{
+			name: "different English titles",
+			source: Anime{
+				TitleEN: "Anime A",
+			},
+			target: Anime{
+				TitleEN: "Anime B",
+			},
+			want: false,
+		},
+		{
+			name: "empty titles no match",
+			source: Anime{
+				TitleEN:     "",
+				TitleJP:     "",
+				TitleRomaji: "",
+			},
+			target: Anime{
+				TitleEN:     "",
+				TitleJP:     "",
+				TitleRomaji: "",
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.source.IdenticalTitleMatch(tt.target)
+			if got != tt.want {
+				t.Errorf("IdenticalTitleMatch() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAnime_GetTitle(t *testing.T) {
+	tests := []struct {
+		name  string
+		anime Anime
+		want  string
+	}{
+		{
+			name: "returns English title when available",
+			anime: Anime{
+				TitleEN:     "English Title",
+				TitleJP:     "日本語タイトル",
+				TitleRomaji: "Romaji Title",
+			},
+			want: "English Title",
+		},
+		{
+			name: "returns Japanese title when English is empty",
+			anime: Anime{
+				TitleEN:     "",
+				TitleJP:     "日本語タイトル",
+				TitleRomaji: "Romaji Title",
+			},
+			want: "日本語タイトル",
+		},
+		{
+			name: "returns Romaji title when EN and JP are empty",
+			anime: Anime{
+				TitleEN:     "",
+				TitleJP:     "",
+				TitleRomaji: "Romaji Title",
+			},
+			want: "Romaji Title",
+		},
+		{
+			name: "returns empty string when all titles are empty",
+			anime: Anime{
+				TitleEN:     "",
+				TitleJP:     "",
+				TitleRomaji: "",
+			},
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.anime.GetTitle()
+			if got != tt.want {
+				t.Errorf("GetTitle() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAnime_String(t *testing.T) {
+	tests := []struct {
+		name  string
+		anime Anime
+	}{
+		{
+			name: "full anime string representation",
+			anime: Anime{
+				IDAnilist:   12345,
+				IDMal:       67890,
+				TitleEN:     "Test Anime",
+				TitleJP:     "テストアニメ",
+				Status:      StatusWatching,
+				Score:       8,
+				Progress:    10,
+				NumEpisodes: 12,
+				SeasonYear:  2024,
+			},
+		},
+		{
+			name: "minimal anime string representation",
+			anime: Anime{
+				IDAnilist: 0,
+				IDMal:     0,
+				TitleEN:   "",
+				Status:    StatusUnknown,
+				Score:     0,
+				Progress:  0,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.anime.String()
+			if got == "" {
+				t.Error("String() returned empty string")
+			}
+			// Check that it contains expected format
+			if !strings.Contains(got, "Anime{") || !strings.Contains(got, "}") {
+				t.Errorf("String() has unexpected format: %s", got)
 			}
 		})
 	}

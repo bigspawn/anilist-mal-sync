@@ -3,9 +3,11 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"log"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -332,4 +334,166 @@ func TestStatistics_RecordUpdatePanicWithoutInit(t *testing.T) {
 	assert.Panics(t, func() {
 		stats.RecordUpdate(UpdateResult{Title: "Test", Status: "completed"})
 	}, "RecordUpdate should panic when StatusCounts is nil")
+}
+
+func TestPrintGlobalSummary(t *testing.T) {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	defer log.SetOutput(os.Stderr)
+
+	logger := NewLogger(false)
+	logger.SetOutput(&buf)
+	ctx := logger.WithContext(context.Background())
+
+	// Create multiple statistics
+	stats1 := NewStatistics()
+	stats1.UpdatedCount = 5
+	stats1.SkippedCount = 10
+	stats1.TotalCount = 15
+	stats1.StatusCounts = map[string]int{"watching": 5, "completed": 10}
+	stats1.SkippedItems = []UpdateResult{
+		{Title: "Skip1", Status: "watching", SkipReason: "no changes"},
+		{Title: "Skip2", Status: "watching", SkipReason: "target not found"},
+	}
+
+	stats2 := NewStatistics()
+	stats2.UpdatedCount = 3
+	stats2.SkippedCount = 7
+	stats2.TotalCount = 10
+	stats2.StatusCounts = map[string]int{"completed": 3, "watching": 7}
+	stats2.SkippedItems = []UpdateResult{
+		{Title: "Skip3", Status: "completed", SkipReason: "no changes"},
+	}
+
+	report := NewSyncReport()
+	report.AddWarning("Warning Anime", "episode mismatch", "(1 vs 12)", "Anime")
+
+	statsArray := []*Statistics{stats1, stats2}
+
+	PrintGlobalSummary(ctx, statsArray, report, 5*time.Second)
+
+	output := buf.String()
+
+	// Check for summary output
+	assert.Contains(t, output, "Sync Complete", "Should print header")
+	assert.Contains(t, output, "Total: 25", "Should show total items")     // 15 + 10
+	assert.Contains(t, output, "Updated: 8", "Should show updated items")  // 5 + 3
+	assert.Contains(t, output, "Skipped: 17", "Should show skipped items") // 10 + 7
+}
+
+func TestPrintGlobalSummary_EmptyStats(t *testing.T) {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	defer log.SetOutput(os.Stderr)
+
+	logger := NewLogger(false)
+	logger.SetOutput(&buf)
+	ctx := logger.WithContext(context.Background())
+
+	report := NewSyncReport()
+	statsArray := []*Statistics{}
+
+	PrintGlobalSummary(ctx, statsArray, report, 1*time.Second)
+
+	output := buf.String()
+
+	// Should still print header
+	assert.Contains(t, output, "Sync Complete", "Should print header")
+	assert.Contains(t, output, "Total: 0", "Should show zero total")
+}
+
+func TestPrintGlobalSummary_WithWarnings(t *testing.T) {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	defer log.SetOutput(os.Stderr)
+
+	logger := NewLogger(false)
+	logger.SetOutput(&buf)
+	ctx := logger.WithContext(context.Background())
+
+	stats := NewStatistics()
+	stats.UpdatedCount = 1
+	stats.TotalCount = 1
+
+	report := NewSyncReport()
+	report.AddWarning("Test Anime", "test reason", "(1 vs 12)", "Anime")
+	report.AddWarning("Test Manga", "test reason 2", "", "Manga")
+
+	statsArray := []*Statistics{stats}
+
+	PrintGlobalSummary(ctx, statsArray, report, 1*time.Second)
+
+	output := buf.String()
+
+	assert.Contains(t, output, "Warnings (2)", "Should show warnings count")
+	assert.Contains(t, output, "Test Anime", "Should show warning title")
+	assert.Contains(t, output, "test reason", "Should show warning reason")
+}
+
+func TestPrintGlobalSummary_WithErrors(t *testing.T) {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	defer log.SetOutput(os.Stderr)
+
+	logger := NewLogger(false)
+	logger.SetOutput(&buf)
+	ctx := logger.WithContext(context.Background())
+
+	stats := NewStatistics()
+	stats.UpdatedCount = 1
+	stats.ErrorCount = 2
+	stats.TotalCount = 3
+	stats.ErrorItems = []UpdateResult{
+		{Title: "Error1", Error: errors.New("error 1")},
+		{Title: "Error2", Error: errors.New("error 2")},
+	}
+
+	report := NewSyncReport()
+	statsArray := []*Statistics{stats}
+
+	PrintGlobalSummary(ctx, statsArray, report, 1*time.Second)
+
+	output := buf.String()
+
+	assert.Contains(t, output, "Errors:", "Should show errors section")
+	assert.Contains(t, output, "Error1", "Should show error title")
+	assert.Contains(t, output, "error 1", "Should show error message")
+}
+
+func TestPrintGlobalSummary_SkipReasonsAggregation(t *testing.T) {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	defer log.SetOutput(os.Stderr)
+
+	logger := NewLogger(false)
+	logger.SetOutput(&buf)
+	ctx := logger.WithContext(context.Background())
+
+	// Create stats with various skip reasons
+	stats1 := NewStatistics()
+	stats1.SkippedCount = 3
+	stats1.SkippedItems = []UpdateResult{
+		{Title: "A", SkipReason: "no changes"},
+		{Title: "B", SkipReason: "no changes"},
+		{Title: "C", SkipReason: "target not found"},
+	}
+
+	stats2 := NewStatistics()
+	stats2.SkippedCount = 2
+	stats2.SkippedItems = []UpdateResult{
+		{Title: "D", SkipReason: "no changes"},
+		{Title: "E", SkipReason: "in ignore list"},
+	}
+
+	report := NewSyncReport()
+	statsArray := []*Statistics{stats1, stats2}
+
+	PrintGlobalSummary(ctx, statsArray, report, 1*time.Second)
+
+	output := buf.String()
+
+	assert.Contains(t, output, "Skipped by reason:", "Should show skip reasons")
+	assert.Contains(t, output, "no changes: 3", "Should aggregate 'no changes' reason")
+	assert.Contains(t, output, "target not found: 1", "Should show 'target not found' count")
+	assert.Contains(t, output, "in ignore list: 1", "Should show 'in ignore list' count")
 }
