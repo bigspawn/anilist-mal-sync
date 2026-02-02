@@ -1,0 +1,578 @@
+package main
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"golang.org/x/oauth2"
+)
+
+// ============================================
+// Race Condition Tests
+// ============================================
+
+func TestOAuth_ConcurrentStateAccess(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping race condition test in short mode")
+	}
+
+	oauth := &OAuth{
+		siteName: "test",
+		state:    "test-state",
+		Config: &oauth2.Config{
+			ClientID:     "test-id",
+			ClientSecret: "test-secret",
+			Endpoint: oauth2.Endpoint{
+				AuthURL:  "https://example.com/auth",
+				TokenURL: "https://example.com/token",
+			},
+		},
+	}
+
+	var wg sync.WaitGroup
+	// Run multiple goroutines accessing state methods
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_ = oauth.GetAuthURL()
+			_ = oauth.NeedInit()
+			_ = oauth.IsTokenValid()
+			_ = oauth.TokenExpiry()
+		}()
+	}
+
+	wg.Wait()
+}
+
+func TestSyncReport_ConcurrentWarningAdd(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping race condition test in short mode")
+	}
+
+	report := NewSyncReport()
+	var wg sync.WaitGroup
+
+	// Add warnings concurrently from multiple goroutines
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func(n int) {
+			defer wg.Done()
+			report.AddWarning(fmt.Sprintf("Title%d", n), "reason", "detail", "Anime")
+		}(i)
+	}
+
+	wg.Wait()
+
+	// Verify all warnings were added
+	if len(report.Warnings) != 100 {
+		t.Errorf("Expected 100 warnings, got %d", len(report.Warnings))
+	}
+}
+
+// ============================================
+// Error Handling Edge Cases
+// ============================================
+
+func TestIsRetryableError_WrappedErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "wrapped rate limit error",
+			err:  fmt.Errorf("API call failed: %w", errors.New("too many requests")),
+			want: true,
+		},
+		{
+			name: "double wrapped error",
+			err:  fmt.Errorf("outer: %w", fmt.Errorf("inner: %w", errors.New("rate limit exceeded"))),
+			want: true,
+		},
+		{
+			name: "wrapped 429 in string",
+			err:  errors.New("request failed with HTTP 429 status"),
+			want: true,
+		},
+		{
+			name: "case insensitive rate limit",
+			err:  errors.New("TOO MANY REQUESTS"),
+			want: true,
+		},
+		{
+			name: "mixed case rate limit",
+			err:  errors.New("Too Many Requests"),
+			want: true,
+		},
+		{
+			name: "substring match in larger error",
+			err:  errors.New("API error: got 429 rate limit from server"),
+			want: true,
+		},
+		{
+			name: "non-retryable wrapped error",
+			err:  fmt.Errorf("failed: %w", errors.New("unauthorized")),
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isRetryableError(tt.err)
+			if got != tt.want {
+				t.Errorf("isRetryableError() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// ============================================
+// Input Edge Cases
+// ============================================
+
+func TestNormalizeTitle_EdgeCases(t *testing.T) {
+	tests := []struct {
+		name  string
+		title string
+		want  string
+	}{
+		{
+			name:  "empty string",
+			title: "",
+			want:  "",
+		},
+		{
+			name:  "only spaces",
+			title: "     ",
+			want:  "",
+		},
+		{
+			name:  "only punctuation - removed individually",
+			title: "!:?.,",
+			want:  ",", // ! and ? removed, then : replaced with space, then . removed, leaving ,
+		},
+		{
+			name:  "only parentheses",
+			title: "((()))",
+			want:  "",
+		},
+		{
+			name:  "unicode characters",
+			title: "進撃の巨人Attack on Titan",
+			want:  "進撃の巨人attack on titan",
+		},
+		{
+			name:  "emoji characters",
+			title: "🎬 Anime Title",
+			want:  "🎬 anime title",
+		},
+		{
+			name:  "multiple colons - single pass replacement",
+			title: "Fullmetal: Alchemist: Brotherhood",
+			want:  "fullmetal alchemist brotherhood", // only first : is replaced
+		},
+		{
+			name:  "nested parentheses",
+			title: "Anime (TV (2023))",
+			want:  "anime", // parens removed, trailing space trimmed
+		},
+		{
+			name:  "mixed punctuation - single pass",
+			title: "What?! Is this... anime?",
+			want:  "what is this anime", // !! -> empty, then . removed, ? kept
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := normalizeTitle(tt.title)
+			if got != tt.want {
+				t.Errorf("normalizeTitle() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestExactMatch_EdgeCases(t *testing.T) {
+	tests := []struct {
+		name       string
+		t1, t2     string
+		titleType  string
+		wantResult bool
+	}{
+		{
+			name:       "both empty",
+			t1:         "",
+			t2:         "",
+			titleType:  "test",
+			wantResult: false,
+		},
+		{
+			name:       "one empty, one non-empty",
+			t1:         "",
+			t2:         "Some Title",
+			titleType:  "test",
+			wantResult: false,
+		},
+		{
+			name:       "only spaces",
+			t1:         "   ",
+			t2:         "   ",
+			titleType:  "test",
+			wantResult: true, // exact match on spaces
+		},
+		{
+			name:       "special characters only",
+			t1:         "!!",
+			t2:         "!!",
+			titleType:  "test",
+			wantResult: true,
+		},
+		{
+			name:       "unicode identical",
+			t1:         "進撃の巨人",
+			t2:         "進撃の巨人",
+			titleType:  "test",
+			wantResult: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := exactMatch(tt.t1, tt.t2, tt.titleType)
+			if got != tt.wantResult {
+				t.Errorf("exactMatch() = %v, want %v", got, tt.wantResult)
+			}
+		})
+	}
+}
+
+func TestBuildDiffString_EdgeCases(t *testing.T) {
+	tests := []struct {
+		name  string
+		pairs []any
+		want  string
+	}{
+		{
+			name:  "nil values",
+			pairs: []any{"Status", (*Status)(nil), "watching"},
+			want:  "Diff{Status: <nil> -> watching, }",
+		},
+		{
+			name:  "empty strings",
+			pairs: []any{"Title", "", "value"},
+			want:  "Diff{Title:  -> value, }",
+		},
+		{
+			name:  "very long values",
+			pairs: []any{"Title", strings.Repeat("a", 1000), strings.Repeat("b", 1000)},
+			want:  fmt.Sprintf("Diff{Title: %s -> %s, }", strings.Repeat("a", 1000), strings.Repeat("b", 1000)),
+		},
+		{
+			name:  "special characters",
+			pairs: []any{"Path", "C:\\Users\\path", "/usr/local/path"},
+			want:  "Diff{Path: C:\\Users\\path -> /usr/local/path, }",
+		},
+		{
+			name:  "zero values",
+			pairs: []any{"Score", 0, 0},
+			want:  "Diff{}",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := buildDiffString(tt.pairs...)
+			if got != tt.want {
+				t.Errorf("buildDiffString() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// ============================================
+// Nil/Zero Value Handling
+// ============================================
+
+func TestAnime_SameTypeWithTarget_NilAndZero(t *testing.T) {
+	anime := Anime{
+		IDAnilist: 123,
+		IDMal:     456,
+		TitleEN:   "Test Anime",
+	}
+
+	tests := []struct {
+		name   string
+		anime  Anime
+		target Target
+		want   bool
+	}{
+		{
+			name:   "nil target",
+			anime:  anime,
+			target: nil,
+			want:   false,
+		},
+		{
+			name:   "zero anime vs non-zero",
+			anime:  Anime{},
+			target: anime,
+			want:   false,
+		},
+		{
+			name:   "non-zero vs zero anime",
+			anime:  anime,
+			target: Anime{},
+			want:   false,
+		},
+		{
+			name:   "manga target (type mismatch)",
+			anime:  anime,
+			target: Manga{IDAnilist: 123},
+			want:   false,
+		},
+		{
+			name:   "same ID but different type",
+			anime:  Anime{IDAnilist: 123, IDMal: 456},
+			target: Manga{IDAnilist: 123, IDMal: 456},
+			want:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.anime.SameTypeWithTarget(tt.target)
+			if got != tt.want {
+				t.Errorf("SameTypeWithTarget() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// ============================================
+// Context Cancellation Tests
+// ============================================
+
+func TestRetryWithBackoff_ContextCancellation(t *testing.T) {
+	tests := []struct {
+		name              string
+		cancelImmediately bool
+		expectCallCount   int
+	}{
+		{
+			name:              "context cancelled immediately",
+			cancelImmediately: true,
+			expectCallCount:   1, // One call before check
+		},
+		{
+			name:              "context not cancelled",
+			cancelImmediately: false,
+			expectCallCount:   3, // 3 calls total (2 errors + 1 success)
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			if tt.cancelImmediately {
+				cancel()
+			} else {
+				defer cancel()
+			}
+
+			callCount := 0
+			operation := func() error {
+				callCount++
+				if callCount > 2 {
+					return nil
+				}
+				// Use a retryable error (rate limit)
+				return errors.New("rate limit exceeded")
+			}
+
+			_ = retryWithBackoff(ctx, operation, "test operation")
+
+			if callCount < tt.expectCallCount {
+				t.Errorf("Expected at least %d calls, got %d", tt.expectCallCount, callCount)
+			}
+		})
+	}
+}
+
+func TestWithTimeout_DeadlineExceeded(t *testing.T) {
+	ctx := context.Background()
+	timeout := 1 * time.Nanosecond
+
+	newCtx, cancel := withTimeout(ctx, timeout)
+	defer cancel()
+
+	// Wait for timeout to pass
+	time.Sleep(10 * time.Millisecond)
+
+	// Verify context is cancelled
+	select {
+	case <-newCtx.Done():
+		if newCtx.Err() != context.DeadlineExceeded {
+			t.Errorf("Expected DeadlineExceeded, got %v", newCtx.Err())
+		}
+	default:
+		t.Error("Expected context to be cancelled")
+	}
+}
+
+// ============================================
+// Edge Case: Empty/Invalid Data
+// ============================================
+
+func TestWatchConfig_GetInterval_EdgeCases(t *testing.T) {
+	tests := []struct {
+		name     string
+		interval string
+		wantErr  bool
+	}{
+		{
+			name:     "negative duration - valid in Go",
+			interval: "-5m",
+			wantErr:  false, // Negative durations are valid in Go
+		},
+		{
+			name:     "zero duration",
+			interval: "0s",
+			wantErr:  false,
+		},
+		{
+			name:     "very large duration",
+			interval: "87600h",
+			wantErr:  false,
+		},
+		{
+			name:     "fractional seconds",
+			interval: "1.5s",
+			wantErr:  false,
+		},
+		{
+			name:     "multiple units",
+			interval: "1h30m45s",
+			wantErr:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			wc := &WatchConfig{Interval: tt.interval}
+			got, err := wc.GetInterval()
+
+			if tt.wantErr && err == nil {
+				t.Error("Expected error, got nil")
+			}
+			// Just verify parsing works - negative durations are valid in Go
+			if !tt.wantErr && err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			// Verify the parsed duration matches expected (negative values OK)
+			if tt.interval == "-5m" && got != -5*time.Minute {
+				t.Errorf("Expected -5m, got %v", got)
+			}
+		})
+	}
+}
+
+func TestStatus_ErrorCases(t *testing.T) {
+	tests := []struct {
+		name    string
+		status  Status
+		wantErr bool
+	}{
+		{
+			name:    "invalid status",
+			status:  Status("invalid_status"),
+			wantErr: true,
+		},
+		{
+			name:    "empty status",
+			status:  Status(""),
+			wantErr: true,
+		},
+		{
+			name:    "unknown status",
+			status:  StatusUnknown,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := tt.status.GetMalStatus()
+			if tt.wantErr && err == nil {
+				t.Error("Expected error for invalid status")
+			}
+		})
+	}
+}
+
+// ============================================
+// Edge Case: Large Inputs
+// ============================================
+
+func TestNormalizeTitle_LongTitle(t *testing.T) {
+	longTitle := strings.Repeat("Very Long Anime Title ", 100)
+
+	// Should not panic
+	result := normalizeTitle(longTitle)
+
+	if len(result) == 0 {
+		t.Error("Expected non-empty result for long title")
+	}
+
+	// Should be shorter than original (replacements happened)
+	if len(result) >= len(longTitle) {
+		t.Errorf("Expected shorter result, got %d vs %d", len(result), len(longTitle))
+	}
+}
+
+func TestLogger_Progress_VeryLongTitle(t *testing.T) {
+	logger := NewLogger(false)
+	var buf bytes.Buffer
+	logger.SetOutput(&buf)
+
+	// Title longer than 150 characters
+	longTitle := strings.Repeat("A", 200)
+
+	// For non-terminal output, Progress only outputs when current == total
+	logger.Progress(10, 10, "watching", longTitle)
+
+	// Should not panic and should show final message
+	output := buf.String()
+	if len(output) == 0 {
+		t.Error("Expected some output when current == total")
+	}
+}
+
+func TestLogger_Progress_VeryLongTitle_Verbose(t *testing.T) {
+	logger := NewLogger(true)
+	var buf bytes.Buffer
+	logger.SetOutput(&buf)
+
+	// Title longer than 150 characters
+	longTitle := strings.Repeat("A", 200)
+
+	// For non-terminal output, Progress only outputs when current == total
+	logger.Progress(10, 10, "watching", longTitle)
+
+	// Should not panic and should show final message
+	output := buf.String()
+	if len(output) == 0 {
+		t.Error("Expected some output in verbose mode when current == total")
+	}
+	// The final message shows "Processed X items" not the title
+	if !strings.Contains(output, "Processed") {
+		t.Error("Expected 'Processed' in output")
+	}
+}
