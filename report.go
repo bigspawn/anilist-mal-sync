@@ -1,8 +1,11 @@
 package main
 
+import "sync"
+
 // SyncReport accumulates warnings for deferred printing
 type SyncReport struct {
 	Warnings []Warning
+	mu       sync.Mutex
 }
 
 // Warning represents a warning about a potentially problematic match
@@ -15,11 +18,15 @@ type Warning struct {
 
 // NewSyncReport creates a new sync report
 func NewSyncReport() *SyncReport {
-	return &SyncReport{}
+	return &SyncReport{
+		Warnings: []Warning{},
+	}
 }
 
-// AddWarning adds a warning to the report
+// AddWarning adds a warning to the report (thread-safe)
 func (r *SyncReport) AddWarning(title, reason, detail, mediaType string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.Warnings = append(r.Warnings, Warning{
 		Title:     title,
 		Reason:    reason,
@@ -28,7 +35,9 @@ func (r *SyncReport) AddWarning(title, reason, detail, mediaType string) {
 	})
 }
 
-// HasWarnings returns true if there are warnings
+// HasWarnings returns true if there are warnings (thread-safe)
 func (r *SyncReport) HasWarnings() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	return len(r.Warnings) > 0
 }

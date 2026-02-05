@@ -31,10 +31,14 @@ func isRetryableError(err error) bool {
 
 	// Check for MAL ErrorResponse with HTTP status code
 	var malErr *mal.ErrorResponse
-	if errors.As(err, &malErr) && malErr.Response != nil {
-		code := malErr.Response.StatusCode
-		// Retry on: 429 (rate limit), 503 (service unavailable), 502 (bad gateway), 500 (internal server error)
-		return code == 429 || code == 503 || code == 502 || code == 500
+	if errors.As(err, &malErr) {
+		if malErr.Response != nil {
+			code := malErr.Response.StatusCode
+			// Retry on: 429 (rate limit), 503 (service unavailable), 502 (bad gateway), 500 (internal server error)
+			return code == 429 || code == 503 || code == 502 || code == 500
+		}
+		// MAL error with nil Response - not retryable
+		return false
 	}
 
 	// Fallback to string-based check for AniList and other errors
