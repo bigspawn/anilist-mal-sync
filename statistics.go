@@ -215,6 +215,7 @@ func PrintGlobalSummary(ctx context.Context, stats []*Statistics, report *SyncRe
 		totals.items, totals.updated, totals.skipped, totals.errors)
 
 	printGlobalSkipReasons(logger, totals.skipReasons)
+	printGlobalUpdates(logger, totals.updatedItems)
 	printGlobalWarnings(logger, report)
 	printGlobalErrors(logger, totals.errorItems)
 }
@@ -223,6 +224,7 @@ type aggregatedTotals struct {
 	items, updated, skipped, errors int
 	skipReasons                     map[string]int
 	errorItems                      []UpdateResult
+	updatedItems                    []UpdateResult
 }
 
 func aggregateStats(stats []*Statistics) aggregatedTotals {
@@ -243,6 +245,7 @@ func aggregateStats(stats []*Statistics) aggregatedTotals {
 			totals.skipReasons[reason] += count
 		}
 		totals.errorItems = append(totals.errorItems, s.ErrorItems...)
+		totals.updatedItems = append(totals.updatedItems, s.UpdatedItems...)
 	}
 
 	return totals
@@ -272,6 +275,22 @@ func printGlobalWarnings(logger *Logger, report *SyncReport) {
 			logger.Warn("  %q - %s %s", w.Title, w.Reason, w.Detail)
 		} else {
 			logger.Warn("  %q - %s", w.Title, w.Reason)
+		}
+	}
+}
+
+func printGlobalUpdates(logger *Logger, updatedItems []UpdateResult) {
+	if len(updatedItems) == 0 {
+		return
+	}
+
+	logger.Info("")
+	logger.InfoSuccess("Updates (%d):", len(updatedItems))
+	for _, item := range updatedItems {
+		if item.Detail != "" {
+			logger.InfoSuccess("  %s %s", item.Title, item.Detail)
+		} else {
+			logger.InfoSuccess("  %s", item.Title)
 		}
 	}
 }

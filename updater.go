@@ -174,9 +174,6 @@ func (u *Updater) updateTarget(ctx context.Context, id TargetID, src Source) {
 		Detail: detail,
 		Status: src.GetStatusString(),
 	})
-
-	// Single-line success message (replaces 3-4 lines)
-	LogInfoUpdate(ctx, src.GetTitle(), detail)
 }
 
 // generateUpdateDetail generates a concise update detail string
