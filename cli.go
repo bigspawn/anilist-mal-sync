@@ -18,6 +18,55 @@ const (
 	ServiceAll         = "all"
 )
 
+// syncFlags are the common flags shared between sync and watch commands
+var syncFlags = []cli.Flag{
+	&cli.BoolFlag{
+		Name:    "force",
+		Aliases: []string{"f"},
+		Usage:   "force sync all entries",
+	},
+	&cli.BoolFlag{
+		Name:    "dry-run",
+		Aliases: []string{"d"},
+		Usage:   "dry run without updating target service",
+	},
+	&cli.BoolFlag{
+		Name:  "manga",
+		Usage: "sync manga instead of anime",
+	},
+	&cli.BoolFlag{
+		Name:  "all",
+		Usage: "sync all anime and manga",
+	},
+	&cli.BoolFlag{
+		Name:  "verbose",
+		Usage: "enable verbose logging",
+	},
+	&cli.BoolFlag{
+		Name:  "reverse-direction",
+		Usage: "sync from MyAnimeList to AniList (default is AniList to MyAnimeList)",
+	},
+}
+
+// setSyncFlagsFromCmd sets global sync variables from command flags and returns verbose value
+func setSyncFlagsFromCmd(cmd *cli.Command) bool {
+	forceVal := cmd.Bool("force")
+	dryVal := cmd.Bool("dry-run")
+	mangaVal := cmd.Bool("manga")
+	allVal := cmd.Bool("all")
+	verboseVal := cmd.Bool("verbose")
+	reverseVal := cmd.Bool("reverse-direction")
+
+	forceSync = &forceVal
+	dryRun = &dryVal
+	mangaSync = &mangaVal
+	allSync = &allVal
+	verbose = &verboseVal
+	reverseDirection = &reverseVal
+
+	return verboseVal
+}
+
 // NewCLI creates the root CLI command
 func NewCLI() *cli.Command {
 	// Define flags for backward compatibility with old CLI behavior

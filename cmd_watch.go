@@ -16,25 +16,30 @@ const (
 )
 
 func newWatchCommand() *cli.Command {
-	return &cli.Command{
-		Name:  "watch",
-		Usage: "Run sync on interval (Docker-friendly)",
-		Flags: []cli.Flag{
-			&cli.DurationFlag{
-				Name:    "interval",
-				Aliases: []string{"i"},
-				Usage:   "Sync interval (1h-168h, required via --interval or config)",
-			},
-			&cli.BoolFlag{
-				Name:  "once",
-				Usage: "Sync immediately then start watching",
-			},
+	watchFlags := append([]cli.Flag{
+		&cli.DurationFlag{
+			Name:    "interval",
+			Aliases: []string{"i"},
+			Usage:   "Sync interval (1h-168h, required via --interval or config)",
 		},
+		&cli.BoolFlag{
+			Name:  "once",
+			Usage: "Sync immediately then start watching",
+		},
+	}, syncFlags...)
+
+	return &cli.Command{
+		Name:   "watch",
+		Usage:  "Run sync on interval (Docker-friendly)",
+		Flags:  watchFlags,
 		Action: runWatch,
 	}
 }
 
 func runWatch(ctx context.Context, cmd *cli.Command) error {
+	// Set package-level vars for compatibility with existing code
+	verboseVal := setSyncFlagsFromCmd(cmd)
+
 	// Load config for compatibility with sync
 	configPath := cmd.String("config")
 	config, err := loadConfigFromFile(configPath)
@@ -42,9 +47,8 @@ func runWatch(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("error loading config: %w", err)
 	}
 
-	// Initialize logger (watch mode uses normal logging, verbose from sync not applicable here)
-	// and add to context
-	logger := NewLogger(false)
+	// Initialize logger and add to context
+	logger := NewLogger(verboseVal)
 	ctx = logger.WithContext(ctx)
 
 	// Create app for compatibility
