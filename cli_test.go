@@ -261,6 +261,40 @@ func TestCLI_StatusCommand_NoFlags(t *testing.T) {
 	}
 }
 
+func TestCLI_WatchCommand_HasSyncFlags(t *testing.T) {
+	rootCmd := NewCLI()
+
+	var watchCmd *cli.Command
+	for _, c := range rootCmd.Commands {
+		if c.Name == "watch" {
+			watchCmd = c
+			break
+		}
+	}
+
+	if watchCmd == nil {
+		t.Fatal("watch command not found")
+	}
+
+	// watch has 2 own flags (interval, once) + 6 sync flags = 8 total
+	if len(watchCmd.Flags) != 8 {
+		t.Errorf("expected 8 flags on watch command (2 watch + 6 sync), got %d", len(watchCmd.Flags))
+	}
+
+	// Check that sync flags are present
+	flagNames := make(map[string]bool)
+	for _, f := range watchCmd.Flags {
+		flagNames[f.Names()[0]] = true
+	}
+
+	syncFlagNames := []string{"force", "dry-run", "manga", "all", "verbose", "reverse-direction"}
+	for _, name := range syncFlagNames {
+		if !flagNames[name] {
+			t.Errorf("watch command missing sync flag: %s", name)
+		}
+	}
+}
+
 // =============================================================================
 // Backward Compatibility Tests
 // =============================================================================
