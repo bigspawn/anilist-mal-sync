@@ -35,8 +35,8 @@ func TestCLI_HasCommands(t *testing.T) {
 func TestCLI_HasFlags(t *testing.T) {
 	cmd := NewCLI()
 
-	if len(cmd.Flags) != 7 {
-		t.Errorf("expected 7 flags on root command, got %d", len(cmd.Flags))
+	if len(cmd.Flags) != 11 {
+		t.Errorf("expected 11 flags on root command, got %d", len(cmd.Flags))
 	}
 
 	// Check that important flags exist
@@ -45,7 +45,10 @@ func TestCLI_HasFlags(t *testing.T) {
 		flagNames[f.Names()[0]] = true
 	}
 
-	expectedFlags := []string{"config", "force", "dry-run", "manga", "all", "verbose", "reverse-direction"}
+	expectedFlags := []string{
+		"config", "force", "dry-run", "manga", "all", "verbose", "reverse-direction",
+		"offline-db", "offline-db-force-refresh", "arm-api", "arm-api-url",
+	}
 	for _, name := range expectedFlags {
 		if !flagNames[name] {
 			t.Errorf("missing flag: %s", name)
@@ -68,8 +71,8 @@ func TestCLI_SyncCommand_HasFlags(t *testing.T) {
 		t.Fatal("sync command not found")
 	}
 
-	if len(syncCmd.Flags) != 6 {
-		t.Errorf("expected 6 flags on sync command, got %d", len(syncCmd.Flags))
+	if len(syncCmd.Flags) != 10 {
+		t.Errorf("expected 10 flags on sync command, got %d", len(syncCmd.Flags))
 	}
 
 	// Check that sync has the right flags
@@ -78,7 +81,10 @@ func TestCLI_SyncCommand_HasFlags(t *testing.T) {
 		flagNames[f.Names()[0]] = true
 	}
 
-	expectedFlags := []string{"force", "dry-run", "manga", "all", "verbose", "reverse-direction"}
+	expectedFlags := []string{
+		"force", "dry-run", "manga", "all", "verbose", "reverse-direction",
+		"offline-db", "offline-db-force-refresh", "arm-api", "arm-api-url",
+	}
 	for _, name := range expectedFlags {
 		if !flagNames[name] {
 			t.Errorf("sync command missing flag: %s", name)
@@ -276,9 +282,9 @@ func TestCLI_WatchCommand_HasSyncFlags(t *testing.T) {
 		t.Fatal("watch command not found")
 	}
 
-	// watch has 2 own flags (interval, once) + 6 sync flags = 8 total
-	if len(watchCmd.Flags) != 8 {
-		t.Errorf("expected 8 flags on watch command (2 watch + 6 sync), got %d", len(watchCmd.Flags))
+	// watch has 2 own flags (interval, once) + 10 sync flags = 12 total
+	if len(watchCmd.Flags) != 12 {
+		t.Errorf("expected 12 flags on watch command (2 watch + 10 sync), got %d", len(watchCmd.Flags))
 	}
 
 	// Check that sync flags are present
@@ -287,7 +293,10 @@ func TestCLI_WatchCommand_HasSyncFlags(t *testing.T) {
 		flagNames[f.Names()[0]] = true
 	}
 
-	syncFlagNames := []string{"force", "dry-run", "manga", "all", "verbose", "reverse-direction"}
+	syncFlagNames := []string{
+		"force", "dry-run", "manga", "all", "verbose", "reverse-direction",
+		"offline-db", "offline-db-force-refresh", "arm-api", "arm-api-url",
+	}
 	for _, name := range syncFlagNames {
 		if !flagNames[name] {
 			t.Errorf("watch command missing sync flag: %s", name)
