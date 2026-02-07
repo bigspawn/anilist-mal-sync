@@ -4,7 +4,6 @@ on:
   workflow_run:
     workflows: ["go", "golangci-lint"]
     types: [completed]
-    branches: ["main"]
 
 env:
   REGISTRY: ghcr.io
@@ -21,6 +20,25 @@ jobs:
       packages: write
 
     steps:
+      - name: Check if PR targets main
+        id: check-pr
+        run: |
+          # Find PR by head SHA
+          HEAD_SHA="${{ github.event.workflow_run.head_sha }}"
+          PR_JSON=$(gh pr list --search "$HEAD_SHA" --json number,baseRefName,headRefName --jq '.[0]' || echo "")
+          if [ -z "$PR_JSON" ]; then
+            echo "No PR found for commit $HEAD_SHA"
+            exit 1
+          fi
+          BASE_BRANCH=$(echo "$PR_JSON" | jq -r '.baseRefName')
+          echo "base_branch=$BASE_BRANCH" >> $GITHUB_OUTPUT
+          if [ "$BASE_BRANCH" != "main" ]; then
+            echo "PR does not target main branch (targets: $BASE_BRANCH), skipping"
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
