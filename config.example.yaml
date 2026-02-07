@@ -20,3 +20,12 @@ watch:
 # Can be overridden with HTTP_TIMEOUT environment variable.
 # Examples: "10s", "30s", "1m", "5m"
 http_timeout: "30s"
+# ID Mapping: Offline Database (uses anime-offline-database)
+offline_database:
+  enabled: true # Enable offline ID mapping (default: true)
+  cache_dir: "" # Leave empty for default: ~/.config/anilist-mal-sync/aod-cache
+  auto_update: true # Auto-update database when new version available
+# ID Mapping: ARM API (https://arm.haglund.dev)
+arm_api:
+  enabled: false # Enable ARM API for online ID mapping (default: false)
+  base_url: "https://arm.haglund.dev" # ARM API base URL
