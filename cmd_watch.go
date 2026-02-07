@@ -47,6 +47,8 @@ func runWatch(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("error loading config: %w", err)
 	}
 
+	applySyncFlagsToConfig(cmd, &config)
+
 	// Initialize logger and add to context
 	logger := NewLogger(verboseVal)
 	ctx = logger.WithContext(ctx)

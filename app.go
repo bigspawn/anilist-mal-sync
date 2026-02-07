@@ -59,6 +59,9 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 	anilistAnimeService := NewAniListAnimeService(anilistClient, scoreFormat)
 	anilistMangaService := NewAniListMangaService(anilistClient, scoreFormat)
 
+	// Load offline database and ARM client for ID mapping (anime only)
+	offlineStrategy, armStrategy := loadIDMappingStrategies(ctx, config)
+
 	// Default ignore titles
 	defaultIgnoreTitles := map[string]struct{}{
 		"scott pilgrim takes off":       {},
@@ -75,6 +78,8 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		DryRun:       *dryRun,
 		StrategyChain: NewStrategyChain(
 			IDStrategy{},
+			offlineStrategy,
+			armStrategy,
 			TitleStrategy{},
 			APISearchStrategy{Service: malAnimeService},
 		),
@@ -103,6 +108,8 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		DryRun:       *dryRun,
 		StrategyChain: NewStrategyChain(
 			IDStrategy{},
+			offlineStrategy,
+			armStrategy,
 			TitleStrategy{},
 			MALIDStrategy{Service: anilistAnimeService},
 			APISearchStrategy{Service: anilistAnimeService},
@@ -137,6 +144,30 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		reverseMangaUpdater: reverseMangaUpdater,
 		syncReport:          NewSyncReport(),
 	}, nil
+}
+
+// loadIDMappingStrategies loads offline database and ARM client, returning strategies.
+// Strategies with nil Database/Client are no-ops (return nil, false, nil).
+func loadIDMappingStrategies(ctx context.Context, config Config) (OfflineDatabaseStrategy, ARMAPIStrategy) {
+	var offlineDB *OfflineDatabase
+	if config.OfflineDatabase.Enabled {
+		LogStage(ctx, "Loading offline database...")
+		var err error
+		offlineDB, err = LoadOfflineDatabase(ctx, config.OfflineDatabase)
+		if err != nil {
+			LogWarn(ctx, "Failed to load offline database: %v (continuing without it)", err)
+		} else {
+			LogInfoSuccess(ctx, "Offline database loaded (%d entries)", offlineDB.entries)
+		}
+	}
+
+	var armClient *ARMClient
+	if config.ARMAPI.Enabled {
+		armClient = NewARMClient(config.ARMAPI.BaseURL, config.GetHTTPTimeout())
+		LogInfoSuccess(ctx, "ARM API enabled (%s)", config.ARMAPI.BaseURL)
+	}
+
+	return OfflineDatabaseStrategy{Database: offlineDB}, ARMAPIStrategy{Client: armClient}
 }
 
 func (a *App) Run(ctx context.Context) error {
