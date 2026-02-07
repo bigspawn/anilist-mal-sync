@@ -46,7 +46,10 @@ services:
       - MAL_CLIENT_ID=your_mal_client_id
       - MAL_CLIENT_SECRET=your_mal_secret
       - MAL_USERNAME=your_mal_username
-      # - WATCH_INTERVAL=12h  # Optional: enable watch mode
+      - OFFLINE_DATABASE_ENABLED=true  # Enable offline DB
+      - ARM_API_ENABLED=true  # Enable ARM API if offline DB is unavailable
+      # Optional:
+      # - WATCH_INTERVAL=12h # Enable watch mode (run in period)
     volumes:
       - tokens:/home/appuser/.config/anilist-mal-sync
     restart: unless-stopped
@@ -154,7 +157,7 @@ offline_database:
   auto_update: true
 arm_api:
   enabled: false
-  base_url: "https://arm.haglund.dev"
+  base_url: "https://arm.haglund.dev" # Default: https://arm.haglund.dev
 ```
 
 ### Environment variables

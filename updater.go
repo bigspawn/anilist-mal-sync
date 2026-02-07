@@ -142,7 +142,7 @@ func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts ma
 
 	if u.DryRun { // skip update if dry run
 		// Record in statistics for summary, don't log each item individually
-		u.Statistics.RecordUpdate(UpdateResult{
+		u.Statistics.RecordDryRun(UpdateResult{
 			Title:  src.GetTitle(),
 			Status: src.GetStatusString(),
 			Detail: "dry run",

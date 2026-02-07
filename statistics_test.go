@@ -497,3 +497,50 @@ func TestPrintGlobalSummary_SkipReasonsAggregation(t *testing.T) {
 	assert.Contains(t, output, "target not found: 1", "Should show 'target not found' count")
 	assert.Contains(t, output, "in ignore list: 1", "Should show 'in ignore list' count")
 }
+
+func TestStatistics_RecordDryRun(t *testing.T) {
+	stats := NewStatistics()
+
+	stats.RecordDryRun(UpdateResult{Title: "Test", Status: "watching", Detail: "dry run"})
+
+	assert.Equal(t, 1, stats.DryRunCount)
+	assert.Equal(t, 1, len(stats.DryRunItems))
+	assert.True(t, stats.DryRunItems[0].IsDryRun)
+	assert.Equal(t, 1, stats.StatusCounts["watching"])
+}
+
+func TestStatistics_ResetClearsDryRun(t *testing.T) {
+	stats := NewStatistics()
+	stats.RecordDryRun(UpdateResult{Title: "Test", Status: "watching"})
+	stats.DryRunCount = 5
+
+	stats.Reset()
+
+	assert.Equal(t, 0, stats.DryRunCount)
+	assert.Nil(t, stats.DryRunItems)
+}
+
+func TestPrintGlobalSummary_WithDryRunItems(t *testing.T) {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	defer log.SetOutput(os.Stderr)
+
+	logger := NewLogger(false)
+	logger.SetOutput(&buf)
+	ctx := logger.WithContext(context.Background())
+
+	stats := NewStatistics()
+	stats.DryRunCount = 2
+	stats.DryRunItems = []UpdateResult{
+		{Title: "Anime1", Detail: "dry run", IsDryRun: true},
+		{Title: "Anime2", Detail: "dry run", IsDryRun: true},
+	}
+
+	report := NewSyncReport()
+	statsArray := []*Statistics{stats}
+
+	PrintGlobalSummary(ctx, statsArray, report, 1*time.Second)
+
+	output := buf.String()
+	assert.Contains(t, output, "Would update (2)")
+}

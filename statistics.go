@@ -16,6 +16,7 @@ type UpdateResult struct {
 	Error      error
 	Skipped    bool
 	SkipReason string
+	IsDryRun   bool // True if this is a dry run "update"
 }
 
 // Statistics tracks sync operation metrics
@@ -27,11 +28,13 @@ type Statistics struct {
 	UpdatedCount int
 	SkippedCount int
 	ErrorCount   int
+	DryRunCount  int
 
 	// Detailed tracking
 	UpdatedItems []UpdateResult
 	SkippedItems []UpdateResult
 	ErrorItems   []UpdateResult
+	DryRunItems  []UpdateResult
 
 	// Status breakdown
 	StatusCounts map[string]int
@@ -59,6 +62,14 @@ func (s *Statistics) RecordSkip(result UpdateResult) {
 	s.StatusCounts[result.Status]++
 }
 
+// RecordDryRun records a dry run item
+func (s *Statistics) RecordDryRun(result UpdateResult) {
+	result.IsDryRun = true
+	s.DryRunCount++
+	s.DryRunItems = append(s.DryRunItems, result)
+	s.StatusCounts[result.Status]++
+}
+
 // RecordError records an error
 func (s *Statistics) RecordError(result UpdateResult) {
 	s.ErrorCount++
@@ -78,9 +89,11 @@ func (s *Statistics) Reset() {
 	s.UpdatedCount = 0
 	s.SkippedCount = 0
 	s.ErrorCount = 0
+	s.DryRunCount = 0
 	s.UpdatedItems = nil
 	s.SkippedItems = nil
 	s.ErrorItems = nil
+	s.DryRunItems = nil
 	s.StatusCounts = make(map[string]int)
 }
 
@@ -216,15 +229,17 @@ func PrintGlobalSummary(ctx context.Context, stats []*Statistics, report *SyncRe
 
 	printGlobalSkipReasons(logger, totals.skipReasons)
 	printGlobalUpdates(logger, totals.updatedItems)
+	printGlobalDryRunUpdates(logger, totals.dryRunItems)
 	printGlobalWarnings(logger, report)
 	printGlobalErrors(logger, totals.errorItems)
 }
 
 type aggregatedTotals struct {
-	items, updated, skipped, errors int
-	skipReasons                     map[string]int
-	errorItems                      []UpdateResult
-	updatedItems                    []UpdateResult
+	items, updated, skipped, errors, dryRun int
+	skipReasons                             map[string]int
+	errorItems                              []UpdateResult
+	updatedItems                            []UpdateResult
+	dryRunItems                             []UpdateResult
 }
 
 func aggregateStats(stats []*Statistics) aggregatedTotals {
@@ -240,12 +255,14 @@ func aggregateStats(stats []*Statistics) aggregatedTotals {
 		totals.updated += s.UpdatedCount
 		totals.skipped += s.SkippedCount
 		totals.errors += s.ErrorCount
+		totals.dryRun += s.DryRunCount
 
 		for reason, count := range groupSkipReasons(s.SkippedItems) {
 			totals.skipReasons[reason] += count
 		}
 		totals.errorItems = append(totals.errorItems, s.ErrorItems...)
 		totals.updatedItems = append(totals.updatedItems, s.UpdatedItems...)
+		totals.dryRunItems = append(totals.dryRunItems, s.DryRunItems...)
 	}
 
 	return totals
@@ -291,6 +308,22 @@ func printGlobalUpdates(logger *Logger, updatedItems []UpdateResult) {
 			logger.InfoSuccess("  %s %s", item.Title, item.Detail)
 		} else {
 			logger.InfoSuccess("  %s", item.Title)
+		}
+	}
+}
+
+func printGlobalDryRunUpdates(logger *Logger, dryRunItems []UpdateResult) {
+	if len(dryRunItems) == 0 {
+		return
+	}
+
+	logger.Info("")
+	logger.InfoDryRun("Would update (%d):", len(dryRunItems))
+	for _, item := range dryRunItems {
+		if item.Detail != "" {
+			logger.Info("  %s %s", item.Title, item.Detail)
+		} else {
+			logger.Info("  %s", item.Title)
 		}
 	}
 }

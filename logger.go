@@ -78,6 +78,15 @@ func (l *Logger) InfoSuccess(format string, args ...interface{}) {
 	}
 }
 
+// InfoDryRun logs dry run "updates" with cyan arrow
+func (l *Logger) InfoDryRun(format string, args ...interface{}) {
+	if l.level >= LogLevelInfo {
+		icon := l.colorize(colorCyan, "→")
+		msg := fmt.Sprintf(format, args...)
+		l.infoLog.Printf("%s %s", icon, msg)
+	}
+}
+
 // InfoUpdate logs an update operation
 func (l *Logger) InfoUpdate(title, detail string) {
 	if l.level >= LogLevelInfo {
@@ -211,6 +220,13 @@ func LogInfoSuccess(ctx context.Context, format string, args ...interface{}) {
 func LogInfoUpdate(ctx context.Context, title, detail string) {
 	if logger := LoggerFromContext(ctx); logger != nil {
 		logger.InfoUpdate(title, detail)
+	}
+}
+
+// LogInfoDryRun logs a dry run message using the logger from context
+func LogInfoDryRun(ctx context.Context, format string, args ...interface{}) {
+	if logger := LoggerFromContext(ctx); logger != nil {
+		logger.InfoDryRun(format, args...)
 	}
 }
 
