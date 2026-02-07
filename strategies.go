@@ -287,3 +287,135 @@ func (s APISearchStrategy) FindTarget(
 
 	return nil, false, nil
 }
+
+// OfflineDatabaseStrategy finds targets using the anime-offline-database ID mappings.
+// Only works for anime (not manga).
+type OfflineDatabaseStrategy struct {
+	Database *OfflineDatabase
+}
+
+func (s OfflineDatabaseStrategy) Name() string {
+	return "OfflineDatabaseStrategy"
+}
+
+func (s OfflineDatabaseStrategy) FindTarget(
+	ctx context.Context,
+	src Source,
+	existingTargets map[TargetID]Target,
+	prefix string,
+	_ *SyncReport,
+) (Target, bool, error) {
+	if s.Database == nil {
+		return nil, false, nil
+	}
+
+	srcAnime, ok := src.(Anime)
+	if !ok {
+		return nil, false, nil
+	}
+
+	targetServiceID, found := s.lookupID(srcAnime)
+	if !found {
+		return nil, false, nil
+	}
+
+	targetID := TargetID(targetServiceID)
+	if target, exists := existingTargets[targetID]; exists {
+		LogDebugDecision(ctx, "[%s] Found target by offline database: ID %d -> %s",
+			prefix, targetServiceID, target.GetTitle())
+		return target, true, nil
+	}
+
+	LogDebugDecision(ctx, "[%s] Offline database mapped to ID %d but not in user's list",
+		prefix, targetServiceID)
+	return nil, false, nil
+}
+
+func (s OfflineDatabaseStrategy) lookupID(src Anime) (int, bool) {
+	if src.IDMal > 0 {
+		if id, ok := s.Database.GetAniListID(src.IDMal); ok {
+			return id, true
+		}
+	}
+	if src.IDAnilist > 0 {
+		if id, ok := s.Database.GetMALID(src.IDAnilist); ok {
+			return id, true
+		}
+	}
+	return 0, false
+}
+
+// ARMAPIStrategy finds targets using the ARM API for ID mapping.
+// Only works for anime (not manga).
+type ARMAPIStrategy struct {
+	Client *ARMClient
+}
+
+func (s ARMAPIStrategy) Name() string {
+	return "ARMAPIStrategy"
+}
+
+func (s ARMAPIStrategy) FindTarget(
+	ctx context.Context,
+	src Source,
+	existingTargets map[TargetID]Target,
+	prefix string,
+	_ *SyncReport,
+) (Target, bool, error) {
+	if s.Client == nil {
+		return nil, false, nil
+	}
+
+	srcAnime, ok := src.(Anime)
+	if !ok {
+		return nil, false, nil
+	}
+
+	targetServiceID, found, err := s.lookupID(ctx, srcAnime)
+	if err != nil {
+		LogDebug(ctx, "[%s] ARM API error: %v", prefix, err)
+		return nil, false, nil
+	}
+	if !found {
+		return nil, false, nil
+	}
+
+	targetID := TargetID(targetServiceID)
+	if target, exists := existingTargets[targetID]; exists {
+		LogDebugDecision(ctx, "[%s] Found target by ARM API: ID %d -> %s",
+			prefix, targetServiceID, target.GetTitle())
+		return target, true, nil
+	}
+
+	LogDebugDecision(ctx, "[%s] ARM API mapped to ID %d but not in user's list",
+		prefix, targetServiceID)
+	return nil, false, nil
+}
+
+func (s ARMAPIStrategy) lookupID(ctx context.Context, src Anime) (int, bool, error) {
+	if src.IDMal > 0 {
+		LogDebug(ctx, "[ARM API] Looking up AniList ID for MAL ID: %d", src.IDMal)
+		id, found, err := s.Client.GetAniListID(ctx, src.IDMal)
+		if err != nil {
+			return 0, false, err
+		}
+		if found {
+			LogDebug(ctx, "[ARM API] Found: MAL %d -> AniList %d", src.IDMal, id)
+			return id, true, nil
+		}
+		LogDebug(ctx, "[ARM API] Not found: MAL %d -> (no mapping)", src.IDMal)
+	}
+	if src.IDAnilist > 0 {
+		LogDebug(ctx, "[ARM API] Looking up MAL ID for AniList ID: %d", src.IDAnilist)
+		id, found, err := s.Client.GetMALID(ctx, src.IDAnilist)
+		if err != nil {
+			return 0, false, err
+		}
+		if found {
+			LogDebug(ctx, "[ARM API] Found: AniList %d -> MAL %d", src.IDAnilist, id)
+			return id, true, nil
+		}
+		LogDebug(ctx, "[ARM API] Not found: AniList %d -> (no mapping)", src.IDAnilist)
+	}
+	return 0, false, nil
+}
