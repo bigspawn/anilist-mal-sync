@@ -46,8 +46,8 @@ services:
       - MAL_CLIENT_ID=your_mal_client_id
       - MAL_CLIENT_SECRET=your_mal_secret
       - MAL_USERNAME=your_mal_username
-      - OFFLINE_DATABASE_ENABLED=true  # Enable offline DB
-      - ARM_API_ENABLED=true  # Enable ARM API if offline DB is unavailable
+      - OFFLINE_DATABASE_ENABLED=true  # Enable offline anime ids DB
+      - ARM_API_ENABLED=true  # Enable ARM API for anime ids DB as a fallback
       # Optional:
       # - WATCH_INTERVAL=12h # Enable watch mode (run in period)
     volumes:
@@ -111,9 +111,9 @@ Done!
 | | `--all` | Sync both anime and manga |
 | | `--verbose` | Enable verbose logging |
 | | `--reverse-direction` | Sync from MyAnimeList to AniList |
-| | `--offline-db` | Enable offline database (default: true) |
+| | `--offline-db` | Enable offline database for anime mapping IDs (default: `true`) |
 | | `--offline-db-force-refresh` | Force re-download offline database |
-| | `--arm-api` | Enable ARM API for ID mapping |
+| | `--arm-api` | Enable ARM API for anime mapping IDs (default: `false`) |
 | | `--arm-api-url` | ARM API base URL |
 
 **Watch options:**
@@ -179,12 +179,10 @@ Configuration can be provided entirely via environment variables (recommended fo
 - `OAUTH_REDIRECT_URI` - OAuth redirect URI (default: `http://localhost:18080/callback`)
 - `TOKEN_FILE_PATH` - Token file path (default: `~/.config/anilist-mal-sync/token.json`)
 - `PUID` / `PGID` - User/Group ID for Docker volume permissions
-
-**ID Mapping (optional):**
-- `OFFLINE_DATABASE_ENABLED` - Enable offline database (default: `true`)
+- `OFFLINE_DATABASE_ENABLED` - Enable offline database for anime mapping IDs (default: `true`)
 - `OFFLINE_DATABASE_CACHE_DIR` - Cache directory (default: `~/.config/anilist-mal-sync/aod-cache`)
 - `OFFLINE_DATABASE_AUTO_UPDATE` - Auto-update database (default: `true`)
-- `ARM_API_ENABLED` - Enable ARM API (default: `false`)
+- `ARM_API_ENABLED` - Enable ARM API for anime mapping IDs (default: `false`)
 - `ARM_API_URL` - ARM API base URL (default: `https://arm.haglund.dev`)
 
 ## Advanced
@@ -264,3 +262,8 @@ This project is not affiliated with AniList or MyAnimeList. Use at your own risk
 - [ ] Sync favorites
 - [x] Sync MAL to AniList
 - [ ] Sync rewatching and rereading
+
+## Credits
+
+- [anime-offline-database](https://github.com/manami-project/anime-offline-database) for JSON based anime dataset
+- [arm-server](https://github.com/BeeeQueue/arm-server) for API anime dataset
