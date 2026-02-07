@@ -193,8 +193,14 @@ func TestUpdater_Update(t *testing.T) {
 			updater.Update(ctx, tt.sources, tt.targets, report)
 
 			if tt.expectUpdate {
-				if updater.Statistics.UpdatedCount == 0 {
-					t.Error("Expected update, but got none")
+				if tt.dryRun {
+					if updater.Statistics.DryRunCount == 0 {
+						t.Error("Expected dry run, but got none")
+					}
+				} else {
+					if updater.Statistics.UpdatedCount == 0 {
+						t.Error("Expected update, but got none")
+					}
 				}
 			}
 
@@ -368,8 +374,14 @@ func TestUpdater_updateSourceByTargets(t *testing.T) {
 			updater.updateSourceByTargets(ctx, tt.src, tt.targets, report)
 
 			if tt.expectUpdate {
-				if updater.Statistics.UpdatedCount == 0 {
-					t.Error("Expected update, but got none")
+				if tt.dryRun {
+					if updater.Statistics.DryRunCount == 0 {
+						t.Error("Expected dry run, but got none")
+					}
+				} else {
+					if updater.Statistics.UpdatedCount == 0 {
+						t.Error("Expected update, but got none")
+					}
 				}
 			}
 
@@ -379,5 +391,46 @@ func TestUpdater_updateSourceByTargets(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestUpdater_DryRunRecordsInDryRunItems(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	ctx := context.Background()
+	mockService := NewMockMediaService(ctrl)
+
+	updater := &Updater{
+		Prefix:     "[Test]",
+		Statistics: NewStatistics(),
+		Service:    mockService,
+		ForceSync:  true,
+		DryRun:     true,
+	}
+
+	src := Anime{
+		IDMal:       12345,
+		TitleEN:     "Test Anime",
+		Status:      StatusWatching,
+		Score:       8,
+		Progress:    10,
+		NumEpisodes: 12,
+	}
+
+	report := NewSyncReport()
+	updater.updateSourceByTargets(ctx, src, map[TargetID]Target{}, report)
+
+	if updater.Statistics.DryRunCount == 0 {
+		t.Error("Expected dry run count > 0")
+	}
+	if updater.Statistics.UpdatedCount != 0 {
+		t.Error("Expected updated count to be 0 in dry run mode")
+	}
+	if len(updater.Statistics.DryRunItems) == 0 {
+		t.Error("Expected dry run items to be recorded")
+	}
+	if !updater.Statistics.DryRunItems[0].IsDryRun {
+		t.Error("Expected IsDryRun to be true")
 	}
 }

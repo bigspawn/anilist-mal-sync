@@ -51,13 +51,27 @@ func (c *Config) GetHTTPTimeout() time.Duration {
 	return dur
 }
 
+type OfflineDatabaseConfig struct {
+	Enabled      bool   `yaml:"enabled"`
+	CacheDir     string `yaml:"cache_dir"`
+	AutoUpdate   bool   `yaml:"auto_update"`
+	ForceRefresh bool   `yaml:"-"` // CLI flag only
+}
+
+type ARMAPIConfig struct {
+	Enabled bool   `yaml:"enabled"`
+	BaseURL string `yaml:"base_url"`
+}
+
 type Config struct {
-	OAuth         OAuthConfig `yaml:"oauth"`
-	Anilist       SiteConfig  `yaml:"anilist"`
-	MyAnimeList   SiteConfig  `yaml:"myanimelist"`
-	TokenFilePath string      `yaml:"token_file_path"`
-	Watch         WatchConfig `yaml:"watch"`
-	HTTPTimeout   string      `yaml:"http_timeout"`
+	OAuth           OAuthConfig           `yaml:"oauth"`
+	Anilist         SiteConfig            `yaml:"anilist"`
+	MyAnimeList     SiteConfig            `yaml:"myanimelist"`
+	TokenFilePath   string                `yaml:"token_file_path"`
+	Watch           WatchConfig           `yaml:"watch"`
+	HTTPTimeout     string                `yaml:"http_timeout"`
+	OfflineDatabase OfflineDatabaseConfig `yaml:"offline_database"`
+	ARMAPI          ARMAPIConfig          `yaml:"arm_api"`
 }
 
 // loadConfigFromEnv loads configuration from environment variables
@@ -91,8 +105,31 @@ func loadConfigFromEnv() (Config, error) {
 			Interval: os.Getenv("WATCH_INTERVAL"),
 		},
 		HTTPTimeout: getEnvOrDefault("HTTP_TIMEOUT", "30s"),
+		OfflineDatabase: OfflineDatabaseConfig{
+			Enabled:    getEnvBoolOrDefault("OFFLINE_DATABASE_ENABLED", true),
+			CacheDir:   getEnvOrDefault("OFFLINE_DATABASE_CACHE_DIR", getDefaultCacheDir()),
+			AutoUpdate: getEnvBoolOrDefault("OFFLINE_DATABASE_AUTO_UPDATE", true),
+		},
+		ARMAPI: ARMAPIConfig{
+			Enabled: getEnvBoolOrDefault("ARM_API_ENABLED", false),
+			BaseURL: getEnvOrDefault("ARM_API_URL", defaultARMBaseURL),
+		},
 	}
 	return cfg, nil
+}
+
+// parseBoolString parses a string as a boolean value.
+func parseBoolString(s string) bool {
+	return s == "true" || s == "1" || s == "yes"
+}
+
+// getEnvBoolOrDefault returns environment variable as bool or default if empty.
+func getEnvBoolOrDefault(key string, defaultValue bool) bool {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+	return parseBoolString(value)
 }
 
 // getEnvOrDefault returns environment variable value or default if empty
@@ -120,6 +157,8 @@ func overrideConfigFromEnv(cfg *Config) {
 	overrideWatchFromEnv(&cfg.Watch)
 	overrideHTTPTimeoutFromEnv(cfg)
 	overrideTokenPathFromEnv(cfg)
+	overrideOfflineDatabaseFromEnv(&cfg.OfflineDatabase)
+	overrideARMAPIFromEnv(&cfg.ARMAPI)
 }
 
 func overrideOAuthFromEnv(oauth *OAuthConfig) {
@@ -187,6 +226,27 @@ func overrideTokenPathFromEnv(cfg *Config) {
 func overrideHTTPTimeoutFromEnv(cfg *Config) {
 	if timeout := os.Getenv("HTTP_TIMEOUT"); timeout != "" {
 		cfg.HTTPTimeout = timeout
+	}
+}
+
+func overrideOfflineDatabaseFromEnv(odc *OfflineDatabaseConfig) {
+	if v := os.Getenv("OFFLINE_DATABASE_ENABLED"); v != "" {
+		odc.Enabled = parseBoolString(v)
+	}
+	if v := os.Getenv("OFFLINE_DATABASE_CACHE_DIR"); v != "" {
+		odc.CacheDir = v
+	}
+	if v := os.Getenv("OFFLINE_DATABASE_AUTO_UPDATE"); v != "" {
+		odc.AutoUpdate = parseBoolString(v)
+	}
+}
+
+func overrideARMAPIFromEnv(ac *ARMAPIConfig) {
+	if v := os.Getenv("ARM_API_ENABLED"); v != "" {
+		ac.Enabled = parseBoolString(v)
+	}
+	if v := os.Getenv("ARM_API_URL"); v != "" {
+		ac.BaseURL = v
 	}
 }
 
@@ -272,12 +332,28 @@ func tryLoadFromEnvWithHelp(filename string) (Config, error) {
 }
 
 func parseConfigFile(data []byte, filename string) (Config, error) {
-	var cfg Config
+	cfg := configWithDefaults()
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		fmt.Fprintln(os.Stderr, getConfigHelp(filename))
 		return Config{}, fmt.Errorf("failed to parse config file: %w", err)
 	}
 	return cfg, nil
+}
+
+// configWithDefaults returns a Config with default values pre-filled
+// so that YAML fields not specified keep their defaults.
+func configWithDefaults() Config {
+	return Config{
+		OfflineDatabase: OfflineDatabaseConfig{
+			Enabled:    true,
+			CacheDir:   getDefaultCacheDir(),
+			AutoUpdate: true,
+		},
+		ARMAPI: ARMAPIConfig{
+			Enabled: false,
+			BaseURL: defaultARMBaseURL,
+		},
+	}
 }
 
 // getConfigHelp returns a helpful message for creating config file

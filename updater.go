@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -46,6 +47,13 @@ func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target, repo
 
 	var statusStr string
 	processedCount := 0
+
+	sort.Slice(srcs, func(i, j int) bool {
+		if srcs[i].GetStatusString() != srcs[j].GetStatusString() {
+			return srcs[i].GetStatusString() < srcs[j].GetStatusString()
+		}
+		return srcs[i].GetTitle() < srcs[j].GetTitle()
+	})
 
 	for _, src := range srcs {
 		// Check for context cancellation
@@ -134,7 +142,7 @@ func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts ma
 
 	if u.DryRun { // skip update if dry run
 		// Record in statistics for summary, don't log each item individually
-		u.Statistics.RecordUpdate(UpdateResult{
+		u.Statistics.RecordDryRun(UpdateResult{
 			Title:  src.GetTitle(),
 			Status: src.GetStatusString(),
 			Detail: "dry run",

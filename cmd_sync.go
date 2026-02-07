@@ -31,6 +31,8 @@ func runSync(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("error loading config: %w", err)
 	}
 
+	applySyncFlagsToConfig(cmd, &config)
+
 	app, err := NewApp(ctx, config)
 	if err != nil {
 		return fmt.Errorf("create app: %w", err)

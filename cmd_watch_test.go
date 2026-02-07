@@ -53,9 +53,9 @@ func TestWatchCommand_HasFlags(t *testing.T) {
 		t.Fatal("watch command not found")
 	}
 
-	// watch has 2 own flags + 6 sync flags = 8 total
-	if len(watchCmd.Flags) != 8 {
-		t.Errorf("expected 8 flags (2 watch + 6 sync), got %d", len(watchCmd.Flags))
+	// watch has 2 own flags + 10 sync flags = 12 total
+	if len(watchCmd.Flags) != 12 {
+		t.Errorf("expected 12 flags (2 watch + 10 sync), got %d", len(watchCmd.Flags))
 	}
 
 	// Check flags by name
@@ -64,7 +64,10 @@ func TestWatchCommand_HasFlags(t *testing.T) {
 		flagNames[f.Names()[0]] = true
 	}
 
-	expectedFlags := []string{"interval", "once", "force", "dry-run", "manga", "all", "verbose", "reverse-direction"}
+	expectedFlags := []string{
+		"interval", "once", "force", "dry-run", "manga", "all", "verbose", "reverse-direction",
+		"offline-db", "offline-db-force-refresh", "arm-api", "arm-api-url",
+	}
 	for _, name := range expectedFlags {
 		if !flagNames[name] {
 			t.Errorf("missing flag: %s", name)

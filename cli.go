@@ -46,6 +46,23 @@ var syncFlags = []cli.Flag{
 		Name:  "reverse-direction",
 		Usage: "sync from MyAnimeList to AniList (default is AniList to MyAnimeList)",
 	},
+	&cli.BoolFlag{
+		Name:  "offline-db",
+		Usage: "enable offline database for ID mapping (default: true)",
+		Value: true,
+	},
+	&cli.BoolFlag{
+		Name:  "offline-db-force-refresh",
+		Usage: "force re-download offline database",
+	},
+	&cli.BoolFlag{
+		Name:  "arm-api",
+		Usage: "enable ARM API for ID mapping (fallback after offline DB)",
+	},
+	&cli.StringFlag{
+		Name:  "arm-api-url",
+		Usage: "ARM API base URL",
+	},
 }
 
 // setSyncFlagsFromCmd sets global sync variables from command flags and returns verbose value
@@ -65,6 +82,24 @@ func setSyncFlagsFromCmd(cmd *cli.Command) bool {
 	reverseDirection = &reverseVal
 
 	return verboseVal
+}
+
+// applySyncFlagsToConfig applies CLI sync flag overrides to config.
+func applySyncFlagsToConfig(cmd *cli.Command, cfg *Config) {
+	if cmd.IsSet("offline-db") {
+		cfg.OfflineDatabase.Enabled = cmd.Bool("offline-db")
+	}
+	if cmd.IsSet("offline-db-force-refresh") && cmd.Bool("offline-db-force-refresh") {
+		cfg.OfflineDatabase.ForceRefresh = true
+	}
+	if cmd.IsSet("arm-api") {
+		cfg.ARMAPI.Enabled = cmd.Bool("arm-api")
+	}
+	if cmd.IsSet("arm-api-url") {
+		if v := cmd.String("arm-api-url"); v != "" {
+			cfg.ARMAPI.BaseURL = v
+		}
+	}
 }
 
 // NewCLI creates the root CLI command
@@ -101,6 +136,23 @@ func NewCLI() *cli.Command {
 		Name:  "reverse-direction",
 		Usage: "sync from MyAnimeList to AniList (default is AniList to MyAnimeList)",
 	}
+	offlineDbFlag := &cli.BoolFlag{
+		Name:  "offline-db",
+		Usage: "enable offline database for ID mapping (default: true)",
+		Value: true,
+	}
+	offlineDbForceRefreshFlag := &cli.BoolFlag{
+		Name:  "offline-db-force-refresh",
+		Usage: "force re-download offline database",
+	}
+	armAPIFlag := &cli.BoolFlag{
+		Name:  "arm-api",
+		Usage: "enable ARM API for ID mapping (fallback after offline DB)",
+	}
+	armAPIURLFlag := &cli.StringFlag{
+		Name:  "arm-api-url",
+		Usage: "ARM API base URL",
+	}
 
 	return &cli.Command{
 		Name:        "anilist-mal-sync",
@@ -115,6 +167,10 @@ func NewCLI() *cli.Command {
 			allSyncFlag,
 			verboseFlag,
 			reverseDirectionFlag,
+			offlineDbFlag,
+			offlineDbForceRefreshFlag,
+			armAPIFlag,
+			armAPIURLFlag,
 		},
 		Commands: []*cli.Command{
 			newLoginCommand(),
