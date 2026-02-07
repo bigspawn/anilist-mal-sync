@@ -9,6 +9,8 @@ Program to synchronize your AniList and MyAnimeList accounts.
 - Bidirectional sync between AniList and MyAnimeList (anime and manga)
 - OAuth2 authentication
 - CLI interface
+- Offline ID mapping using anime-offline-database (prevents incorrect season matches)
+- Optional ARM API integration for online ID lookups
 
 ## Quick Start (Docker)
 
@@ -106,6 +108,10 @@ Done!
 | | `--all` | Sync both anime and manga |
 | | `--verbose` | Enable verbose logging |
 | | `--reverse-direction` | Sync from MyAnimeList to AniList |
+| | `--offline-db` | Enable offline database (default: true) |
+| | `--offline-db-force-refresh` | Force re-download offline database |
+| | `--arm-api` | Enable ARM API for ID mapping |
+| | `--arm-api-url` | ARM API base URL |
 
 **Watch options:**
 | Short | Long | Description |
@@ -142,6 +148,13 @@ myanimelist:
 token_file_path: ""  # Leave empty for default: ~/.config/anilist-mal-sync/token.json
 watch:
   interval: "24h"  # Sync interval for watch mode (1h-168h), can be overridden with --interval flag
+offline_database:
+  enabled: true
+  cache_dir: ""  # Default: ~/.config/anilist-mal-sync/aod-cache
+  auto_update: true
+arm_api:
+  enabled: false
+  base_url: "https://arm.haglund.dev"
 ```
 
 ### Environment variables
@@ -163,6 +176,13 @@ Configuration can be provided entirely via environment variables (recommended fo
 - `OAUTH_REDIRECT_URI` - OAuth redirect URI (default: `http://localhost:18080/callback`)
 - `TOKEN_FILE_PATH` - Token file path (default: `~/.config/anilist-mal-sync/token.json`)
 - `PUID` / `PGID` - User/Group ID for Docker volume permissions
+
+**ID Mapping (optional):**
+- `OFFLINE_DATABASE_ENABLED` - Enable offline database (default: `true`)
+- `OFFLINE_DATABASE_CACHE_DIR` - Cache directory (default: `~/.config/anilist-mal-sync/aod-cache`)
+- `OFFLINE_DATABASE_AUTO_UPDATE` - Auto-update database (default: `true`)
+- `ARM_API_ENABLED` - Enable ARM API (default: `false`)
+- `ARM_API_URL` - ARM API base URL (default: `https://arm.haglund.dev`)
 
 ## Advanced
 
