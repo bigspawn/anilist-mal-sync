@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -46,6 +47,13 @@ func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target, repo
 
 	var statusStr string
 	processedCount := 0
+
+	sort.Slice(srcs, func(i, j int) bool {
+		if srcs[i].GetStatusString() != srcs[j].GetStatusString() {
+			return srcs[i].GetStatusString() < srcs[j].GetStatusString()
+		}
+		return srcs[i].GetTitle() < srcs[j].GetTitle()
+	})
 
 	for _, src := range srcs {
 		// Check for context cancellation
