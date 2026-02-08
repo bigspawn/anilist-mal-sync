@@ -590,10 +590,16 @@ func TestCLI_ARMAPIFlagDescriptionContainsDefault(t *testing.T) {
 	}
 
 	usage := docFlag.GetUsage()
-	expectedSubstring := "(default: false)"
 
-	if !contains(usage, expectedSubstring) {
-		t.Errorf("arm-api flag usage should contain %q, got %q", expectedSubstring, usage)
+	// Check for both "(default: false)" and that it mentions "anime ID mapping"
+	if !contains(usage, "(default: false)") {
+		t.Errorf("arm-api flag usage should contain '(default: false)', got %q", usage)
+	}
+	if !contains(usage, "anime ID mapping") {
+		t.Errorf("arm-api flag usage should contain 'anime ID mapping', got %q", usage)
+	}
+	if !contains(usage, "ignored for --manga") {
+		t.Errorf("arm-api flag usage should contain 'ignored for --manga', got %q", usage)
 	}
 }
 
@@ -618,10 +624,16 @@ func TestCLI_OfflineDBFlagDescriptionContainsDefault(t *testing.T) {
 	}
 
 	usage := docFlag.GetUsage()
-	expectedSubstring := "(default: true)"
 
-	if !contains(usage, expectedSubstring) {
-		t.Errorf("offline-db flag usage should contain %q, got %q", expectedSubstring, usage)
+	// Check for both "(default: true)" and that it mentions "anime ID mapping"
+	if !contains(usage, "(default: true)") {
+		t.Errorf("offline-db flag usage should contain '(default: true)', got %q", usage)
+	}
+	if !contains(usage, "anime ID mapping") {
+		t.Errorf("offline-db flag usage should contain 'anime ID mapping', got %q", usage)
+	}
+	if !contains(usage, "ignored for --manga") {
+		t.Errorf("offline-db flag usage should contain 'ignored for --manga', got %q", usage)
 	}
 }
 

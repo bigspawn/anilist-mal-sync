@@ -111,9 +111,9 @@ Done!
 | | `--all` | Sync both anime and manga |
 | | `--verbose` | Enable verbose logging |
 | | `--reverse-direction` | Sync from MyAnimeList to AniList |
-| | `--offline-db` | Enable offline database for anime mapping IDs (default: `true`) |
+| | `--offline-db` | Enable offline database for anime ID mapping (default: `true`, ignored for `--manga`) |
 | | `--offline-db-force-refresh` | Force re-download offline database |
-| | `--arm-api` | Enable ARM API for anime mapping IDs (default: `false`) |
+| | `--arm-api` | Enable ARM API for anime ID mapping (default: `false`, ignored for `--manga`) |
 | | `--arm-api-url` | ARM API base URL |
 
 **Watch options:**
@@ -160,6 +160,26 @@ arm_api:
   base_url: "https://arm.haglund.dev" # Default: https://arm.haglund.dev
 ```
 
+## ID Mapping Strategies
+
+The tool uses different ID mapping strategies for anime and manga:
+
+### Anime ID Mapping
+When syncing anime (default or `--all` mode), the following strategies are used in order:
+1. **Direct ID lookup** - If the entry already exists in your target list
+2. **Offline Database** (optional, enabled by default) - Local database from [anime-offline-database](https://github.com/manami-project/anime-offline-database)
+3. **ARM API** (optional, disabled by default) - Online fallback to [arm-server](https://arm.haglund.dev)
+4. **Title matching** - Match by title similarity
+5. **API search** - Search the target service API
+
+### Manga ID Mapping
+When syncing manga (`--manga` mode), offline database and ARM API are not available. Only these strategies are used:
+1. **Direct ID lookup** - If the entry already exists in your target list
+2. **Title matching** - Match by title similarity
+3. **API search** - Search the target service API
+
+**Note:** The offline database and ARM API are automatically disabled when using `--manga` flag (without `--all`) to improve startup performance.
+
 ### Environment variables
 
 Configuration can be provided entirely via environment variables (recommended for Docker):
@@ -179,10 +199,10 @@ Configuration can be provided entirely via environment variables (recommended fo
 - `OAUTH_REDIRECT_URI` - OAuth redirect URI (default: `http://localhost:18080/callback`)
 - `TOKEN_FILE_PATH` - Token file path (default: `~/.config/anilist-mal-sync/token.json`)
 - `PUID` / `PGID` - User/Group ID for Docker volume permissions
-- `OFFLINE_DATABASE_ENABLED` - Enable offline database for anime mapping IDs (default: `true`)
+- `OFFLINE_DATABASE_ENABLED` - Enable offline database for anime ID mapping (default: `true`, not used for manga-only sync)
 - `OFFLINE_DATABASE_CACHE_DIR` - Cache directory (default: `~/.config/anilist-mal-sync/aod-cache`)
 - `OFFLINE_DATABASE_AUTO_UPDATE` - Auto-update database (default: `true`)
-- `ARM_API_ENABLED` - Enable ARM API for anime mapping IDs (default: `false`)
+- `ARM_API_ENABLED` - Enable ARM API for anime ID mapping (default: `false`, not used for manga-only sync)
 - `ARM_API_URL` - ARM API base URL (default: `https://arm.haglund.dev`)
 
 ## Advanced

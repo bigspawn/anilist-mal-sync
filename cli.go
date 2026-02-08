@@ -48,7 +48,7 @@ var syncFlags = []cli.Flag{
 	},
 	&cli.BoolFlag{
 		Name:  "offline-db",
-		Usage: "enable offline database for ID mapping (default: true)",
+		Usage: "enable offline database for anime ID mapping (ignored for --manga) (default: true)",
 		Value: true,
 	},
 	&cli.BoolFlag{
@@ -57,7 +57,7 @@ var syncFlags = []cli.Flag{
 	},
 	&cli.BoolFlag{
 		Name:  "arm-api",
-		Usage: "enable ARM API for ID mapping (fallback after offline DB) (default: false)",
+		Usage: "enable ARM API for anime ID mapping (ignored for --manga, fallback after offline DB) (default: false)",
 	},
 	&cli.StringFlag{
 		Name:  "arm-api-url",
@@ -144,7 +144,7 @@ func NewCLI() *cli.Command {
 	}
 	offlineDbFlag := &cli.BoolFlag{
 		Name:  "offline-db",
-		Usage: "enable offline database for ID mapping (default: true)",
+		Usage: "enable offline database for anime ID mapping (ignored for --manga) (default: true)",
 		Value: true,
 		Local: true,
 	}
@@ -155,7 +155,7 @@ func NewCLI() *cli.Command {
 	}
 	armAPIFlag := &cli.BoolFlag{
 		Name:  "arm-api",
-		Usage: "enable ARM API for ID mapping (fallback after offline DB) (default: false)",
+		Usage: "enable ARM API for anime ID mapping (ignored for --manga, fallback after offline DB) (default: false)",
 		Local: true,
 	}
 	armAPIURLFlag := &cli.StringFlag{
