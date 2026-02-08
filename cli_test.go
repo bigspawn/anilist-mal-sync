@@ -272,7 +272,7 @@ func TestCLI_WatchCommand_HasSyncFlags(t *testing.T) {
 
 	var watchCmd *cli.Command
 	for _, c := range rootCmd.Commands {
-		if c.Name == "watch" {
+		if c.Name == watchCommandName {
 			watchCmd = c
 			break
 		}
@@ -464,4 +464,277 @@ func TestIsCancellationError_ContextCanceled(t *testing.T) {
 			}
 		})
 	}
+}
+
+// =============================================================================
+// Local Flag Tests (verify sync flags don't leak to other commands)
+// =============================================================================
+
+func TestCLI_SyncFlagsMarkedAsLocal(t *testing.T) {
+	cmd := NewCLI()
+
+	// Flags that should be marked as Local (not inherited by subcommands)
+	syncSpecificFlags := []string{
+		"force", "dry-run", "manga", "all", "verbose", "reverse-direction",
+		"offline-db", "offline-db-force-refresh", "arm-api", "arm-api-url",
+	}
+
+	for _, flagName := range syncSpecificFlags {
+		t.Run(flagName, func(t *testing.T) {
+			var foundFlag cli.Flag
+			for _, f := range cmd.Flags {
+				if f.Names()[0] == flagName {
+					foundFlag = f
+					break
+				}
+			}
+
+			if foundFlag == nil {
+				t.Fatalf("flag %s not found on root command", flagName)
+			}
+
+			// Check if flag implements LocalFlag interface
+			localFlag, ok := foundFlag.(cli.LocalFlag)
+			if !ok {
+				t.Errorf("flag %s does not implement LocalFlag interface", flagName)
+				return
+			}
+
+			if !localFlag.IsLocal() {
+				t.Errorf("flag %s should be marked as Local (true), got Local=false", flagName)
+			}
+		})
+	}
+
+	// config flag should NOT be local (it's truly global)
+	t.Run("config_is_not_local", func(t *testing.T) {
+		var configFlag cli.Flag
+		for _, f := range cmd.Flags {
+			if f.Names()[0] == "config" {
+				configFlag = f
+				break
+			}
+		}
+
+		if configFlag == nil {
+			t.Fatal("config flag not found on root command")
+		}
+
+		localFlag, ok := configFlag.(cli.LocalFlag)
+		if ok && localFlag.IsLocal() {
+			t.Errorf("config flag should NOT be marked as Local, got Local=true")
+		}
+	})
+}
+
+func TestCLI_NonSyncCommandsDontInheritSyncFlags(t *testing.T) {
+	rootCmd := NewCLI()
+
+	// Sync-specific flags that should NOT appear in non-sync subcommands
+	syncSpecificFlags := []string{
+		"force", "dry-run", "manga", "all", "verbose", "reverse-direction",
+		"offline-db", "offline-db-force-refresh", "arm-api", "arm-api-url",
+	}
+
+	nonSyncCommands := []string{"login", "logout", "status"}
+
+	for _, cmdName := range nonSyncCommands {
+		t.Run(cmdName, func(t *testing.T) {
+			var subCmd *cli.Command
+			for _, c := range rootCmd.Commands {
+				if c.Name == cmdName {
+					subCmd = c
+					break
+				}
+			}
+
+			if subCmd == nil {
+				t.Fatalf("%s command not found", cmdName)
+			}
+
+			// Get the flag names in this subcommand
+			flagNames := make(map[string]bool)
+			for _, f := range subCmd.Flags {
+				flagNames[f.Names()[0]] = true
+			}
+
+			// Verify sync-specific flags are NOT present
+			for _, syncFlag := range syncSpecificFlags {
+				if flagNames[syncFlag] {
+					t.Errorf("%s command should not have sync-specific flag '%s'", cmdName, syncFlag)
+				}
+			}
+		})
+	}
+}
+
+func TestCLI_ARMAPIFlagDescriptionContainsDefault(t *testing.T) {
+	rootCmd := NewCLI()
+
+	var armAPIFlag cli.Flag
+	for _, f := range rootCmd.Flags {
+		if f.Names()[0] == "arm-api" {
+			armAPIFlag = f
+			break
+		}
+	}
+
+	if armAPIFlag == nil {
+		t.Fatal("arm-api flag not found on root command")
+	}
+
+	// Check if flag implements DocGenerationFlag interface to get usage
+	docFlag, ok := armAPIFlag.(cli.DocGenerationFlag)
+	if !ok {
+		t.Fatal("arm-api flag does not implement DocGenerationFlag interface")
+	}
+
+	usage := docFlag.GetUsage()
+	expectedSubstring := "(default: false)"
+
+	if !contains(usage, expectedSubstring) {
+		t.Errorf("arm-api flag usage should contain %q, got %q", expectedSubstring, usage)
+	}
+}
+
+func TestCLI_OfflineDBFlagDescriptionContainsDefault(t *testing.T) {
+	rootCmd := NewCLI()
+
+	var offlineDBFlag cli.Flag
+	for _, f := range rootCmd.Flags {
+		if f.Names()[0] == "offline-db" {
+			offlineDBFlag = f
+			break
+		}
+	}
+
+	if offlineDBFlag == nil {
+		t.Fatal("offline-db flag not found on root command")
+	}
+
+	docFlag, ok := offlineDBFlag.(cli.DocGenerationFlag)
+	if !ok {
+		t.Fatal("offline-db flag does not implement DocGenerationFlag interface")
+	}
+
+	usage := docFlag.GetUsage()
+	expectedSubstring := "(default: true)"
+
+	if !contains(usage, expectedSubstring) {
+		t.Errorf("offline-db flag usage should contain %q, got %q", expectedSubstring, usage)
+	}
+}
+
+// =============================================================================
+// Logout Command Tests (missing from original test suite)
+// =============================================================================
+
+func TestCLI_LogoutCommand_HasServiceFlag(t *testing.T) {
+	rootCmd := NewCLI()
+
+	var logoutCmd *cli.Command
+	for _, c := range rootCmd.Commands {
+		if c.Name == "logout" {
+			logoutCmd = c
+			break
+		}
+	}
+
+	if logoutCmd == nil {
+		t.Fatal("logout command not found")
+	}
+
+	if len(logoutCmd.Flags) != 1 {
+		t.Errorf("expected 1 flag on logout command, got %d", len(logoutCmd.Flags))
+	}
+
+	flag := logoutCmd.Flags[0]
+	if flag.Names()[0] != "service" {
+		t.Errorf("expected 'service' flag, got %s", flag.Names()[0])
+	}
+}
+
+// =============================================================================
+// Watch Command Specific Flags Tests
+// =============================================================================
+
+func TestCLI_WatchCommand_HasIntervalAndOnceFlags(t *testing.T) {
+	rootCmd := NewCLI()
+
+	var watchCmd *cli.Command
+	for _, c := range rootCmd.Commands {
+		if c.Name == watchCommandName {
+			watchCmd = c
+			break
+		}
+	}
+
+	if watchCmd == nil {
+		t.Fatal("watch command not found")
+	}
+
+	flagNames := make(map[string]bool)
+	for _, f := range watchCmd.Flags {
+		flagNames[f.Names()[0]] = true
+	}
+
+	// Check for watch-specific flags
+	watchFlags := []string{"interval", "once"}
+	for _, flagName := range watchFlags {
+		if !flagNames[flagName] {
+			t.Errorf("watch command missing flag: %s", flagName)
+		}
+	}
+}
+
+func TestCLI_WatchCommand_IntervalHasShortAlias(t *testing.T) {
+	rootCmd := NewCLI()
+
+	var watchCmd *cli.Command
+	for _, c := range rootCmd.Commands {
+		if c.Name == watchCommandName {
+			watchCmd = c
+			break
+		}
+	}
+
+	if watchCmd == nil {
+		t.Fatal("watch command not found")
+	}
+
+	var intervalFlag cli.Flag
+	for _, f := range watchCmd.Flags {
+		if f.Names()[0] == "interval" {
+			intervalFlag = f
+			break
+		}
+	}
+
+	if intervalFlag == nil {
+		t.Fatal("interval flag not found on watch command")
+	}
+
+	names := intervalFlag.Names()
+	expectedAliases := []string{"interval", "i"}
+
+	if !equalSlices(names, expectedAliases) {
+		t.Errorf("interval flag: expected aliases %v, got %v", expectedAliases, names)
+	}
+}
+
+// =============================================================================
+// Helper Functions
+// =============================================================================
+
+func contains(s, substr string) bool {
+	return indexOf(s, substr) >= 0
+}
+
+func indexOf(s, substr string) int {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return i
+		}
+	}
+	return -1
 }
