@@ -497,13 +497,16 @@ func TestLogger_Progress_VeryLongTitle(t *testing.T) {
 	// Title longer than 150 characters
 	longTitle := strings.Repeat("A", 200)
 
-	// For non-terminal output, Progress only outputs when current == total
+	// For non-terminal output, Progress outputs each item
 	logger.Progress(10, 10, "watching", longTitle)
 
-	// Should not panic and should show final message
+	// Should not panic and should show progress message
 	output := buf.String()
 	if len(output) == 0 {
 		t.Error("Expected some output when current == total")
+	}
+	if !strings.Contains(output, "[10/10]") {
+		t.Error("Expected '[10/10]' in output")
 	}
 }
 
@@ -515,16 +518,15 @@ func TestLogger_Progress_VeryLongTitle_Verbose(t *testing.T) {
 	// Title longer than 150 characters
 	longTitle := strings.Repeat("A", 200)
 
-	// For non-terminal output, Progress only outputs when current == total
+	// For non-terminal output, Progress outputs each item
 	logger.Progress(10, 10, "watching", longTitle)
 
-	// Should not panic and should show final message
+	// Should not panic and should show progress message
 	output := buf.String()
 	if len(output) == 0 {
 		t.Error("Expected some output in verbose mode when current == total")
 	}
-	// The final message shows "Processed X items" not the title
-	if !strings.Contains(output, "Processed") {
-		t.Error("Expected 'Processed' in output")
+	if !strings.Contains(output, "[10/10]") {
+		t.Error("Expected '[10/10]' in output")
 	}
 }

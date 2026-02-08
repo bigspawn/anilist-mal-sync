@@ -154,10 +154,8 @@ func (l *Logger) Progress(current, total int, status, title string) {
 	}
 
 	if !l.useColors {
-		// Non-terminal (file/pipe): only show final message
-		if current == total {
-			l.infoLog.Printf("Processed %d items\n", total)
-		}
+		// Non-terminal (file/pipe): print each item on its own line
+		l.infoLog.Printf("[%d/%d] %s: %s", current, total, status, title)
 		return
 	}
 
