@@ -304,3 +304,4 @@ This project is not affiliated with AniList or MyAnimeList. Use at your own risk
 
 - [anime-offline-database](https://github.com/manami-project/anime-offline-database) for JSON based anime dataset
 - [arm-server](https://github.com/BeeeQueue/arm-server) for API anime dataset
+- [Hato](https://github.com/Atelier-Shiori/Hato) for JSON API anime and manga
