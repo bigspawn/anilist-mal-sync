@@ -48,7 +48,7 @@ var syncFlags = []cli.Flag{
 	},
 	&cli.BoolFlag{
 		Name:  "offline-db",
-		Usage: "enable offline database for anime ID mapping (ignored for --manga)",
+		Usage: "enable offline database for anime ID mapping (ignored for --manga) (default: true)",
 		Value: true,
 	},
 	&cli.BoolFlag{
@@ -57,7 +57,7 @@ var syncFlags = []cli.Flag{
 	},
 	&cli.BoolFlag{
 		Name:  "arm-api",
-		Usage: "enable ARM API for anime ID mapping (ignored for --manga, fallback after offline DB)",
+		Usage: "enable ARM API for anime ID mapping (ignored for --manga, fallback after offline DB) (default: false)",
 	},
 	&cli.StringFlag{
 		Name:  "arm-api-url",
@@ -114,44 +114,54 @@ func NewCLI() *cli.Command {
 		Name:    "force",
 		Aliases: []string{"f"},
 		Usage:   "force sync all entries",
+		Local:   true,
 	}
 	dryRunFlag := &cli.BoolFlag{
 		Name:    "dry-run",
 		Aliases: []string{"d"},
 		Usage:   "dry run without updating target service",
+		Local:   true,
 	}
 	mangaSyncFlag := &cli.BoolFlag{
 		Name:  "manga",
 		Usage: "sync manga instead of anime",
+		Local: true,
 	}
 	allSyncFlag := &cli.BoolFlag{
 		Name:  "all",
 		Usage: "sync all anime and manga",
+		Local: true,
 	}
 	verboseFlag := &cli.BoolFlag{
 		Name:  "verbose",
 		Usage: "enable verbose logging",
+		Local: true,
 	}
 	reverseDirectionFlag := &cli.BoolFlag{
 		Name:  "reverse-direction",
 		Usage: "sync from MyAnimeList to AniList (default is AniList to MyAnimeList)",
+		Local: true,
 	}
 	offlineDbFlag := &cli.BoolFlag{
 		Name:  "offline-db",
-		Usage: "enable offline database for ID mapping (default: true)",
+		Usage: "enable offline database for anime ID mapping (ignored for --manga) (default: true)",
 		Value: true,
+		Local: true,
 	}
 	offlineDbForceRefreshFlag := &cli.BoolFlag{
 		Name:  "offline-db-force-refresh",
 		Usage: "force re-download offline database",
+		Local: true,
 	}
 	armAPIFlag := &cli.BoolFlag{
 		Name:  "arm-api",
-		Usage: "enable ARM API for ID mapping (fallback after offline DB)",
+		Usage: "enable ARM API for anime ID mapping (ignored for --manga, fallback after offline DB) (default: false)",
+		Local: true,
 	}
 	armAPIURLFlag := &cli.StringFlag{
 		Name:  "arm-api-url",
 		Usage: "ARM API base URL",
+		Local: true,
 	}
 
 	return &cli.Command{
