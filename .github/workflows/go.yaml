@@ -1,3 +1,4 @@
+# Test concurrency cancellation
 name: go
 
 on:
