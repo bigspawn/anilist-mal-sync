@@ -1,4 +1,4 @@
-# Test concurrency - push 1
+# Test concurrency - push 2
 name: go
 
 on:
