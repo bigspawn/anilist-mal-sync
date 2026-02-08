@@ -5,22 +5,46 @@ on:
     branches:
       - main
       - master
+    paths-ignore:
+      - "**.md"
+      - "doc/**"
+      - ".vscode/**"
+      - ".idea/**"
+      - "examples/**"
+      - "docker-compose.yml"
+      - "LICENSE"
+      - ".gitignore"
   pull_request:
+    paths-ignore:
+      - "**.md"
+      - "doc/**"
+      - ".vscode/**"
+      - ".idea/**"
+      - "examples/**"
+      - "docker-compose.yml"
+      - "LICENSE"
+      - ".gitignore"
 
 permissions:
   contents: read
   # Optional: allow read access to pull request. Use with `only-new-issues` option.
-  # pull-requests: read
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   golangci:
     name: lint
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: stable
+          cache: true
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v8
         with:
