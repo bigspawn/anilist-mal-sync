@@ -3,8 +3,9 @@ package main
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
@@ -73,63 +74,6 @@ func TestSyncReport_ConcurrentWarningAdd(t *testing.T) {
 	// Verify all warnings were added
 	if len(report.Warnings) != 100 {
 		t.Errorf("Expected 100 warnings, got %d", len(report.Warnings))
-	}
-}
-
-// ============================================
-// Error Handling Edge Cases
-// ============================================
-
-func TestIsRetryableError_WrappedErrors(t *testing.T) {
-	tests := []struct {
-		name string
-		err  error
-		want bool
-	}{
-		{
-			name: "wrapped rate limit error",
-			err:  fmt.Errorf("API call failed: %w", errors.New("too many requests")),
-			want: true,
-		},
-		{
-			name: "double wrapped error",
-			err:  fmt.Errorf("outer: %w", fmt.Errorf("inner: %w", errors.New("rate limit exceeded"))),
-			want: true,
-		},
-		{
-			name: "wrapped 429 in string",
-			err:  errors.New("request failed with HTTP 429 status"),
-			want: true,
-		},
-		{
-			name: "case insensitive rate limit",
-			err:  errors.New("TOO MANY REQUESTS"),
-			want: true,
-		},
-		{
-			name: "mixed case rate limit",
-			err:  errors.New("Too Many Requests"),
-			want: true,
-		},
-		{
-			name: "substring match in larger error",
-			err:  errors.New("API error: got 429 rate limit from server"),
-			want: true,
-		},
-		{
-			name: "non-retryable wrapped error",
-			err:  fmt.Errorf("failed: %w", errors.New("unauthorized")),
-			want: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := isRetryableError(tt.err)
-			if got != tt.want {
-				t.Errorf("isRetryableError() = %v, want %v", got, tt.want)
-			}
-		})
 	}
 }
 
@@ -360,7 +304,7 @@ func TestAnime_SameTypeWithTarget_NilAndZero(t *testing.T) {
 // Context Cancellation Tests
 // ============================================
 
-func TestRetryWithBackoff_ContextCancellation(t *testing.T) {
+func TestRetryableTransport_ContextCancellation(t *testing.T) {
 	tests := []struct {
 		name              string
 		cancelImmediately bool
@@ -369,7 +313,7 @@ func TestRetryWithBackoff_ContextCancellation(t *testing.T) {
 		{
 			name:              "context cancelled immediately",
 			cancelImmediately: true,
-			expectCallCount:   1, // One call before check
+			expectCallCount:   0, // No calls when context is already cancelled
 		},
 		{
 			name:              "context not cancelled",
@@ -388,16 +332,22 @@ func TestRetryWithBackoff_ContextCancellation(t *testing.T) {
 			}
 
 			callCount := 0
-			operation := func() error {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				callCount++
 				if callCount > 2 {
-					return nil
+					w.WriteHeader(http.StatusOK)
+					return
 				}
-				// Use a retryable error (rate limit)
-				return errors.New("rate limit exceeded")
-			}
+				// Return a retryable status code
+				w.WriteHeader(http.StatusTooManyRequests)
+			}))
+			defer server.Close()
 
-			_ = retryWithBackoff(ctx, operation, "test operation")
+			transport := NewRetryableTransport(&http.Client{}, 3)
+			client := &http.Client{Transport: transport}
+
+			req, _ := http.NewRequestWithContext(ctx, "GET", server.URL, nil)
+			_, _ = client.Do(req)
 
 			if callCount < tt.expectCallCount {
 				t.Errorf("Expected at least %d calls, got %d", tt.expectCallCount, callCount)

@@ -380,16 +380,7 @@ func (s ARMAPIStrategy) FindTarget(
 		return nil, false, nil
 	}
 
-	targetID := TargetID(targetServiceID)
-	if target, exists := existingTargets[targetID]; exists {
-		LogDebugDecision(ctx, "[%s] Found target by ARM API: ID %d -> %s",
-			prefix, targetServiceID, target.GetTitle())
-		return target, true, nil
-	}
-
-	LogDebugDecision(ctx, "[%s] ARM API mapped to ID %d but not in user's list",
-		prefix, targetServiceID)
-	return nil, false, nil
+	return checkExistingTarget(ctx, existingTargets, targetServiceID, prefix, "ARM API")
 }
 
 func (s ARMAPIStrategy) lookupID(ctx context.Context, src Anime) (int, bool, error) {
@@ -450,7 +441,7 @@ func (s HatoAPIStrategy) FindTarget(
 			return nil, false, nil
 		}
 		if found {
-			return s.checkTarget(ctx, targetServiceID, existingTargets, prefix)
+			return checkExistingTarget(ctx, existingTargets, targetServiceID, prefix, "Hato API")
 		}
 		return nil, false, nil
 	}
@@ -463,7 +454,7 @@ func (s HatoAPIStrategy) FindTarget(
 			return nil, false, nil
 		}
 		if found {
-			return s.checkTarget(ctx, targetServiceID, existingTargets, prefix)
+			return checkExistingTarget(ctx, existingTargets, targetServiceID, prefix, "Hato API")
 		}
 		return nil, false, nil
 	}
@@ -471,86 +462,65 @@ func (s HatoAPIStrategy) FindTarget(
 	return nil, false, nil
 }
 
-//nolint:dupl // Similar to lookupIDManga but with different media type
+// lookupID performs bidirectional ID lookup using the Hato API.
+// First tries MAL ID → AniList ID, then AniList ID → MAL ID.
+func (s HatoAPIStrategy) lookupID(ctx context.Context, malID, anilistID int, mediaType string) (int, bool, error) {
+	// Try MAL ID → AniList ID lookup
+	if malID > 0 {
+		LogDebug(ctx, "[HATO API] Looking up AniList ID for MAL ID: %d (%s)", malID, mediaType)
+		id, found, err := s.Client.GetAniListID(ctx, malID, mediaType)
+		if err != nil {
+			return 0, false, err
+		}
+		if found {
+			LogDebug(ctx, "[HATO API] Found: MAL %d -> AniList %d (%s)", malID, id, mediaType)
+			return id, true, nil
+		}
+		LogDebug(ctx, "[HATO API] Not found: MAL %d -> (no mapping) (%s)", malID, mediaType)
+	}
+
+	// Try AniList ID → MAL ID lookup
+	if anilistID > 0 {
+		LogDebug(ctx, "[HATO API] Looking up MAL ID for AniList ID: %d (%s)", anilistID, mediaType)
+		id, found, err := s.Client.GetMALID(ctx, anilistID, mediaType)
+		if err != nil {
+			return 0, false, err
+		}
+		if found {
+			LogDebug(ctx, "[HATO API] Found: AniList %d -> MAL %d (%s)", anilistID, id, mediaType)
+			return id, true, nil
+		}
+		LogDebug(ctx, "[HATO API] Not found: AniList %d -> (no mapping) (%s)", anilistID, mediaType)
+	}
+
+	return 0, false, nil
+}
+
 func (s HatoAPIStrategy) lookupIDAnime(ctx context.Context, src Anime) (int, bool, error) {
-	// Try MAL ID → AniList ID lookup
-	if src.IDMal > 0 {
-		LogDebug(ctx, "[HATO API] Looking up AniList ID for MAL ID: %d (anime)", src.IDMal)
-		id, found, err := s.Client.GetAniListID(ctx, src.IDMal, "anime")
-		if err != nil {
-			return 0, false, err
-		}
-		if found {
-			LogDebug(ctx, "[HATO API] Found: MAL %d -> AniList %d (anime)", src.IDMal, id)
-			return id, true, nil
-		}
-		LogDebug(ctx, "[HATO API] Not found: MAL %d -> (no mapping) (anime)", src.IDMal)
-	}
-
-	// Try AniList ID → MAL ID lookup
-	if src.IDAnilist > 0 {
-		LogDebug(ctx, "[HATO API] Looking up MAL ID for AniList ID: %d (anime)", src.IDAnilist)
-		id, found, err := s.Client.GetMALID(ctx, src.IDAnilist, "anime")
-		if err != nil {
-			return 0, false, err
-		}
-		if found {
-			LogDebug(ctx, "[HATO API] Found: AniList %d -> MAL %d (anime)", src.IDAnilist, id)
-			return id, true, nil
-		}
-		LogDebug(ctx, "[HATO API] Not found: AniList %d -> (no mapping) (anime)", src.IDAnilist)
-	}
-
-	return 0, false, nil
+	return s.lookupID(ctx, src.IDMal, src.IDAnilist, "anime")
 }
 
-//nolint:dupl // Similar to lookupIDAnime but with different media type
 func (s HatoAPIStrategy) lookupIDManga(ctx context.Context, src Manga) (int, bool, error) {
-	// Try MAL ID → AniList ID lookup
-	if src.IDMal > 0 {
-		LogDebug(ctx, "[HATO API] Looking up AniList ID for MAL ID: %d (manga)", src.IDMal)
-		id, found, err := s.Client.GetAniListID(ctx, src.IDMal, "manga")
-		if err != nil {
-			return 0, false, err
-		}
-		if found {
-			LogDebug(ctx, "[HATO API] Found: MAL %d -> AniList %d (manga)", src.IDMal, id)
-			return id, true, nil
-		}
-		LogDebug(ctx, "[HATO API] Not found: MAL %d -> (no mapping) (manga)", src.IDMal)
-	}
-
-	// Try AniList ID → MAL ID lookup
-	if src.IDAnilist > 0 {
-		LogDebug(ctx, "[HATO API] Looking up MAL ID for AniList ID: %d (manga)", src.IDAnilist)
-		id, found, err := s.Client.GetMALID(ctx, src.IDAnilist, "manga")
-		if err != nil {
-			return 0, false, err
-		}
-		if found {
-			LogDebug(ctx, "[HATO API] Found: AniList %d -> MAL %d (manga)", src.IDAnilist, id)
-			return id, true, nil
-		}
-		LogDebug(ctx, "[HATO API] Not found: AniList %d -> (no mapping) (manga)", src.IDAnilist)
-	}
-
-	return 0, false, nil
+	return s.lookupID(ctx, src.IDMal, src.IDAnilist, "manga")
 }
 
-func (s HatoAPIStrategy) checkTarget(
+// checkExistingTarget checks if a target ID exists in the user's list and returns appropriate result.
+// This is a shared helper used by API-based strategies (ARM, Hato).
+func checkExistingTarget(
 	ctx context.Context,
-	targetServiceID int,
 	existingTargets map[TargetID]Target,
+	targetServiceID int,
 	prefix string,
+	apiName string,
 ) (Target, bool, error) {
 	targetID := TargetID(targetServiceID)
 	if target, exists := existingTargets[targetID]; exists {
-		LogDebugDecision(ctx, "[%s] Found target by Hato API: ID %d -> %s",
-			prefix, targetServiceID, target.GetTitle())
+		LogDebugDecision(ctx, "[%s] Found target by %s: ID %d -> %s",
+			prefix, apiName, targetServiceID, target.GetTitle())
 		return target, true, nil
 	}
 
-	LogDebugDecision(ctx, "[%s] Hato API mapped to ID %d but not in user's list",
-		prefix, targetServiceID)
+	LogDebugDecision(ctx, "[%s] %s mapped to ID %d but not in user's list",
+		prefix, apiName, targetServiceID)
 	return nil, false, nil
 }

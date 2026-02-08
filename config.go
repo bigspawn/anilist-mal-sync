@@ -183,55 +183,27 @@ func overrideOAuthFromEnv(oauth *OAuthConfig) {
 		oauth.Port = port
 	}
 
-	if redirectURI := os.Getenv("OAUTH_REDIRECT_URI"); redirectURI != "" {
-		oauth.RedirectURI = redirectURI
-	}
+	overrideStringFromEnv(&oauth.RedirectURI, "OAUTH_REDIRECT_URI")
 }
 
 func overrideAnilistFromEnv(anilist *SiteConfig) {
-	if clientID := os.Getenv("ANILIST_CLIENT_ID"); clientID != "" {
-		anilist.ClientID = clientID
-	}
-
-	// Support both new and old env var names for backward compatibility
-	if clientSecret := os.Getenv("ANILIST_CLIENT_SECRET"); clientSecret != "" {
-		anilist.ClientSecret = clientSecret
-	} else if clientSecret := os.Getenv("CLIENT_SECRET_ANILIST"); clientSecret != "" {
-		anilist.ClientSecret = clientSecret
-	}
-
-	if username := os.Getenv("ANILIST_USERNAME"); username != "" {
-		anilist.Username = username
-	}
+	overrideStringFromEnv(&anilist.ClientID, "ANILIST_CLIENT_ID")
+	overrideStringFromEnv(&anilist.ClientSecret, "ANILIST_CLIENT_SECRET", "CLIENT_SECRET_ANILIST")
+	overrideStringFromEnv(&anilist.Username, "ANILIST_USERNAME")
 }
 
 func overrideMyAnimeListFromEnv(mal *SiteConfig) {
-	if clientID := os.Getenv("MAL_CLIENT_ID"); clientID != "" {
-		mal.ClientID = clientID
-	}
-
-	// Support both new and old env var names for backward compatibility
-	if clientSecret := os.Getenv("MAL_CLIENT_SECRET"); clientSecret != "" {
-		mal.ClientSecret = clientSecret
-	} else if clientSecret := os.Getenv("CLIENT_SECRET_MYANIMELIST"); clientSecret != "" {
-		mal.ClientSecret = clientSecret
-	}
-
-	if username := os.Getenv("MAL_USERNAME"); username != "" {
-		mal.Username = username
-	}
+	overrideStringFromEnv(&mal.ClientID, "MAL_CLIENT_ID")
+	overrideStringFromEnv(&mal.ClientSecret, "MAL_CLIENT_SECRET", "CLIENT_SECRET_MYANIMELIST")
+	overrideStringFromEnv(&mal.Username, "MAL_USERNAME")
 }
 
 func overrideWatchFromEnv(watch *WatchConfig) {
-	if interval := os.Getenv("WATCH_INTERVAL"); interval != "" {
-		watch.Interval = interval
-	}
+	overrideStringFromEnv(&watch.Interval, "WATCH_INTERVAL")
 }
 
 func overrideTokenPathFromEnv(cfg *Config) {
-	if tokenFilePath := os.Getenv("TOKEN_FILE_PATH"); tokenFilePath != "" {
-		cfg.TokenFilePath = tokenFilePath
-	}
+	overrideStringFromEnv(&cfg.TokenFilePath, "TOKEN_FILE_PATH")
 
 	if cfg.TokenFilePath == "" {
 		cfg.TokenFilePath = getDefaultTokenPathOrEmpty()
@@ -239,44 +211,42 @@ func overrideTokenPathFromEnv(cfg *Config) {
 }
 
 func overrideHTTPTimeoutFromEnv(cfg *Config) {
-	if timeout := os.Getenv("HTTP_TIMEOUT"); timeout != "" {
-		cfg.HTTPTimeout = timeout
-	}
+	overrideStringFromEnv(&cfg.HTTPTimeout, "HTTP_TIMEOUT")
 }
 
 func overrideOfflineDatabaseFromEnv(odc *OfflineDatabaseConfig) {
-	if v := os.Getenv("OFFLINE_DATABASE_ENABLED"); v != "" {
-		odc.Enabled = parseBoolString(v)
-	}
-	if v := os.Getenv("OFFLINE_DATABASE_CACHE_DIR"); v != "" {
-		odc.CacheDir = v
-	}
-	if v := os.Getenv("OFFLINE_DATABASE_AUTO_UPDATE"); v != "" {
-		odc.AutoUpdate = parseBoolString(v)
-	}
+	overrideBoolFromEnv(&odc.Enabled, "OFFLINE_DATABASE_ENABLED")
+	overrideStringFromEnv(&odc.CacheDir, "OFFLINE_DATABASE_CACHE_DIR")
+	overrideBoolFromEnv(&odc.AutoUpdate, "OFFLINE_DATABASE_AUTO_UPDATE")
 }
 
 func overrideARMAPIFromEnv(ac *ARMAPIConfig) {
-	if v := os.Getenv("ARM_API_ENABLED"); v != "" {
-		ac.Enabled = parseBoolString(v)
-	}
-	if v := os.Getenv("ARM_API_URL"); v != "" {
-		ac.BaseURL = v
-	}
+	overrideBoolFromEnv(&ac.Enabled, "ARM_API_ENABLED")
+	overrideStringFromEnv(&ac.BaseURL, "ARM_API_URL")
 }
 
 func overrideHatoAPIFromEnv(hc *HatoAPIConfig) {
-	if v := os.Getenv("HATO_API_ENABLED"); v != "" {
-		hc.Enabled = parseBoolString(v)
+	overrideBoolFromEnv(&hc.Enabled, "HATO_API_ENABLED")
+	overrideStringFromEnv(&hc.BaseURL, "HATO_API_URL")
+	overrideStringFromEnv(&hc.CacheDir, "HATO_API_CACHE_DIR")
+	overrideStringFromEnv(&hc.CacheMaxAge, "HATO_API_CACHE_MAX_AGE")
+}
+
+// overrideStringFromEnv overrides a string field from environment variables.
+// Tries each key in order until a non-empty value is found.
+func overrideStringFromEnv(field *string, keys ...string) {
+	for _, key := range keys {
+		if value := os.Getenv(key); value != "" {
+			*field = value
+			return
+		}
 	}
-	if v := os.Getenv("HATO_API_URL"); v != "" {
-		hc.BaseURL = v
-	}
-	if v := os.Getenv("HATO_API_CACHE_DIR"); v != "" {
-		hc.CacheDir = v
-	}
-	if v := os.Getenv("HATO_API_CACHE_MAX_AGE"); v != "" {
-		hc.CacheMaxAge = v
+}
+
+// overrideBoolFromEnv overrides a boolean field from an environment variable.
+func overrideBoolFromEnv(field *bool, key string) {
+	if value := os.Getenv(key); value != "" {
+		*field = parseBoolString(value)
 	}
 }
 

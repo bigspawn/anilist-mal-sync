@@ -16,7 +16,6 @@ require github.com/nstratos/go-myanimelist v0.9.5
 require github.com/urfave/cli/v3 v3.6.1
 
 require (
-	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/mock v0.6.0
 )

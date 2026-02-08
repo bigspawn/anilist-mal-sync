@@ -14,7 +14,7 @@ const defaultHatoBaseURL = "https://hato.malupdaterosx.moe"
 // Supports both anime and manga ID mapping with persistent JSON caching.
 type HatoClient struct {
 	baseURL    string
-	httpClient *http.Client
+	httpClient HTTPClient
 	cache      *HatoCache // Persistent cache (can be nil)
 }
 
@@ -55,30 +55,42 @@ func NewHatoClient(ctx context.Context, baseURL string, timeout time.Duration, c
 
 	return &HatoClient{
 		baseURL: baseURL,
-		httpClient: &http.Client{
+		httpClient: NewRetryableClient(&http.Client{
 			Timeout: timeout,
-		},
+		}, 3),
 		cache: cache,
+	}
+}
+
+// getCachedData attempts to retrieve cached data for the given service, media type, and ID.
+// Returns (data, found).
+func (c *HatoClient) getCachedData(service, mediaType string, id int) (*HatoResponseData, bool) {
+	if c.cache == nil {
+		return nil, false
+	}
+	return c.cache.Get(service, mediaType, id)
+}
+
+// setCachedData stores data in the cache.
+func (c *HatoClient) setCachedData(service, mediaType string, id int, data HatoResponseData) {
+	if c.cache != nil {
+		c.cache.Set(service, mediaType, id, data)
 	}
 }
 
 // GetAniListID returns the AniList ID for a given MAL ID and media type.
 // mediaType should be "anime" or "manga".
 // Checks cache first, then makes API request if needed.
-//
-//nolint:dupl // Similar to GetMALID but with different field access
 func (c *HatoClient) GetAniListID(ctx context.Context, malID int, mediaType string) (int, bool, error) {
 	// Check cache first
-	if c.cache != nil {
-		if data, found := c.cache.Get("mal", mediaType, malID); found {
-			if data.AniListID != nil && *data.AniListID > 0 {
-				LogDebug(ctx, "[HATO CACHE] HIT: MAL %d -> AniList %d (%s)", malID, *data.AniListID, mediaType)
-				return *data.AniListID, true, nil
-			}
-			// Cached negative result
-			LogDebug(ctx, "[HATO CACHE] HIT: MAL %d -> not found (cached) (%s)", malID, mediaType)
-			return 0, false, nil
+	if data, found := c.getCachedData("mal", mediaType, malID); found {
+		if data.AniListID != nil && *data.AniListID > 0 {
+			LogDebug(ctx, "[HATO CACHE] HIT: MAL %d -> AniList %d (%s)", malID, *data.AniListID, mediaType)
+			return *data.AniListID, true, nil
 		}
+		// Cached negative result
+		LogDebug(ctx, "[HATO CACHE] HIT: MAL %d -> not found (cached) (%s)", malID, mediaType)
+		return 0, false, nil
 	}
 
 	// Cache miss - make API request
@@ -92,20 +104,13 @@ func (c *HatoClient) GetAniListID(ctx context.Context, malID int, mediaType stri
 	}
 	if resp == nil || resp.Data.AniListID == nil {
 		LogDebug(ctx, "[HATO API] Response: not found (404 or null)")
-		// Cache negative result to avoid repeated API calls
-		if c.cache != nil {
-			c.cache.Set("mal", mediaType, malID, HatoResponseData{}) // Empty data = not found
-		}
+		c.setCachedData("mal", mediaType, malID, HatoResponseData{})
 		return 0, false, nil
 	}
 
 	anilistID := *resp.Data.AniListID
 	LogDebug(ctx, "[HATO API] Response: AniList ID = %d", anilistID)
-
-	// Save complete response to cache
-	if c.cache != nil {
-		c.cache.Set("mal", mediaType, malID, resp.Data)
-	}
+	c.setCachedData("mal", mediaType, malID, resp.Data)
 
 	return anilistID, true, nil
 }
@@ -113,20 +118,16 @@ func (c *HatoClient) GetAniListID(ctx context.Context, malID int, mediaType stri
 // GetMALID returns the MAL ID for a given AniList ID and media type.
 // mediaType should be "anime" or "manga".
 // Checks cache first, then makes API request if needed.
-//
-//nolint:dupl // Similar to GetAniListID but with different field access
 func (c *HatoClient) GetMALID(ctx context.Context, anilistID int, mediaType string) (int, bool, error) {
 	// Check cache first
-	if c.cache != nil {
-		if data, found := c.cache.Get("anilist", mediaType, anilistID); found {
-			if data.MalID != nil && *data.MalID > 0 {
-				LogDebug(ctx, "[HATO CACHE] HIT: AniList %d -> MAL %d (%s)", anilistID, *data.MalID, mediaType)
-				return *data.MalID, true, nil
-			}
-			// Cached negative result
-			LogDebug(ctx, "[HATO CACHE] HIT: AniList %d -> not found (cached) (%s)", anilistID, mediaType)
-			return 0, false, nil
+	if data, found := c.getCachedData("anilist", mediaType, anilistID); found {
+		if data.MalID != nil && *data.MalID > 0 {
+			LogDebug(ctx, "[HATO CACHE] HIT: AniList %d -> MAL %d (%s)", anilistID, *data.MalID, mediaType)
+			return *data.MalID, true, nil
 		}
+		// Cached negative result
+		LogDebug(ctx, "[HATO CACHE] HIT: AniList %d -> not found (cached) (%s)", anilistID, mediaType)
+		return 0, false, nil
 	}
 
 	// Cache miss - make API request
@@ -140,20 +141,13 @@ func (c *HatoClient) GetMALID(ctx context.Context, anilistID int, mediaType stri
 	}
 	if resp == nil || resp.Data.MalID == nil {
 		LogDebug(ctx, "[HATO API] Response: not found (404 or null)")
-		// Cache negative result
-		if c.cache != nil {
-			c.cache.Set("anilist", mediaType, anilistID, HatoResponseData{}) // Empty data = not found
-		}
+		c.setCachedData("anilist", mediaType, anilistID, HatoResponseData{})
 		return 0, false, nil
 	}
 
 	malID := *resp.Data.MalID
 	LogDebug(ctx, "[HATO API] Response: MAL ID = %d", malID)
-
-	// Save complete response to cache
-	if c.cache != nil {
-		c.cache.Set("anilist", mediaType, anilistID, resp.Data)
-	}
+	c.setCachedData("anilist", mediaType, anilistID, resp.Data)
 
 	return malID, true, nil
 }

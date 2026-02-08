@@ -61,7 +61,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 	anilistMangaService := NewAniListMangaService(anilistClient, scoreFormat)
 
 	// Load offline database and ARM client for ID mapping (anime only)
-	offlineStrategy, hatoStrategy, armStrategy := loadIDMappingStrategies(ctx, config)
+	offlineStrategy, hatoStrategy, hatoClient, armStrategy := loadIDMappingStrategies(ctx, config)
 
 	// Default ignore titles
 	defaultIgnoreTitles := map[string]struct{}{
@@ -138,11 +138,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 
 	LogInfoSuccess(ctx, "Initialization complete")
 
-	// Create Hato client for cache saving
-	var hatoClient *HatoClient
-	if config.HatoAPI.Enabled {
-		hatoClient = NewHatoClient(ctx, config.HatoAPI.BaseURL, config.GetHTTPTimeout(), config.HatoAPI.CacheDir)
-	}
+	// hatoClient is already created by loadIDMappingStrategies() and will be used for both strategies and cache saving
 
 	return &App{
 		config:              config,
@@ -160,7 +156,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 
 // loadIDMappingStrategies loads offline database and ARM client, returning strategies.
 // Strategies with nil Database/Client are no-ops (return nil, false, nil).
-func loadIDMappingStrategies(ctx context.Context, config Config) (OfflineDatabaseStrategy, HatoAPIStrategy, ARMAPIStrategy) {
+func loadIDMappingStrategies(ctx context.Context, config Config) (OfflineDatabaseStrategy, HatoAPIStrategy, *HatoClient, ARMAPIStrategy) {
 	var offlineDB *OfflineDatabase
 	if config.OfflineDatabase.Enabled {
 		LogStage(ctx, "Loading offline database...")
@@ -187,6 +183,7 @@ func loadIDMappingStrategies(ctx context.Context, config Config) (OfflineDatabas
 
 	return OfflineDatabaseStrategy{Database: offlineDB},
 		HatoAPIStrategy{Client: hatoClient},
+		hatoClient,
 		ARMAPIStrategy{Client: armClient}
 }
 

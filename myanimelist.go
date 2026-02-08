@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/nstratos/go-myanimelist/mal"
@@ -36,6 +35,7 @@ type MyAnimeListClient struct {
 
 func NewMyAnimeListClient(ctx context.Context, oauth *OAuth, username string, httpTimeout time.Duration, verbose bool) *MyAnimeListClient {
 	httpClient := oauth2.NewClient(ctx, oauth.TokenSource(ctx))
+	httpClient.Transport = NewRetryableTransport(httpClient, 3)
 	httpClient.Transport = newLoggingRoundTripper(httpClient.Transport, verbose)
 
 	client := mal.NewClient(httpClient)
@@ -54,22 +54,10 @@ func (c *MyAnimeListClient) GetUserAnimeList(ctx context.Context) ([]mal.UserAni
 }
 
 func (c *MyAnimeListClient) GetAnimesByName(ctx context.Context, name string) ([]mal.Anime, error) {
-	var result []mal.Anime
-	err := retryWithBackoff(ctx, func() error {
-		ctx, cancel := withTimeout(ctx, c.httpTimeout)
-		defer cancel()
-		list, _, e := c.c.Anime.List(ctx, name, animeFields, mal.Limit(3))
-		if e != nil {
-			return e
-		}
-		result = list
-		return nil
-	}, fmt.Sprintf("MAL search anime by name: %s", name))
-	if err != nil {
-		return nil, err
-	}
-
-	return result, nil
+	ctx, cancel := withTimeout(ctx, c.httpTimeout)
+	defer cancel()
+	list, _, err := c.c.Anime.List(ctx, name, animeFields, mal.Limit(3))
+	return list, err
 }
 
 func (c *MyAnimeListClient) GetAnimeByID(ctx context.Context, id int) (*mal.Anime, error) {
@@ -77,22 +65,10 @@ func (c *MyAnimeListClient) GetAnimeByID(ctx context.Context, id int) (*mal.Anim
 		return nil, errEmptyMalID
 	}
 
-	var result *mal.Anime
-	err := retryWithBackoff(ctx, func() error {
-		ctx, cancel := withTimeout(ctx, c.httpTimeout)
-		defer cancel()
-		anime, _, e := c.c.Anime.Details(ctx, id, animeFields)
-		if e != nil {
-			return e
-		}
-		result = anime
-		return nil
-	}, fmt.Sprintf("MAL get anime by ID: %d", id))
-	if err != nil {
-		return nil, err
-	}
-
-	return result, nil
+	ctx, cancel := withTimeout(ctx, c.httpTimeout)
+	defer cancel()
+	anime, _, err := c.c.Anime.Details(ctx, id, animeFields)
+	return anime, err
 }
 
 func (c *MyAnimeListClient) UpdateAnimeByIDAndOptions(ctx context.Context, id int, opts []mal.UpdateMyAnimeListStatusOption) error {
@@ -103,13 +79,11 @@ func (c *MyAnimeListClient) UpdateAnimeByIDAndOptions(ctx context.Context, id in
 	// Log update details for debugging
 	DPrintf("[DEBUG] Updating MAL ID %d with opts: %+v", id, opts)
 
-	return retryWithBackoff(ctx, func() error {
-		_, _, err := c.c.Anime.UpdateMyListStatus(ctx, id, opts...)
-		if err != nil {
-			return fmt.Errorf("failed to update anime %d: %w", id, err)
-		}
-		return nil
-	}, fmt.Sprintf("MAL update anime: %d", id), "AniList to MAL Anime")
+	_, _, err := c.c.Anime.UpdateMyListStatus(ctx, id, opts...)
+	if err != nil {
+		return fmt.Errorf("failed to update anime %d: %w", id, err)
+	}
+	return nil
 }
 
 func (c *MyAnimeListClient) GetUserMangaList(ctx context.Context) ([]mal.UserManga, error) {
@@ -123,22 +97,10 @@ func (c *MyAnimeListClient) GetUserMangaList(ctx context.Context) ([]mal.UserMan
 }
 
 func (c *MyAnimeListClient) GetMangasByName(ctx context.Context, name string) ([]mal.Manga, error) {
-	var result []mal.Manga
-	err := retryWithBackoff(ctx, func() error {
-		ctx, cancel := withTimeout(ctx, c.httpTimeout)
-		defer cancel()
-		l, _, e := c.c.Manga.List(ctx, name, mangaFields, mal.Limit(10))
-		if e != nil {
-			return e
-		}
-		result = l
-		return nil
-	}, fmt.Sprintf("MAL search manga by name: %s", name))
-	if err != nil {
-		return nil, err
-	}
-
-	return result, nil
+	ctx, cancel := withTimeout(ctx, c.httpTimeout)
+	defer cancel()
+	list, _, err := c.c.Manga.List(ctx, name, mangaFields, mal.Limit(10))
+	return list, err
 }
 
 func (c *MyAnimeListClient) GetMangaByID(ctx context.Context, id int) (*mal.Manga, error) {
@@ -146,22 +108,10 @@ func (c *MyAnimeListClient) GetMangaByID(ctx context.Context, id int) (*mal.Mang
 		return nil, errEmptyMalID
 	}
 
-	var result *mal.Manga
-	err := retryWithBackoff(ctx, func() error {
-		ctx, cancel := withTimeout(ctx, c.httpTimeout)
-		defer cancel()
-		m, _, e := c.c.Manga.Details(ctx, id, mangaFields)
-		if e != nil {
-			return e
-		}
-		result = m
-		return nil
-	}, fmt.Sprintf("MAL get manga by ID: %d", id))
-	if err != nil {
-		return nil, err
-	}
-
-	return result, nil
+	ctx, cancel := withTimeout(ctx, c.httpTimeout)
+	defer cancel()
+	manga, _, err := c.c.Manga.Details(ctx, id, mangaFields)
+	return manga, err
 }
 
 func (c *MyAnimeListClient) UpdateMangaByIDAndOptions(ctx context.Context, id int, opts []mal.UpdateMyMangaListStatusOption) error {
@@ -169,53 +119,18 @@ func (c *MyAnimeListClient) UpdateMangaByIDAndOptions(ctx context.Context, id in
 		return nil
 	}
 
-	return retryWithBackoff(ctx, func() error {
-		_, _, err := c.c.Manga.UpdateMyListStatus(ctx, id, opts...)
-		if err != nil {
-			return fmt.Errorf("failed to update manga %d: %w", id, err)
-		}
-		return nil
-	}, fmt.Sprintf("MAL update manga: %d", id), "AniList to MAL Manga")
+	_, _, err := c.c.Manga.UpdateMyListStatus(ctx, id, opts...)
+	if err != nil {
+		return fmt.Errorf("failed to update manga %d: %w", id, err)
+	}
+	return nil
 }
 
-func NewMyAnimeListOAuth(ctx context.Context, config Config) (*OAuth, error) {
-	// Generate PKCE code verifier using oauth2 package
+// newMyAnimeListOAuth creates MAL OAuth with optional initialization
+func newMyAnimeListOAuth(ctx context.Context, config Config, initWithToken bool) (*OAuth, error) {
 	verifier := oauth2.GenerateVerifier()
 
 	oauthMAL, err := NewOAuth(
-		config.MyAnimeList,
-		config.OAuth.RedirectURI,
-		"myanimelist",
-		[]oauth2.AuthCodeOption{
-			oauth2.SetAuthURLParam("code_challenge", verifier),       // Plain challenge (same as verifier)
-			oauth2.SetAuthURLParam("code_challenge_method", "plain"), // Explicit plain method
-			oauth2.VerifierOption(verifier),                          // Verifier for token exchange
-		},
-		config.TokenFilePath,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	if oauthMAL.NeedInit() {
-		getToken(ctx, oauthMAL, config.OAuth.Port)
-		// Check if context was cancelled during OAuth flow
-		if ctx.Err() != nil {
-			return nil, ctx.Err()
-		}
-	} else {
-		log.Println("Token already set, no need to start server")
-	}
-
-	return oauthMAL, nil
-}
-
-// NewMyAnimeListOAuthWithoutInit creates MAL OAuth without starting auth flow.
-// Use InitToken() to manually trigger authentication when needed.
-func NewMyAnimeListOAuthWithoutInit(config Config) (*OAuth, error) {
-	verifier := oauth2.GenerateVerifier()
-
-	return NewOAuth(
 		config.MyAnimeList,
 		config.OAuth.RedirectURI,
 		"myanimelist",
@@ -226,6 +141,21 @@ func NewMyAnimeListOAuthWithoutInit(config Config) (*OAuth, error) {
 		},
 		config.TokenFilePath,
 	)
+	if err != nil {
+		return nil, err
+	}
+
+	return initOAuthIfNeeded(ctx, oauthMAL, config.OAuth.Port, initWithToken)
+}
+
+func NewMyAnimeListOAuth(ctx context.Context, config Config) (*OAuth, error) {
+	return newMyAnimeListOAuth(ctx, config, true)
+}
+
+// NewMyAnimeListOAuthWithoutInit creates MAL OAuth without starting auth flow.
+// Use InitToken() to manually trigger authentication when needed.
+func NewMyAnimeListOAuthWithoutInit(config Config) (*OAuth, error) {
+	return newMyAnimeListOAuth(context.Background(), config, false)
 }
 
 // fetchAllPages fetches all pages from a paginated MAL API endpoint using retry logic with timeout.
@@ -245,13 +175,10 @@ func fetchAllPages[T any](
 		var items []T
 		var resp *mal.Response
 
-		err := retryWithBackoff(ctx, func() error {
-			ctx, cancel := withTimeout(ctx, timeout)
-			defer cancel()
-			var e error
-			items, resp, e = fetch(ctx, offset)
-			return e
-		}, fmt.Sprintf("%s (page %d, offset: %d)", operationName, pageNum, offset))
+		ctx, cancel := withTimeout(ctx, timeout)
+		var err error
+		items, resp, err = fetch(ctx, offset)
+		cancel()
 		if err != nil {
 			return nil, err
 		}
