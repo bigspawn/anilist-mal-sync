@@ -1,0 +1,23 @@
+name: Cleanup PR caches
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Delete PR branch caches
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Fetching caches for PR #${{ github.event.pull_request.number }}..."
+          gh cache list \
+            --ref "refs/pull/${{ github.event.pull_request.number }}/merge" \
+            --limit 100 --json id -q '.[].id' |
+            xargs -I{} gh cache delete {} || true
+          echo "Done."
