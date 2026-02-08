@@ -48,7 +48,7 @@ var syncFlags = []cli.Flag{
 	},
 	&cli.BoolFlag{
 		Name:  "offline-db",
-		Usage: "enable offline database for ID mapping (default: true)",
+		Usage: "enable offline database for anime ID mapping (ignored for --manga)",
 		Value: true,
 	},
 	&cli.BoolFlag{
@@ -57,7 +57,7 @@ var syncFlags = []cli.Flag{
 	},
 	&cli.BoolFlag{
 		Name:  "arm-api",
-		Usage: "enable ARM API for ID mapping (fallback after offline DB)",
+		Usage: "enable ARM API for anime ID mapping (ignored for --manga, fallback after offline DB)",
 	},
 	&cli.StringFlag{
 		Name:  "arm-api-url",
