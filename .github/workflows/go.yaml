@@ -1,4 +1,3 @@
-# Test concurrency - push 2
 name: go
 
 on:
