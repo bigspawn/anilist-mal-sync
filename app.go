@@ -14,6 +14,7 @@ type App struct {
 	mal                *MyAnimeListClient
 	anilist            *AnilistClient
 	anilistScoreFormat verniy.ScoreFormat
+	hatoClient         *HatoClient
 
 	animeUpdater        *Updater
 	mangaUpdater        *Updater
@@ -60,7 +61,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 	anilistMangaService := NewAniListMangaService(anilistClient, scoreFormat)
 
 	// Load offline database and ARM client for ID mapping (anime only)
-	offlineStrategy, armStrategy := loadIDMappingStrategies(ctx, config)
+	offlineStrategy, hatoStrategy, armStrategy := loadIDMappingStrategies(ctx, config)
 
 	// Default ignore titles
 	defaultIgnoreTitles := map[string]struct{}{
@@ -79,6 +80,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		StrategyChain: NewStrategyChain(
 			IDStrategy{},
 			offlineStrategy,
+			hatoStrategy,
 			armStrategy,
 			TitleStrategy{},
 			APISearchStrategy{Service: malAnimeService},
@@ -94,6 +96,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		DryRun:       *dryRun,
 		StrategyChain: NewStrategyChain(
 			IDStrategy{},
+			hatoStrategy,
 			TitleStrategy{},
 			APISearchStrategy{Service: malMangaService},
 		),
@@ -109,6 +112,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		StrategyChain: NewStrategyChain(
 			IDStrategy{},
 			offlineStrategy,
+			hatoStrategy,
 			armStrategy,
 			TitleStrategy{},
 			MALIDStrategy{Service: anilistAnimeService},
@@ -125,6 +129,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		DryRun:       *dryRun,
 		StrategyChain: NewStrategyChain(
 			IDStrategy{},
+			hatoStrategy,
 			TitleStrategy{},
 			MALIDStrategy{Service: anilistMangaService},
 			APISearchStrategy{Service: anilistMangaService},
@@ -133,11 +138,18 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 
 	LogInfoSuccess(ctx, "Initialization complete")
 
+	// Create Hato client for cache saving
+	var hatoClient *HatoClient
+	if config.HatoAPI.Enabled {
+		hatoClient = NewHatoClient(ctx, config.HatoAPI.BaseURL, config.GetHTTPTimeout(), config.HatoAPI.CacheDir)
+	}
+
 	return &App{
 		config:              config,
 		mal:                 malClient,
 		anilist:             anilistClient,
 		anilistScoreFormat:  scoreFormat,
+		hatoClient:          hatoClient,
 		animeUpdater:        animeUpdater,
 		mangaUpdater:        mangaUpdater,
 		reverseAnimeUpdater: reverseAnimeUpdater,
@@ -148,7 +160,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 
 // loadIDMappingStrategies loads offline database and ARM client, returning strategies.
 // Strategies with nil Database/Client are no-ops (return nil, false, nil).
-func loadIDMappingStrategies(ctx context.Context, config Config) (OfflineDatabaseStrategy, ARMAPIStrategy) {
+func loadIDMappingStrategies(ctx context.Context, config Config) (OfflineDatabaseStrategy, HatoAPIStrategy, ARMAPIStrategy) {
 	var offlineDB *OfflineDatabase
 	if config.OfflineDatabase.Enabled {
 		LogStage(ctx, "Loading offline database...")
@@ -161,13 +173,21 @@ func loadIDMappingStrategies(ctx context.Context, config Config) (OfflineDatabas
 		}
 	}
 
+	var hatoClient *HatoClient
+	if config.HatoAPI.Enabled {
+		hatoClient = NewHatoClient(ctx, config.HatoAPI.BaseURL, config.GetHTTPTimeout(), config.HatoAPI.CacheDir)
+		LogInfoSuccess(ctx, "Hato API enabled (%s)", config.HatoAPI.BaseURL)
+	}
+
 	var armClient *ARMClient
 	if config.ARMAPI.Enabled {
 		armClient = NewARMClient(config.ARMAPI.BaseURL, config.GetHTTPTimeout())
 		LogInfoSuccess(ctx, "ARM API enabled (%s)", config.ARMAPI.BaseURL)
 	}
 
-	return OfflineDatabaseStrategy{Database: offlineDB}, ARMAPIStrategy{Client: armClient}
+	return OfflineDatabaseStrategy{Database: offlineDB},
+		HatoAPIStrategy{Client: hatoClient},
+		ARMAPIStrategy{Client: armClient}
 }
 
 func (a *App) Run(ctx context.Context) error {
@@ -213,6 +233,13 @@ func (a *App) runNormalSync(ctx context.Context) error {
 		}
 	}
 
+	// Save Hato cache if enabled
+	if a.hatoClient != nil {
+		if err := a.hatoClient.SaveCache(ctx); err != nil {
+			LogWarn(ctx, "Failed to save Hato cache: %v", err)
+		}
+	}
+
 	return nil
 }
 
@@ -226,6 +253,13 @@ func (a *App) runReverseSync(ctx context.Context) error {
 	if !(*mangaSync) || *allSync {
 		if err := a.reverseSyncAnime(ctx); err != nil {
 			return fmt.Errorf("error reverse syncing anime: %w", err)
+		}
+	}
+
+	// Save Hato cache if enabled
+	if a.hatoClient != nil {
+		if err := a.hatoClient.SaveCache(ctx); err != nil {
+			LogWarn(ctx, "Failed to save Hato cache: %v", err)
 		}
 	}
 

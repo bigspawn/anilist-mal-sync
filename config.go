@@ -63,6 +63,13 @@ type ARMAPIConfig struct {
 	BaseURL string `yaml:"base_url"`
 }
 
+type HatoAPIConfig struct {
+	Enabled     bool   `yaml:"enabled"`
+	BaseURL     string `yaml:"base_url"`
+	CacheDir    string `yaml:"cache_dir"`
+	CacheMaxAge string `yaml:"cache_max_age"`
+}
+
 type Config struct {
 	OAuth           OAuthConfig           `yaml:"oauth"`
 	Anilist         SiteConfig            `yaml:"anilist"`
@@ -72,6 +79,7 @@ type Config struct {
 	HTTPTimeout     string                `yaml:"http_timeout"`
 	OfflineDatabase OfflineDatabaseConfig `yaml:"offline_database"`
 	ARMAPI          ARMAPIConfig          `yaml:"arm_api"`
+	HatoAPI         HatoAPIConfig         `yaml:"hato_api"`
 }
 
 // loadConfigFromEnv loads configuration from environment variables
@@ -113,6 +121,12 @@ func loadConfigFromEnv() (Config, error) {
 		ARMAPI: ARMAPIConfig{
 			Enabled: getEnvBoolOrDefault("ARM_API_ENABLED", false),
 			BaseURL: getEnvOrDefault("ARM_API_URL", defaultARMBaseURL),
+		},
+		HatoAPI: HatoAPIConfig{
+			Enabled:     getEnvBoolOrDefault("HATO_API_ENABLED", true),
+			BaseURL:     getEnvOrDefault("HATO_API_URL", defaultHatoBaseURL),
+			CacheDir:    getEnvOrDefault("HATO_API_CACHE_DIR", getDefaultHatoCacheDir()),
+			CacheMaxAge: getEnvOrDefault("HATO_API_CACHE_MAX_AGE", "720h"),
 		},
 	}
 	return cfg, nil
@@ -159,6 +173,7 @@ func overrideConfigFromEnv(cfg *Config) {
 	overrideTokenPathFromEnv(cfg)
 	overrideOfflineDatabaseFromEnv(&cfg.OfflineDatabase)
 	overrideARMAPIFromEnv(&cfg.ARMAPI)
+	overrideHatoAPIFromEnv(&cfg.HatoAPI)
 }
 
 func overrideOAuthFromEnv(oauth *OAuthConfig) {
@@ -247,6 +262,21 @@ func overrideARMAPIFromEnv(ac *ARMAPIConfig) {
 	}
 	if v := os.Getenv("ARM_API_URL"); v != "" {
 		ac.BaseURL = v
+	}
+}
+
+func overrideHatoAPIFromEnv(hc *HatoAPIConfig) {
+	if v := os.Getenv("HATO_API_ENABLED"); v != "" {
+		hc.Enabled = parseBoolString(v)
+	}
+	if v := os.Getenv("HATO_API_URL"); v != "" {
+		hc.BaseURL = v
+	}
+	if v := os.Getenv("HATO_API_CACHE_DIR"); v != "" {
+		hc.CacheDir = v
+	}
+	if v := os.Getenv("HATO_API_CACHE_MAX_AGE"); v != "" {
+		hc.CacheMaxAge = v
 	}
 }
 
@@ -352,6 +382,12 @@ func configWithDefaults() Config {
 		ARMAPI: ARMAPIConfig{
 			Enabled: false,
 			BaseURL: defaultARMBaseURL,
+		},
+		HatoAPI: HatoAPIConfig{
+			Enabled:     true,
+			BaseURL:     defaultHatoBaseURL,
+			CacheDir:    getDefaultHatoCacheDir(),
+			CacheMaxAge: "720h",
 		},
 	}
 }

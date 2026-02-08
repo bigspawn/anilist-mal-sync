@@ -29,3 +29,10 @@ offline_database:
 arm_api:
   enabled: false # Enable ARM API for online ID mapping (default: false)
   base_url: "https://arm.haglund.dev" # ARM API base URL
+# ID Mapping: Hato API (https://hato.malupdaterosx.moe)
+# Supports both anime and manga (unlike ARM API which is anime-only)
+# NOTE: Production endpoint requires patron status. See: https://www.patreon.com/chikorita157
+hato_api:
+  enabled: true # Enable Hato API for ID mapping (default: true)
+  base_url: "https://hato.malupdaterosx.moe" # Hato API base URL
+  cache_dir: "" # Leave empty for default: ~/.config/anilist-mal-sync/hato-cache
