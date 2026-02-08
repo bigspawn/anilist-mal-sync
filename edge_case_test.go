@@ -332,13 +332,12 @@ func TestRetryableTransport_ContextCancellation(t *testing.T) {
 			}
 
 			callCount := 0
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				callCount++
 				if callCount > 2 {
 					w.WriteHeader(http.StatusOK)
 					return
 				}
-				// Return a retryable status code
 				w.WriteHeader(http.StatusTooManyRequests)
 			}))
 			defer server.Close()
@@ -346,8 +345,11 @@ func TestRetryableTransport_ContextCancellation(t *testing.T) {
 			transport := NewRetryableTransport(&http.Client{}, 3)
 			client := &http.Client{Transport: transport}
 
-			req, _ := http.NewRequestWithContext(ctx, "GET", server.URL, nil)
-			_, _ = client.Do(req)
+			req, _ := http.NewRequestWithContext(ctx, http.MethodGet, server.URL, nil)
+			resp, _ := client.Do(req)
+			if resp != nil {
+				_ = resp.Body.Close()
+			}
 
 			if callCount < tt.expectCallCount {
 				t.Errorf("Expected at least %d calls, got %d", tt.expectCallCount, callCount)

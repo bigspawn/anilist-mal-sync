@@ -65,7 +65,7 @@ func cloneRequest(req *http.Request) *http.Request {
 	r := req.Clone(req.Context())
 	if req.Body != nil && req.Body != http.NoBody {
 		body, _ := io.ReadAll(req.Body)
-		req.Body.Close()
+		_ = req.Body.Close()
 		r.Body = io.NopCloser(strings.NewReader(string(body)))
 		req.Body = io.NopCloser(strings.NewReader(string(body)))
 	}
@@ -130,7 +130,7 @@ func executeWithRetry(
 		}
 
 		if resp != nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 
 		if err != nil {

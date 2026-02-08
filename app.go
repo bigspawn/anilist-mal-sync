@@ -60,8 +60,10 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 	anilistAnimeService := NewAniListAnimeService(anilistClient, scoreFormat)
 	anilistMangaService := NewAniListMangaService(anilistClient, scoreFormat)
 
-	// Load offline database and ARM client for ID mapping (anime only)
-	offlineStrategy, hatoStrategy, hatoClient, armStrategy := loadIDMappingStrategies(ctx, config)
+	// Determine if anime synchronization will be performed.
+	// Offline database and ARM API are only needed for anime, not for manga.
+	needsAnime := !(*mangaSync) || *allSync
+	offlineStrategy, hatoStrategy, hatoClient, armStrategy := loadIDMappingStrategies(ctx, config, needsAnime)
 
 	// Default ignore titles
 	defaultIgnoreTitles := map[string]struct{}{
@@ -154,11 +156,20 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 	}, nil
 }
 
-// loadIDMappingStrategies loads offline database and ARM client, returning strategies.
+// loadIDMappingStrategies loads ID mapping resources (offline database and ARM API).
+// These resources are only used for anime synchronization, not for manga.
 // Strategies with nil Database/Client are no-ops (return nil, false, nil).
-func loadIDMappingStrategies(ctx context.Context, config Config) (OfflineDatabaseStrategy, HatoAPIStrategy, *HatoClient, ARMAPIStrategy) {
+//
+// Parameters:
+//   - needsAnime: if false, offline DB and ARM API will not be loaded
+func loadIDMappingStrategies(
+	ctx context.Context,
+	config Config,
+	needsAnime bool,
+) (OfflineDatabaseStrategy, HatoAPIStrategy, *HatoClient, ARMAPIStrategy) {
 	var offlineDB *OfflineDatabase
-	if config.OfflineDatabase.Enabled {
+	// Only load offline database for anime synchronization
+	if needsAnime && config.OfflineDatabase.Enabled {
 		LogStage(ctx, "Loading offline database...")
 		var err error
 		offlineDB, err = LoadOfflineDatabase(ctx, config.OfflineDatabase)
@@ -176,7 +187,8 @@ func loadIDMappingStrategies(ctx context.Context, config Config) (OfflineDatabas
 	}
 
 	var armClient *ARMClient
-	if config.ARMAPI.Enabled {
+	// Only load ARM API for anime synchronization
+	if needsAnime && config.ARMAPI.Enabled {
 		armClient = NewARMClient(config.ARMAPI.BaseURL, config.GetHTTPTimeout())
 		LogInfoSuccess(ctx, "ARM API enabled (%s)", config.ARMAPI.BaseURL)
 	}
