@@ -47,6 +47,10 @@ services:
       - MAL_CLIENT_SECRET=your_mal_secret
       - MAL_USERNAME=your_mal_username
       - OFFLINE_DATABASE_ENABLED=true  # Enable offline anime ids DB
+      - HATO_API_ENABLED=true  # Enable Hato API for anime and manga mapping
+      # - HATO_API_URL=https://hato.malupdaterosx.moe
+      # - HATO_API_CACHE_DIR=/home/appuser/.config/anilist-mal-sync/hato-cache
+      # - HATO_API_CACHE_MAX_AGE=720h
       - ARM_API_ENABLED=true  # Enable ARM API for anime ids DB as a fallback
       # Optional:
       # - WATCH_INTERVAL=12h # Enable watch mode (run in period)
@@ -158,6 +162,11 @@ offline_database:
 arm_api:
   enabled: false
   base_url: "https://arm.haglund.dev" # Default: https://arm.haglund.dev
+hato_api:
+  enabled: true  # Enable Hato API for ID mapping (default: true)
+  base_url: "https://hato.malupdaterosx.moe"  # Hato API base URL
+  cache_dir: ""  # Leave empty for default: ~/.config/anilist-mal-sync/hato-cache
+  cache_max_age: "720h"  # Cache max age (default: 720h / 30 days)
 ```
 
 ## ID Mapping Strategies
@@ -168,17 +177,21 @@ The tool uses different ID mapping strategies for anime and manga:
 When syncing anime (default or `--all` mode), the following strategies are used in order:
 1. **Direct ID lookup** - If the entry already exists in your target list
 2. **Offline Database** (optional, enabled by default) - Local database from [anime-offline-database](https://github.com/manami-project/anime-offline-database)
-3. **ARM API** (optional, disabled by default) - Online fallback to [arm-server](https://arm.haglund.dev)
-4. **Title matching** - Match by title similarity
-5. **API search** - Search the target service API
+3. **Hato API** (optional, enabled by default) - Online API for anime/manga ID mapping
+4. **ARM API** (optional, disabled by default) - Online fallback to [arm-server](https://arm.haglund.dev)
+5. **Title matching** - Match by title similarity
+6. **API search** - Search the target service API
 
 ### Manga ID Mapping
-When syncing manga (`--manga` mode), offline database and ARM API are not available. Only these strategies are used:
+When syncing manga (`--manga` mode), the following strategies are used:
 1. **Direct ID lookup** - If the entry already exists in your target list
-2. **Title matching** - Match by title similarity
-3. **API search** - Search the target service API
+2. **Hato API** (optional, enabled by default) - Online API for manga ID mapping
+3. **Title matching** - Match by title similarity
+4. **API search** - Search the target service API
 
-**Note:** The offline database and ARM API are automatically disabled when using `--manga` flag (without `--all`) to improve startup performance.
+**Note:**
+- The offline database and ARM API are anime-only and automatically disabled when using `--manga` flag (without `--all`) to improve startup performance.
+- Hato API supports both anime and manga and is enabled by default.
 
 ### Environment variables
 
@@ -202,6 +215,10 @@ Configuration can be provided entirely via environment variables (recommended fo
 - `OFFLINE_DATABASE_ENABLED` - Enable offline database for anime ID mapping (default: `true`, not used for manga-only sync)
 - `OFFLINE_DATABASE_CACHE_DIR` - Cache directory (default: `~/.config/anilist-mal-sync/aod-cache`)
 - `OFFLINE_DATABASE_AUTO_UPDATE` - Auto-update database (default: `true`)
+- `HATO_API_ENABLED` - Enable Hato API for ID mapping (default: `true`, supports both anime and manga)
+- `HATO_API_URL` - Hato API base URL (default: `https://hato.malupdaterosx.moe`)
+- `HATO_API_CACHE_DIR` - Hato API cache directory (default: `~/.config/anilist-mal-sync/hato-cache`)
+- `HATO_API_CACHE_MAX_AGE` - Hato API cache max age (default: `720h` / 30 days)
 - `ARM_API_ENABLED` - Enable ARM API for anime ID mapping (default: `false`, not used for manga-only sync)
 - `ARM_API_URL` - ARM API base URL (default: `https://arm.haglund.dev`)
 
