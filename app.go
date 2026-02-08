@@ -8,6 +8,11 @@ import (
 	"github.com/rl404/verniy"
 )
 
+const (
+	mediaTypeAnime = "anime"
+	mediaTypeManga = "manga"
+)
+
 type App struct {
 	config Config
 
@@ -277,12 +282,12 @@ func (a *App) runReverseSync(ctx context.Context) error {
 
 // syncAnimeFromAnilistToMAL syncs anime from AniList to MAL
 func (a *App) syncAnime(ctx context.Context) error {
-	return a.performSync(ctx, "anime", false, a.animeUpdater)
+	return a.performSync(ctx, mediaTypeAnime, false, a.animeUpdater)
 }
 
 // syncMangaFromAnilistToMAL syncs manga from AniList to MAL
 func (a *App) syncManga(ctx context.Context) error {
-	return a.performSync(ctx, "manga", false, a.mangaUpdater)
+	return a.performSync(ctx, mediaTypeManga, false, a.mangaUpdater)
 }
 
 // reverseSyncAnimeFromMALToAnilist syncs anime from MAL to AniList
@@ -337,7 +342,7 @@ func (a *App) fetchData(ctx context.Context, mediaType string, fromAnilist bool,
 func (a *App) fetchFromAnilistToMAL(ctx context.Context, mediaType string, prefix string) ([]Source, []Target, error) {
 	LogDebug(ctx, "[%s] Fetching AniList...", prefix)
 
-	if mediaType == "anime" {
+	if mediaType == mediaTypeAnime {
 		srcList, err := a.anilist.GetUserAnimeList(ctx)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error getting user anime list from anilist: %w", err)
@@ -383,7 +388,7 @@ func (a *App) fetchFromAnilistToMAL(ctx context.Context, mediaType string, prefi
 func (a *App) fetchFromMALToAnilist(ctx context.Context, mediaType string, prefix string) ([]Source, []Target, error) {
 	LogDebug(ctx, "[%s] Fetching MAL...", prefix)
 
-	if mediaType == "anime" {
+	if mediaType == mediaTypeAnime {
 		srcList, err := a.mal.GetUserAnimeList(ctx)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error getting user anime list from mal: %w", err)

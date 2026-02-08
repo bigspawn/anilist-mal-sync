@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-//nolint:goconst // Test strings are kept explicit for clarity
 func TestHatoClient_GetAniListID_Anime(t *testing.T) {
 	ctx := t.Context()
 	anilistID := 1
@@ -21,7 +20,7 @@ func TestHatoClient_GetAniListID_Anime(t *testing.T) {
 		response := HatoResponse{}
 		response.Data.AniListID = &anilistID
 		response.Data.MalID = &malID
-		typeStr := "anime"
+		typeStr := mediaTypeAnime
 		response.Data.TypeStr = &typeStr
 		writeJSON(t, w, response)
 	}))
@@ -30,7 +29,7 @@ func TestHatoClient_GetAniListID_Anime(t *testing.T) {
 	// Test without cache
 	client := NewHatoClient(ctx, server.URL, 5*time.Second, "")
 
-	id, found, err := client.GetAniListID(ctx, 1, "anime")
+	id, found, err := client.GetAniListID(ctx, 1, mediaTypeAnime)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,14 +58,14 @@ func TestHatoClient_CacheHit(t *testing.T) {
 	client := NewHatoClient(ctx, server.URL, 5*time.Second, tmpDir)
 
 	// First request - cache MISS
-	id1, found1, err := client.GetAniListID(ctx, 1, "anime")
+	id1, found1, err := client.GetAniListID(ctx, 1, mediaTypeAnime)
 	assert.NoError(t, err)
 	assert.True(t, found1)
 	assert.Equal(t, 1, id1)
 	assert.Equal(t, 1, requestCount, "First request should hit API")
 
 	// Second request - cache HIT
-	id2, found2, err := client.GetAniListID(ctx, 1, "anime")
+	id2, found2, err := client.GetAniListID(ctx, 1, mediaTypeAnime)
 	assert.NoError(t, err)
 	assert.True(t, found2)
 	assert.Equal(t, 1, id2)
@@ -84,7 +83,7 @@ func TestHatoClient_GetAniListID_Manga(t *testing.T) {
 		response := HatoResponse{}
 		response.Data.AniListID = &anilistID
 		response.Data.MalID = &malID
-		typeStr := "manga" //nolint:goconst // Test value
+		typeStr := mediaTypeManga
 		response.Data.TypeStr = &typeStr
 		writeJSON(t, w, response)
 	}))
@@ -92,7 +91,7 @@ func TestHatoClient_GetAniListID_Manga(t *testing.T) {
 
 	client := NewHatoClient(ctx, server.URL, 5*time.Second, "")
 
-	id, found, err := client.GetAniListID(ctx, 92182, "manga")
+	id, found, err := client.GetAniListID(ctx, 92182, mediaTypeManga)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +109,7 @@ func TestHatoClient_GetMALID_Anime(t *testing.T) {
 		response := HatoResponse{}
 		response.Data.MalID = &malID
 		response.Data.AniListID = &anilistID
-		typeStr := "anime"
+		typeStr := mediaTypeAnime
 		response.Data.TypeStr = &typeStr
 		writeJSON(t, w, response)
 	}))
@@ -118,7 +117,7 @@ func TestHatoClient_GetMALID_Anime(t *testing.T) {
 
 	client := NewHatoClient(ctx, server.URL, 5*time.Second, "")
 
-	id, found, err := client.GetMALID(ctx, 1, "anime")
+	id, found, err := client.GetMALID(ctx, 1, mediaTypeAnime)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +135,7 @@ func TestHatoClient_GetMALID_Manga(t *testing.T) {
 		response := HatoResponse{}
 		response.Data.MalID = &malID
 		response.Data.AniListID = &anilistID
-		typeStr := "manga"
+		typeStr := mediaTypeManga
 		response.Data.TypeStr = &typeStr
 		writeJSON(t, w, response)
 	}))
@@ -144,7 +143,7 @@ func TestHatoClient_GetMALID_Manga(t *testing.T) {
 
 	client := NewHatoClient(ctx, server.URL, 5*time.Second, "")
 
-	id, found, err := client.GetMALID(ctx, 87471, "manga")
+	id, found, err := client.GetMALID(ctx, 87471, mediaTypeManga)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +161,7 @@ func TestHatoClient_NotFound(t *testing.T) {
 
 	client := NewHatoClient(ctx, server.URL, 5*time.Second, "")
 
-	_, found, err := client.GetAniListID(ctx, 999999, "anime")
+	_, found, err := client.GetAniListID(ctx, 999999, mediaTypeAnime)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,7 +177,7 @@ func TestHatoClient_404(t *testing.T) {
 
 	client := NewHatoClient(ctx, server.URL, 5*time.Second, "")
 
-	_, found, err := client.GetAniListID(ctx, 999999, "anime")
+	_, found, err := client.GetAniListID(ctx, 999999, mediaTypeAnime)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +193,7 @@ func TestHatoClient_ServerError(t *testing.T) {
 
 	client := NewHatoClient(ctx, server.URL, 5*time.Second, "")
 
-	_, _, err := client.GetAniListID(ctx, 1, "anime")
+	_, _, err := client.GetAniListID(ctx, 1, mediaTypeAnime)
 	assert.Error(t, err)
 }
 
@@ -202,7 +201,7 @@ func TestHatoClient_Unreachable(t *testing.T) {
 	ctx := t.Context()
 	client := NewHatoClient(ctx, "http://127.0.0.1:1", 1*time.Second, "")
 
-	_, _, err := client.GetAniListID(ctx, 1, "anime")
+	_, _, err := client.GetAniListID(ctx, 1, mediaTypeAnime)
 	assert.Error(t, err)
 }
 
@@ -221,13 +220,13 @@ func TestHatoClient_NegativeCache(t *testing.T) {
 	client := NewHatoClient(ctx, server.URL, 5*time.Second, tmpDir)
 
 	// First request - not found
-	_, found1, err := client.GetAniListID(ctx, 999, "anime")
+	_, found1, err := client.GetAniListID(ctx, 999, mediaTypeAnime)
 	assert.NoError(t, err)
 	assert.False(t, found1)
 	assert.Equal(t, 1, requestCount)
 
 	// Second request - should hit cache (negative result)
-	_, found2, err := client.GetAniListID(ctx, 999, "anime")
+	_, found2, err := client.GetAniListID(ctx, 999, mediaTypeAnime)
 	assert.NoError(t, err)
 	assert.False(t, found2)
 	assert.Equal(t, 1, requestCount, "Second request should hit negative cache")
@@ -242,7 +241,7 @@ func TestHatoAPIStrategy_FindTarget_Anime(t *testing.T) {
 			response := HatoResponse{}
 			response.Data.AniListID = &anilistID
 			response.Data.MalID = &malID
-			typeStr := "anime"
+			typeStr := mediaTypeAnime
 			response.Data.TypeStr = &typeStr
 			writeJSON(t, w, response)
 			return
@@ -288,7 +287,7 @@ func TestHatoAPIStrategy_FindTarget_Manga(t *testing.T) {
 			response := HatoResponse{}
 			response.Data.AniListID = &anilistID
 			response.Data.MalID = &malID
-			typeStr := "manga"
+			typeStr := mediaTypeManga
 			response.Data.TypeStr = &typeStr
 			writeJSON(t, w, response)
 			return
