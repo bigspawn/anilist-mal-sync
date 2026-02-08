@@ -17,7 +17,7 @@ func newStatusCommand() *cli.Command {
 	}
 }
 
-func runStatus(_ context.Context, cmd *cli.Command) error {
+func runStatus(ctx context.Context, cmd *cli.Command) error {
 	configPath := cmd.String("config")
 
 	config, err := loadConfigFromFile(configPath)
@@ -29,7 +29,7 @@ func runStatus(_ context.Context, cmd *cli.Command) error {
 	log.Println("======================")
 
 	// Check AniList
-	oauthAnilist, err := NewAnilistOAuthWithoutInit(config)
+	oauthAnilist, err := NewAnilistOAuthWithoutInit(ctx, config)
 	if err != nil {
 		log.Printf("AniList:      Error - %v\n", err)
 	} else {
@@ -37,7 +37,7 @@ func runStatus(_ context.Context, cmd *cli.Command) error {
 	}
 
 	// Check MyAnimeList
-	oauthMAL, err := NewMyAnimeListOAuthWithoutInit(config)
+	oauthMAL, err := NewMyAnimeListOAuthWithoutInit(ctx, config)
 	if err != nil {
 		log.Printf("MyAnimeList:  Error - %v\n", err)
 	} else {

@@ -81,6 +81,8 @@ func (c *HatoClient) setCachedData(service, mediaType string, id int, data HatoR
 // GetAniListID returns the AniList ID for a given MAL ID and media type.
 // mediaType should be "anime" or "manga".
 // Checks cache first, then makes API request if needed.
+//
+//nolint:dupl // Intentionally similar to GetMALID - they access different fields
 func (c *HatoClient) GetAniListID(ctx context.Context, malID int, mediaType string) (int, bool, error) {
 	// Check cache first
 	if data, found := c.getCachedData("mal", mediaType, malID); found {
@@ -118,6 +120,8 @@ func (c *HatoClient) GetAniListID(ctx context.Context, malID int, mediaType stri
 // GetMALID returns the MAL ID for a given AniList ID and media type.
 // mediaType should be "anime" or "manga".
 // Checks cache first, then makes API request if needed.
+//
+//nolint:dupl // Intentionally similar to GetAniListID - they access different fields
 func (c *HatoClient) GetMALID(ctx context.Context, anilistID int, mediaType string) (int, bool, error) {
 	// Check cache first
 	if data, found := c.getCachedData("anilist", mediaType, anilistID); found {

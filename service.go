@@ -115,8 +115,8 @@ func NewAniListAnimeService(client *AnilistClient, scoreFormat verniy.ScoreForma
 	return &AniListAnimeService{client: client, scoreFormat: scoreFormat}
 }
 
-func (s *AniListAnimeService) GetByID(ctx context.Context, id TargetID, prefix string) (Target, error) {
-	resp, err := s.client.GetAnimeByID(ctx, int(id), prefix)
+func (s *AniListAnimeService) GetByID(ctx context.Context, id TargetID, _ string) (Target, error) {
+	resp, err := s.client.GetAnimeByID(ctx, int(id))
 	if err != nil {
 		return nil, fmt.Errorf("error getting anilist anime by id: %w", err)
 	}
@@ -127,16 +127,16 @@ func (s *AniListAnimeService) GetByID(ctx context.Context, id TargetID, prefix s
 	return ani, nil
 }
 
-func (s *AniListAnimeService) GetByName(ctx context.Context, name string, prefix string) ([]Target, error) {
-	resp, err := s.client.GetAnimesByName(ctx, name, prefix)
+func (s *AniListAnimeService) GetByName(ctx context.Context, name string, _ string) ([]Target, error) {
+	resp, err := s.client.GetAnimesByName(ctx, name)
 	if err != nil {
 		return nil, fmt.Errorf("error getting anilist anime by name: %w", err)
 	}
 	return newTargetsFromAnimes(newAnimesFromVerniyMedias(resp)), nil
 }
 
-func (s *AniListAnimeService) GetByMALID(ctx context.Context, malID int, prefix string) (Target, error) {
-	resp, err := s.client.GetAnimeByMALID(ctx, malID, prefix)
+func (s *AniListAnimeService) GetByMALID(ctx context.Context, malID int, _ string) (Target, error) {
+	resp, err := s.client.GetAnimeByMALID(ctx, malID)
 	if err != nil {
 		return nil, fmt.Errorf("error getting anilist anime by MAL ID: %w", err)
 	}
@@ -176,8 +176,8 @@ func NewAniListMangaService(client *AnilistClient, scoreFormat verniy.ScoreForma
 	return &AniListMangaService{client: client, scoreFormat: scoreFormat}
 }
 
-func (s *AniListMangaService) GetByID(ctx context.Context, id TargetID, prefix string) (Target, error) {
-	resp, err := s.client.GetMangaByID(ctx, int(id), prefix)
+func (s *AniListMangaService) GetByID(ctx context.Context, id TargetID, _ string) (Target, error) {
+	resp, err := s.client.GetMangaByID(ctx, int(id))
 	if err != nil {
 		return nil, fmt.Errorf("error getting anilist manga by id: %w", err)
 	}
@@ -188,16 +188,16 @@ func (s *AniListMangaService) GetByID(ctx context.Context, id TargetID, prefix s
 	return manga, nil
 }
 
-func (s *AniListMangaService) GetByName(ctx context.Context, name string, prefix string) ([]Target, error) {
-	resp, err := s.client.GetMangasByName(ctx, name, prefix)
+func (s *AniListMangaService) GetByName(ctx context.Context, name string, _ string) ([]Target, error) {
+	resp, err := s.client.GetMangasByName(ctx, name)
 	if err != nil {
 		return nil, fmt.Errorf("error getting anilist manga by name: %w", err)
 	}
 	return newTargetsFromMangas(newMangasFromVerniyMedias(resp)), nil
 }
 
-func (s *AniListMangaService) GetByMALID(ctx context.Context, malID int, prefix string) (Target, error) {
-	resp, err := s.client.GetMangaByMALID(ctx, malID, prefix)
+func (s *AniListMangaService) GetByMALID(ctx context.Context, malID int, _ string) (Target, error) {
+	resp, err := s.client.GetMangaByMALID(ctx, malID)
 	if err != nil {
 		return nil, fmt.Errorf("error getting anilist manga by MAL ID: %w", err)
 	}

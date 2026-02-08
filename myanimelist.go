@@ -154,8 +154,8 @@ func NewMyAnimeListOAuth(ctx context.Context, config Config) (*OAuth, error) {
 
 // NewMyAnimeListOAuthWithoutInit creates MAL OAuth without starting auth flow.
 // Use InitToken() to manually trigger authentication when needed.
-func NewMyAnimeListOAuthWithoutInit(config Config) (*OAuth, error) {
-	return newMyAnimeListOAuth(context.Background(), config, false)
+func NewMyAnimeListOAuthWithoutInit(ctx context.Context, config Config) (*OAuth, error) {
+	return newMyAnimeListOAuth(ctx, config, false)
 }
 
 // fetchAllPages fetches all pages from a paginated MAL API endpoint using retry logic with timeout.

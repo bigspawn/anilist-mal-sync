@@ -123,8 +123,8 @@ func NewAnilistOAuth(ctx context.Context, config Config) (*OAuth, error) {
 
 // NewAnilistOAuthWithoutInit creates AniList OAuth without starting auth flow.
 // Use InitToken() to manually trigger authentication when needed.
-func NewAnilistOAuthWithoutInit(config Config) (*OAuth, error) {
-	return newAnilistOAuth(context.Background(), config, false)
+func NewAnilistOAuthWithoutInit(ctx context.Context, config Config) (*OAuth, error) {
+	return newAnilistOAuth(ctx, config, false)
 }
 
 // GraphQLError represents a GraphQL error
@@ -157,7 +157,7 @@ type SaveMediaListEntry struct {
 
 // UpdateAnimeEntry updates an anime entry in AniList using GraphQL mutation
 func (c *AnilistClient) UpdateAnimeEntry(
-	ctx context.Context, mediaID int, status string, progress int, score int, prefix string,
+	ctx context.Context, mediaID int, status string, progress int, score int, _ string,
 ) error {
 	ctx, cancel := withTimeout(ctx, c.httpTimeout)
 	defer cancel()
@@ -224,7 +224,7 @@ func (c *AnilistClient) UpdateMangaEntry(
 	progress int,
 	progressVolumes int,
 	score int,
-	prefix string,
+	_ string,
 ) error {
 	ctx, cancel := withTimeout(ctx, c.httpTimeout)
 	defer cancel()
@@ -286,7 +286,7 @@ func (c *AnilistClient) UpdateMangaEntry(
 }
 
 // GetAnimeByID gets an anime from AniList by ID
-func (c *AnilistClient) GetAnimeByID(ctx context.Context, id int, prefix string) (*verniy.Media, error) {
+func (c *AnilistClient) GetAnimeByID(ctx context.Context, id int) (*verniy.Media, error) {
 	ctx, cancel := withTimeout(ctx, c.httpTimeout)
 	defer cancel()
 	media, err := c.c.GetAnimeWithContext(ctx, id,
@@ -308,7 +308,7 @@ func (c *AnilistClient) GetAnimeByID(ctx context.Context, id int, prefix string)
 }
 
 // GetAnimesByName searches for anime on AniList by name
-func (c *AnilistClient) GetAnimesByName(ctx context.Context, name string, prefix string) ([]verniy.Media, error) {
+func (c *AnilistClient) GetAnimesByName(ctx context.Context, name string) ([]verniy.Media, error) {
 	ctx, cancel := withTimeout(ctx, c.httpTimeout)
 	defer cancel()
 	page, err := c.c.SearchAnimeWithContext(ctx, verniy.PageParamMedia{Search: name}, 1, 10,
@@ -330,7 +330,7 @@ func (c *AnilistClient) GetAnimesByName(ctx context.Context, name string, prefix
 }
 
 // GetAnimeByMALID gets an anime from AniList by MAL ID
-func (c *AnilistClient) GetAnimeByMALID(ctx context.Context, malID int, prefix string) (*verniy.Media, error) {
+func (c *AnilistClient) GetAnimeByMALID(ctx context.Context, malID int) (*verniy.Media, error) {
 	ctx, cancel := withTimeout(ctx, c.httpTimeout)
 	defer cancel()
 	page, err := c.c.SearchAnimeWithContext(ctx, verniy.PageParamMedia{IDMAL: malID}, 1, 1,
@@ -355,7 +355,7 @@ func (c *AnilistClient) GetAnimeByMALID(ctx context.Context, malID int, prefix s
 }
 
 // GetMangaByID gets a manga from AniList by ID
-func (c *AnilistClient) GetMangaByID(ctx context.Context, id int, prefix string) (*verniy.Media, error) {
+func (c *AnilistClient) GetMangaByID(ctx context.Context, id int) (*verniy.Media, error) {
 	ctx, cancel := withTimeout(ctx, c.httpTimeout)
 	defer cancel()
 	media, err := c.c.GetMangaWithContext(ctx, id,
@@ -379,7 +379,7 @@ func (c *AnilistClient) GetMangaByID(ctx context.Context, id int, prefix string)
 }
 
 // GetMangasByName searches for manga on AniList by name
-func (c *AnilistClient) GetMangasByName(ctx context.Context, name string, prefix string) ([]verniy.Media, error) {
+func (c *AnilistClient) GetMangasByName(ctx context.Context, name string) ([]verniy.Media, error) {
 	ctx, cancel := withTimeout(ctx, c.httpTimeout)
 	defer cancel()
 	page, err := c.c.SearchMangaWithContext(ctx, verniy.PageParamMedia{Search: name}, 1, 10,
@@ -403,7 +403,7 @@ func (c *AnilistClient) GetMangasByName(ctx context.Context, name string, prefix
 }
 
 // GetMangaByMALID gets a manga from AniList by MAL ID
-func (c *AnilistClient) GetMangaByMALID(ctx context.Context, malID int, prefix string) (*verniy.Media, error) {
+func (c *AnilistClient) GetMangaByMALID(ctx context.Context, malID int) (*verniy.Media, error) {
 	ctx, cancel := withTimeout(ctx, c.httpTimeout)
 	defer cancel()
 	page, err := c.c.SearchMangaWithContext(ctx, verniy.PageParamMedia{IDMAL: malID}, 1, 1,
