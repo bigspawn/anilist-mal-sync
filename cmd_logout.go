@@ -24,7 +24,7 @@ func newLogoutCommand() *cli.Command {
 	}
 }
 
-func runLogout(_ context.Context, cmd *cli.Command) error {
+func runLogout(ctx context.Context, cmd *cli.Command) error {
 	configPath := cmd.String("config")
 	service := cmd.String("service")
 
@@ -35,14 +35,14 @@ func runLogout(_ context.Context, cmd *cli.Command) error {
 
 	switch service {
 	case ServiceAnilist:
-		return logoutAnilist(config)
+		return logoutAnilist(ctx, config)
 	case ServiceMyAnimeList:
-		return logoutMyAnimeList(config)
+		return logoutMyAnimeList(ctx, config)
 	case ServiceAll:
-		if err := logoutMyAnimeList(config); err != nil {
+		if err := logoutMyAnimeList(ctx, config); err != nil {
 			log.Printf("Warning: %v", err)
 		}
-		if err := logoutAnilist(config); err != nil {
+		if err := logoutAnilist(ctx, config); err != nil {
 			log.Printf("Warning: %v", err)
 		}
 		return nil
@@ -51,8 +51,8 @@ func runLogout(_ context.Context, cmd *cli.Command) error {
 	}
 }
 
-func logoutAnilist(config Config) error {
-	oauth, err := NewAnilistOAuthWithoutInit(config)
+func logoutAnilist(ctx context.Context, config Config) error {
+	oauth, err := NewAnilistOAuthWithoutInit(ctx, config)
 	if err != nil {
 		return fmt.Errorf("error creating anilist oauth: %w", err)
 	}
@@ -70,8 +70,8 @@ func logoutAnilist(config Config) error {
 	return nil
 }
 
-func logoutMyAnimeList(config Config) error {
-	oauth, err := NewMyAnimeListOAuthWithoutInit(config)
+func logoutMyAnimeList(ctx context.Context, config Config) error {
+	oauth, err := NewMyAnimeListOAuthWithoutInit(ctx, config)
 	if err != nil {
 		return fmt.Errorf("error creating myanimelist oauth: %w", err)
 	}

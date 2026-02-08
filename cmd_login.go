@@ -71,7 +71,7 @@ func loginAnilist(ctx context.Context, config Config) error {
 	colorPrint("\n%s=== AniList Authentication ===%s\n", colorBold+colorCyan, colorReset)
 	log.Println("Starting AniList authentication...")
 
-	oauth, err := NewAnilistOAuthWithoutInit(config)
+	oauth, err := NewAnilistOAuthWithoutInit(ctx, config)
 	if err != nil {
 		return fmt.Errorf("error creating anilist oauth: %w", err)
 	}
@@ -95,7 +95,7 @@ func loginMyAnimeList(ctx context.Context, config Config) error {
 	colorPrint("\n%s=== MyAnimeList Authentication ===%s\n", colorBold+colorCyan, colorReset)
 	log.Println("Starting MyAnimeList authentication...")
 
-	oauth, err := NewMyAnimeListOAuthWithoutInit(config)
+	oauth, err := NewMyAnimeListOAuthWithoutInit(ctx, config)
 	if err != nil {
 		return fmt.Errorf("error creating myanimelist oauth: %w", err)
 	}

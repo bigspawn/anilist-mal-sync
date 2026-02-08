@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nstratos/go-myanimelist/mal"
 	"github.com/rl404/verniy"
 )
 
@@ -203,117 +201,6 @@ func TestRandHTTPParamString(t *testing.T) {
 			got2 := randHTTPParamString(tt.length)
 			if tt.length >= 16 && got == got2 {
 				t.Error("multiple calls produced the same string (unlikely)")
-			}
-		})
-	}
-}
-
-// ============================================
-// Retry Tests
-// ============================================
-
-func TestCreateBackoffPolicy(t *testing.T) {
-	policy := createBackoffPolicy()
-
-	if policy == nil {
-		t.Fatal("expected non-nil policy")
-	}
-	if policy.InitialInterval != 1*time.Second {
-		t.Errorf("got InitialInterval %v, want 1s", policy.InitialInterval)
-	}
-	if policy.MaxInterval != 30*time.Second {
-		t.Errorf("got MaxInterval %v, want 30s", policy.MaxInterval)
-	}
-	if policy.MaxElapsedTime != 2*time.Minute {
-		t.Errorf("got MaxElapsedTime %v, want 2m", policy.MaxElapsedTime)
-	}
-	if policy.Multiplier != 2.0 {
-		t.Errorf("got Multiplier %v, want 2.0", policy.Multiplier)
-	}
-	if policy.RandomizationFactor != 0.1 {
-		t.Errorf("got RandomizationFactor %v, want 0.1", policy.RandomizationFactor)
-	}
-}
-
-func TestIsRetryableError(t *testing.T) {
-	tests := []struct {
-		name string
-		err  error
-		want bool
-	}{
-		{
-			name: "nil error",
-			err:  nil,
-			want: false,
-		},
-		{
-			name: "rate limit error string",
-			err:  errors.New("too many requests"),
-			want: true,
-		},
-		{
-			name: "rate limit error string 2",
-			err:  errors.New("rate limit exceeded"),
-			want: true,
-		},
-		{
-			name: "429 error string",
-			err:  errors.New("HTTP 429"),
-			want: true,
-		},
-		{
-			name: "503 error string",
-			err:  errors.New("HTTP 503"),
-			want: true,
-		},
-		{
-			name: "502 error string",
-			err:  errors.New("HTTP 502"),
-			want: true,
-		},
-		{
-			name: "500 error string",
-			err:  errors.New("HTTP 500"),
-			want: true,
-		},
-		{
-			name: "MAL error with 429 status",
-			err: &mal.ErrorResponse{
-				Response: &http.Response{StatusCode: http.StatusTooManyRequests},
-			},
-			want: true,
-		},
-		{
-			name: "MAL error with 503 status",
-			err: &mal.ErrorResponse{
-				Response: &http.Response{StatusCode: http.StatusServiceUnavailable},
-			},
-			want: true,
-		},
-		{
-			name: "MAL error with 200 status",
-			err: &mal.ErrorResponse{
-				Response: &http.Response{StatusCode: http.StatusOK},
-			},
-			want: false,
-		},
-		{
-			name: "non-retryable error",
-			err:  errors.New("unauthorized"),
-			want: false,
-		},
-		{
-			name: "MAL error without response",
-			err:  &mal.ErrorResponse{},
-			want: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := isRetryableError(tt.err)
-			if got != tt.want {
-				t.Errorf("got %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -380,16 +380,7 @@ func (s ARMAPIStrategy) FindTarget(
 		return nil, false, nil
 	}
 
-	targetID := TargetID(targetServiceID)
-	if target, exists := existingTargets[targetID]; exists {
-		LogDebugDecision(ctx, "[%s] Found target by ARM API: ID %d -> %s",
-			prefix, targetServiceID, target.GetTitle())
-		return target, true, nil
-	}
-
-	LogDebugDecision(ctx, "[%s] ARM API mapped to ID %d but not in user's list",
-		prefix, targetServiceID)
-	return nil, false, nil
+	return checkExistingTarget(ctx, existingTargets, targetServiceID, prefix, "ARM API")
 }
 
 func (s ARMAPIStrategy) lookupID(ctx context.Context, src Anime) (int, bool, error) {
@@ -418,4 +409,118 @@ func (s ARMAPIStrategy) lookupID(ctx context.Context, src Anime) (int, bool, err
 		LogDebug(ctx, "[ARM API] Not found: AniList %d -> (no mapping)", src.IDAnilist)
 	}
 	return 0, false, nil
+}
+
+// HatoAPIStrategy finds targets using the Hato API for ID mapping.
+// Works for both anime and manga.
+type HatoAPIStrategy struct {
+	Client *HatoClient
+}
+
+func (s HatoAPIStrategy) Name() string {
+	return "HatoAPIStrategy"
+}
+
+func (s HatoAPIStrategy) FindTarget(
+	ctx context.Context,
+	src Source,
+	existingTargets map[TargetID]Target,
+	prefix string,
+	_ *SyncReport,
+) (Target, bool, error) {
+	// Early return if client is disabled
+	if s.Client == nil {
+		return nil, false, nil
+	}
+
+	// Try Anime type
+	if srcAnime, ok := src.(Anime); ok {
+		targetServiceID, found, err := s.lookupIDAnime(ctx, srcAnime)
+		if err != nil {
+			LogDebug(ctx, "[%s] Hato API error: %v", prefix, err)
+			return nil, false, nil
+		}
+		if found {
+			return checkExistingTarget(ctx, existingTargets, targetServiceID, prefix, "Hato API")
+		}
+		return nil, false, nil
+	}
+
+	// Try Manga type
+	if srcManga, ok := src.(Manga); ok {
+		targetServiceID, found, err := s.lookupIDManga(ctx, srcManga)
+		if err != nil {
+			LogDebug(ctx, "[%s] Hato API error: %v", prefix, err)
+			return nil, false, nil
+		}
+		if found {
+			return checkExistingTarget(ctx, existingTargets, targetServiceID, prefix, "Hato API")
+		}
+		return nil, false, nil
+	}
+
+	return nil, false, nil
+}
+
+// lookupID performs bidirectional ID lookup using the Hato API.
+// First tries MAL ID → AniList ID, then AniList ID → MAL ID.
+func (s HatoAPIStrategy) lookupID(ctx context.Context, malID, anilistID int, mediaType string) (int, bool, error) {
+	// Try MAL ID → AniList ID lookup
+	if malID > 0 {
+		LogDebug(ctx, "[HATO API] Looking up AniList ID for MAL ID: %d (%s)", malID, mediaType)
+		id, found, err := s.Client.GetAniListID(ctx, malID, mediaType)
+		if err != nil {
+			return 0, false, err
+		}
+		if found {
+			LogDebug(ctx, "[HATO API] Found: MAL %d -> AniList %d (%s)", malID, id, mediaType)
+			return id, true, nil
+		}
+		LogDebug(ctx, "[HATO API] Not found: MAL %d -> (no mapping) (%s)", malID, mediaType)
+	}
+
+	// Try AniList ID → MAL ID lookup
+	if anilistID > 0 {
+		LogDebug(ctx, "[HATO API] Looking up MAL ID for AniList ID: %d (%s)", anilistID, mediaType)
+		id, found, err := s.Client.GetMALID(ctx, anilistID, mediaType)
+		if err != nil {
+			return 0, false, err
+		}
+		if found {
+			LogDebug(ctx, "[HATO API] Found: AniList %d -> MAL %d (%s)", anilistID, id, mediaType)
+			return id, true, nil
+		}
+		LogDebug(ctx, "[HATO API] Not found: AniList %d -> (no mapping) (%s)", anilistID, mediaType)
+	}
+
+	return 0, false, nil
+}
+
+func (s HatoAPIStrategy) lookupIDAnime(ctx context.Context, src Anime) (int, bool, error) {
+	return s.lookupID(ctx, src.IDMal, src.IDAnilist, "anime")
+}
+
+func (s HatoAPIStrategy) lookupIDManga(ctx context.Context, src Manga) (int, bool, error) {
+	return s.lookupID(ctx, src.IDMal, src.IDAnilist, "manga")
+}
+
+// checkExistingTarget checks if a target ID exists in the user's list and returns appropriate result.
+// This is a shared helper used by API-based strategies (ARM, Hato).
+func checkExistingTarget(
+	ctx context.Context,
+	existingTargets map[TargetID]Target,
+	targetServiceID int,
+	prefix string,
+	apiName string,
+) (Target, bool, error) {
+	targetID := TargetID(targetServiceID)
+	if target, exists := existingTargets[targetID]; exists {
+		LogDebugDecision(ctx, "[%s] Found target by %s: ID %d -> %s",
+			prefix, apiName, targetServiceID, target.GetTitle())
+		return target, true, nil
+	}
+
+	LogDebugDecision(ctx, "[%s] %s mapped to ID %d but not in user's list",
+		prefix, apiName, targetServiceID)
+	return nil, false, nil
 }

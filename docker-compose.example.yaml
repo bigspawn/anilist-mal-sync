@@ -19,6 +19,10 @@ services:
       # - WATCH_INTERVAL=12h
       # Optional: ID Mapping settings
       # - OFFLINE_DATABASE_ENABLED=true  # Enable offline DB (default: true)
+      # - HATO_API_ENABLED=true  # Enable Hato API (default: true)
+      # - HATO_API_URL=https://hato.malupdaterosx.moe  # Hato API base URL
+      # - HATO_API_CACHE_DIR=/home/appuser/.config/anilist-mal-sync/hato-cache  # Cache directory
+      # - HATO_API_CACHE_MAX_AGE=720h  # Cache max age (default: 720h / 30 days)
       # - ARM_API_ENABLED=false  # Enable ARM API (default: false)
       # - ARM_API_URL=https://arm.haglund.dev  # ARM API base URL
     volumes:

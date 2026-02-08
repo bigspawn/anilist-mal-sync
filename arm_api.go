@@ -13,7 +13,7 @@ const defaultARMBaseURL = "https://arm.haglund.dev"
 // ARMClient is an HTTP client for the ARM API (https://arm.haglund.dev).
 type ARMClient struct {
 	baseURL    string
-	httpClient *http.Client
+	httpClient HTTPClient
 }
 
 // ARMResponse represents the response from /api/v2/ids.
@@ -31,9 +31,9 @@ func NewARMClient(baseURL string, timeout time.Duration) *ARMClient {
 	}
 	return &ARMClient{
 		baseURL: baseURL,
-		httpClient: &http.Client{
+		httpClient: NewRetryableClient(&http.Client{
 			Timeout: timeout,
-		},
+		}, 3),
 	}
 }
 

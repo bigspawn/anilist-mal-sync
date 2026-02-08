@@ -429,6 +429,25 @@ func getToken(ctx context.Context, oauth *OAuth, port string) {
 	}
 }
 
+// initOAuthIfNeeded initializes OAuth token if needed, based on the initWithToken flag.
+// This is a shared helper used by both AniList and MAL OAuth creation.
+func initOAuthIfNeeded(ctx context.Context, oauth *OAuth, port string, initWithToken bool) (*OAuth, error) {
+	if !initWithToken {
+		return oauth, nil
+	}
+
+	if oauth.NeedInit() {
+		getToken(ctx, oauth, port)
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+	} else {
+		log.Println("Token already set, no need to start server")
+	}
+
+	return oauth, nil
+}
+
 func createDirIfNotExists(path string) error {
 	path = filepath.Clean(path)
 	dir := filepath.Dir(path)

@@ -146,7 +146,7 @@ func downloadAODFile(ctx context.Context, url, destPath string) error {
 		return fmt.Errorf("create request: %w", err)
 	}
 
-	client := &http.Client{Timeout: 5 * time.Minute}
+	client := NewRetryableClient(&http.Client{Timeout: 5 * time.Minute}, 3)
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("download: %w", err)
@@ -316,7 +316,7 @@ func getLatestReleaseInfo(ctx context.Context) (downloadURL, tag string, err err
 	}
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := NewRetryableClient(&http.Client{Timeout: 30 * time.Second}, 3)
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", "", fmt.Errorf("request: %w", err)

@@ -63,6 +63,13 @@ type ARMAPIConfig struct {
 	BaseURL string `yaml:"base_url"`
 }
 
+type HatoAPIConfig struct {
+	Enabled     bool   `yaml:"enabled"`
+	BaseURL     string `yaml:"base_url"`
+	CacheDir    string `yaml:"cache_dir"`
+	CacheMaxAge string `yaml:"cache_max_age"`
+}
+
 type Config struct {
 	OAuth           OAuthConfig           `yaml:"oauth"`
 	Anilist         SiteConfig            `yaml:"anilist"`
@@ -72,6 +79,7 @@ type Config struct {
 	HTTPTimeout     string                `yaml:"http_timeout"`
 	OfflineDatabase OfflineDatabaseConfig `yaml:"offline_database"`
 	ARMAPI          ARMAPIConfig          `yaml:"arm_api"`
+	HatoAPI         HatoAPIConfig         `yaml:"hato_api"`
 }
 
 // loadConfigFromEnv loads configuration from environment variables
@@ -113,6 +121,12 @@ func loadConfigFromEnv() (Config, error) {
 		ARMAPI: ARMAPIConfig{
 			Enabled: getEnvBoolOrDefault("ARM_API_ENABLED", false),
 			BaseURL: getEnvOrDefault("ARM_API_URL", defaultARMBaseURL),
+		},
+		HatoAPI: HatoAPIConfig{
+			Enabled:     getEnvBoolOrDefault("HATO_API_ENABLED", true),
+			BaseURL:     getEnvOrDefault("HATO_API_URL", defaultHatoBaseURL),
+			CacheDir:    getEnvOrDefault("HATO_API_CACHE_DIR", getDefaultHatoCacheDir()),
+			CacheMaxAge: getEnvOrDefault("HATO_API_CACHE_MAX_AGE", "720h"),
 		},
 	}
 	return cfg, nil
@@ -159,6 +173,7 @@ func overrideConfigFromEnv(cfg *Config) {
 	overrideTokenPathFromEnv(cfg)
 	overrideOfflineDatabaseFromEnv(&cfg.OfflineDatabase)
 	overrideARMAPIFromEnv(&cfg.ARMAPI)
+	overrideHatoAPIFromEnv(&cfg.HatoAPI)
 }
 
 func overrideOAuthFromEnv(oauth *OAuthConfig) {
@@ -168,55 +183,27 @@ func overrideOAuthFromEnv(oauth *OAuthConfig) {
 		oauth.Port = port
 	}
 
-	if redirectURI := os.Getenv("OAUTH_REDIRECT_URI"); redirectURI != "" {
-		oauth.RedirectURI = redirectURI
-	}
+	overrideStringFromEnv(&oauth.RedirectURI, "OAUTH_REDIRECT_URI")
 }
 
 func overrideAnilistFromEnv(anilist *SiteConfig) {
-	if clientID := os.Getenv("ANILIST_CLIENT_ID"); clientID != "" {
-		anilist.ClientID = clientID
-	}
-
-	// Support both new and old env var names for backward compatibility
-	if clientSecret := os.Getenv("ANILIST_CLIENT_SECRET"); clientSecret != "" {
-		anilist.ClientSecret = clientSecret
-	} else if clientSecret := os.Getenv("CLIENT_SECRET_ANILIST"); clientSecret != "" {
-		anilist.ClientSecret = clientSecret
-	}
-
-	if username := os.Getenv("ANILIST_USERNAME"); username != "" {
-		anilist.Username = username
-	}
+	overrideStringFromEnv(&anilist.ClientID, "ANILIST_CLIENT_ID")
+	overrideStringFromEnv(&anilist.ClientSecret, "ANILIST_CLIENT_SECRET", "CLIENT_SECRET_ANILIST")
+	overrideStringFromEnv(&anilist.Username, "ANILIST_USERNAME")
 }
 
 func overrideMyAnimeListFromEnv(mal *SiteConfig) {
-	if clientID := os.Getenv("MAL_CLIENT_ID"); clientID != "" {
-		mal.ClientID = clientID
-	}
-
-	// Support both new and old env var names for backward compatibility
-	if clientSecret := os.Getenv("MAL_CLIENT_SECRET"); clientSecret != "" {
-		mal.ClientSecret = clientSecret
-	} else if clientSecret := os.Getenv("CLIENT_SECRET_MYANIMELIST"); clientSecret != "" {
-		mal.ClientSecret = clientSecret
-	}
-
-	if username := os.Getenv("MAL_USERNAME"); username != "" {
-		mal.Username = username
-	}
+	overrideStringFromEnv(&mal.ClientID, "MAL_CLIENT_ID")
+	overrideStringFromEnv(&mal.ClientSecret, "MAL_CLIENT_SECRET", "CLIENT_SECRET_MYANIMELIST")
+	overrideStringFromEnv(&mal.Username, "MAL_USERNAME")
 }
 
 func overrideWatchFromEnv(watch *WatchConfig) {
-	if interval := os.Getenv("WATCH_INTERVAL"); interval != "" {
-		watch.Interval = interval
-	}
+	overrideStringFromEnv(&watch.Interval, "WATCH_INTERVAL")
 }
 
 func overrideTokenPathFromEnv(cfg *Config) {
-	if tokenFilePath := os.Getenv("TOKEN_FILE_PATH"); tokenFilePath != "" {
-		cfg.TokenFilePath = tokenFilePath
-	}
+	overrideStringFromEnv(&cfg.TokenFilePath, "TOKEN_FILE_PATH")
 
 	if cfg.TokenFilePath == "" {
 		cfg.TokenFilePath = getDefaultTokenPathOrEmpty()
@@ -224,29 +211,42 @@ func overrideTokenPathFromEnv(cfg *Config) {
 }
 
 func overrideHTTPTimeoutFromEnv(cfg *Config) {
-	if timeout := os.Getenv("HTTP_TIMEOUT"); timeout != "" {
-		cfg.HTTPTimeout = timeout
-	}
+	overrideStringFromEnv(&cfg.HTTPTimeout, "HTTP_TIMEOUT")
 }
 
 func overrideOfflineDatabaseFromEnv(odc *OfflineDatabaseConfig) {
-	if v := os.Getenv("OFFLINE_DATABASE_ENABLED"); v != "" {
-		odc.Enabled = parseBoolString(v)
-	}
-	if v := os.Getenv("OFFLINE_DATABASE_CACHE_DIR"); v != "" {
-		odc.CacheDir = v
-	}
-	if v := os.Getenv("OFFLINE_DATABASE_AUTO_UPDATE"); v != "" {
-		odc.AutoUpdate = parseBoolString(v)
-	}
+	overrideBoolFromEnv(&odc.Enabled, "OFFLINE_DATABASE_ENABLED")
+	overrideStringFromEnv(&odc.CacheDir, "OFFLINE_DATABASE_CACHE_DIR")
+	overrideBoolFromEnv(&odc.AutoUpdate, "OFFLINE_DATABASE_AUTO_UPDATE")
 }
 
 func overrideARMAPIFromEnv(ac *ARMAPIConfig) {
-	if v := os.Getenv("ARM_API_ENABLED"); v != "" {
-		ac.Enabled = parseBoolString(v)
+	overrideBoolFromEnv(&ac.Enabled, "ARM_API_ENABLED")
+	overrideStringFromEnv(&ac.BaseURL, "ARM_API_URL")
+}
+
+func overrideHatoAPIFromEnv(hc *HatoAPIConfig) {
+	overrideBoolFromEnv(&hc.Enabled, "HATO_API_ENABLED")
+	overrideStringFromEnv(&hc.BaseURL, "HATO_API_URL")
+	overrideStringFromEnv(&hc.CacheDir, "HATO_API_CACHE_DIR")
+	overrideStringFromEnv(&hc.CacheMaxAge, "HATO_API_CACHE_MAX_AGE")
+}
+
+// overrideStringFromEnv overrides a string field from environment variables.
+// Tries each key in order until a non-empty value is found.
+func overrideStringFromEnv(field *string, keys ...string) {
+	for _, key := range keys {
+		if value := os.Getenv(key); value != "" {
+			*field = value
+			return
+		}
 	}
-	if v := os.Getenv("ARM_API_URL"); v != "" {
-		ac.BaseURL = v
+}
+
+// overrideBoolFromEnv overrides a boolean field from an environment variable.
+func overrideBoolFromEnv(field *bool, key string) {
+	if value := os.Getenv(key); value != "" {
+		*field = parseBoolString(value)
 	}
 }
 
@@ -352,6 +352,12 @@ func configWithDefaults() Config {
 		ARMAPI: ARMAPIConfig{
 			Enabled: false,
 			BaseURL: defaultARMBaseURL,
+		},
+		HatoAPI: HatoAPIConfig{
+			Enabled:     true,
+			BaseURL:     defaultHatoBaseURL,
+			CacheDir:    getDefaultHatoCacheDir(),
+			CacheMaxAge: "720h",
 		},
 	}
 }
