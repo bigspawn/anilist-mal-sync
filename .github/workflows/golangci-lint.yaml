@@ -46,7 +46,7 @@ jobs:
           go-version: stable
           cache: true
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v8
+        uses: golangci/golangci-lint-action@v9
         with:
           version: v2.7
           only-new-issues: true
