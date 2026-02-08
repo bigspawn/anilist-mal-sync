@@ -3,8 +3,30 @@ name: go
 on:
   push:
     branches: ["main"]
+    paths-ignore:
+      - "**.md"
+      - "doc/**"
+      - ".vscode/**"
+      - ".idea/**"
+      - "examples/**"
+      - "docker-compose.yml"
+      - "LICENSE"
+      - ".gitignore"
   pull_request:
     branches: ["main"]
+    paths-ignore:
+      - "**.md"
+      - "doc/**"
+      - ".vscode/**"
+      - ".idea/**"
+      - "examples/**"
+      - "docker-compose.yml"
+      - "LICENSE"
+      - ".gitignore"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -16,6 +38,7 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: "1.25"
+          cache: true
 
       - name: Build
         run: go build -mod=vendor -v ./...
@@ -24,6 +47,7 @@ jobs:
         run: go test -mod=vendor -v -coverprofile=coverage.out -covermode=atomic ./...
 
       - name: Upload coverage to Codecov
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: codecov/codecov-action@v4
         with:
           files: ./coverage.out

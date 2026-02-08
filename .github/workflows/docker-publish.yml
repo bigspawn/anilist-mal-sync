@@ -5,10 +5,23 @@ on:
     tags: ["v*.*.*"]
   pull_request:
     branches: ["main"]
+    paths-ignore:
+      - "**.md"
+      - "doc/**"
+      - ".vscode/**"
+      - ".idea/**"
+      - "examples/**"
+      - "docker-compose.yml"
+      - "LICENSE"
+      - ".gitignore"
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -63,7 +76,7 @@ jobs:
         with:
           context: .
           push: false
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64,linux/arm/v7' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
