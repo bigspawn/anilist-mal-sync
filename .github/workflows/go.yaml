@@ -1,4 +1,4 @@
-# Test concurrency cancellation
+# Test concurrency cancellation - second push
 name: go
 
 on:
