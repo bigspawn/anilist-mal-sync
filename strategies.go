@@ -504,8 +504,107 @@ func (s HatoAPIStrategy) lookupIDManga(ctx context.Context, src Manga) (int, boo
 	return s.lookupID(ctx, src.IDMal, src.IDAnilist, "manga")
 }
 
+// JikanAPIStrategy finds targets using the Jikan API for manga ID mapping.
+// Only works for manga (not anime).
+type JikanAPIStrategy struct {
+	Client *JikanClient
+}
+
+func (s JikanAPIStrategy) Name() string {
+	return "JikanAPIStrategy"
+}
+
+func (s JikanAPIStrategy) FindTarget(
+	ctx context.Context,
+	src Source,
+	existingTargets map[TargetID]Target,
+	prefix string,
+	_ *SyncReport,
+) (Target, bool, error) {
+	if s.Client == nil {
+		return nil, false, nil
+	}
+
+	srcManga, ok := src.(Manga)
+	if !ok {
+		return nil, false, nil
+	}
+
+	// AniList→MAL direction: source has AniList ID, needs MAL ID
+	if srcManga.IDMal == 0 && srcManga.IDAnilist > 0 {
+		return s.findMALTarget(ctx, srcManga, existingTargets, prefix)
+	}
+
+	// MAL→AniList direction: source has MAL ID, needs AniList ID
+	if srcManga.IDAnilist == 0 && srcManga.IDMal > 0 {
+		return s.findAniListTarget(ctx, srcManga, existingTargets, prefix)
+	}
+
+	return nil, false, nil
+}
+
+// findMALTarget searches Jikan by title to find the MAL ID, then looks up the target.
+func (s JikanAPIStrategy) findMALTarget(
+	ctx context.Context,
+	src Manga,
+	existingTargets map[TargetID]Target,
+	prefix string,
+) (Target, bool, error) {
+	titles := searchTitlesForJikan(src.TitleEN, src.TitleJP, src.TitleRomaji)
+	if len(titles) == 0 {
+		return nil, false, nil
+	}
+
+	for _, query := range titles {
+		results := s.Client.SearchManga(ctx, query)
+
+		malID := findBestJikanMatch(results, src.TitleEN, src.TitleJP, src.TitleRomaji)
+		if malID <= 0 {
+			continue
+		}
+
+		LogDebug(ctx, "[%s] Jikan: matched %q -> MAL ID %d", prefix, src.GetTitle(), malID)
+		return checkExistingTarget(ctx, existingTargets, malID, prefix, "Jikan API")
+	}
+
+	LogDebug(ctx, "[%s] Jikan: no match found for %q", prefix, src.GetTitle())
+	return nil, false, nil
+}
+
+// findAniListTarget gets manga from Jikan by MAL ID, then uses enriched titles
+// to match against existing AniList targets.
+func (s JikanAPIStrategy) findAniListTarget(
+	ctx context.Context,
+	src Manga,
+	existingTargets map[TargetID]Target,
+	prefix string,
+) (Target, bool, error) {
+	jikanData, found := s.Client.GetMangaByMALID(ctx, src.IDMal)
+	if !found || jikanData == nil {
+		return nil, false, nil
+	}
+
+	// Use enriched title data from Jikan to find match in existing targets
+	for _, target := range existingTargets {
+		tgtManga, ok := target.(Manga)
+		if !ok {
+			continue
+		}
+
+		if matchJikanMangaToSource(jikanData, tgtManga.TitleEN, tgtManga.TitleJP, tgtManga.TitleRomaji) {
+			LogDebugDecision(ctx, "[%s] Found target by Jikan API: MAL %d -> %s (AniList %d)",
+				prefix, src.IDMal, tgtManga.GetTitle(), tgtManga.IDAnilist)
+			return target, true, nil
+		}
+	}
+
+	LogDebug(ctx, "[%s] Jikan: MAL %d (%s) not matched to any existing target",
+		prefix, src.IDMal, jikanData.Title)
+	return nil, false, nil
+}
+
 // checkExistingTarget checks if a target ID exists in the user's list and returns appropriate result.
-// This is a shared helper used by API-based strategies (ARM, Hato).
+// This is a shared helper used by API-based strategies (ARM, Hato, Jikan).
 func checkExistingTarget(
 	ctx context.Context,
 	existingTargets map[TargetID]Target,
