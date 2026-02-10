@@ -70,6 +70,12 @@ type HatoAPIConfig struct {
 	CacheMaxAge string `yaml:"cache_max_age"`
 }
 
+type JikanAPIConfig struct {
+	Enabled     bool   `yaml:"enabled"`
+	CacheDir    string `yaml:"cache_dir"`
+	CacheMaxAge string `yaml:"cache_max_age"`
+}
+
 type Config struct {
 	OAuth           OAuthConfig           `yaml:"oauth"`
 	Anilist         SiteConfig            `yaml:"anilist"`
@@ -80,6 +86,7 @@ type Config struct {
 	OfflineDatabase OfflineDatabaseConfig `yaml:"offline_database"`
 	ARMAPI          ARMAPIConfig          `yaml:"arm_api"`
 	HatoAPI         HatoAPIConfig         `yaml:"hato_api"`
+	JikanAPI        JikanAPIConfig        `yaml:"jikan_api"`
 }
 
 // loadConfigFromEnv loads configuration from environment variables
@@ -128,6 +135,11 @@ func loadConfigFromEnv() (Config, error) {
 			CacheDir:    getEnvOrDefault("HATO_API_CACHE_DIR", getDefaultHatoCacheDir()),
 			CacheMaxAge: getEnvOrDefault("HATO_API_CACHE_MAX_AGE", "720h"),
 		},
+		JikanAPI: JikanAPIConfig{
+			Enabled:     getEnvBoolOrDefault("JIKAN_API_ENABLED", false),
+			CacheDir:    getEnvOrDefault("JIKAN_API_CACHE_DIR", getDefaultJikanCacheDir()),
+			CacheMaxAge: getEnvOrDefault("JIKAN_API_CACHE_MAX_AGE", "168h"),
+		},
 	}
 	return cfg, nil
 }
@@ -174,6 +186,7 @@ func overrideConfigFromEnv(cfg *Config) {
 	overrideOfflineDatabaseFromEnv(&cfg.OfflineDatabase)
 	overrideARMAPIFromEnv(&cfg.ARMAPI)
 	overrideHatoAPIFromEnv(&cfg.HatoAPI)
+	overrideJikanAPIFromEnv(&cfg.JikanAPI)
 }
 
 func overrideOAuthFromEnv(oauth *OAuthConfig) {
@@ -230,6 +243,12 @@ func overrideHatoAPIFromEnv(hc *HatoAPIConfig) {
 	overrideStringFromEnv(&hc.BaseURL, "HATO_API_URL")
 	overrideStringFromEnv(&hc.CacheDir, "HATO_API_CACHE_DIR")
 	overrideStringFromEnv(&hc.CacheMaxAge, "HATO_API_CACHE_MAX_AGE")
+}
+
+func overrideJikanAPIFromEnv(jc *JikanAPIConfig) {
+	overrideBoolFromEnv(&jc.Enabled, "JIKAN_API_ENABLED")
+	overrideStringFromEnv(&jc.CacheDir, "JIKAN_API_CACHE_DIR")
+	overrideStringFromEnv(&jc.CacheMaxAge, "JIKAN_API_CACHE_MAX_AGE")
 }
 
 // overrideStringFromEnv overrides a string field from environment variables.
@@ -358,6 +377,11 @@ func configWithDefaults() Config {
 			BaseURL:     defaultHatoBaseURL,
 			CacheDir:    getDefaultHatoCacheDir(),
 			CacheMaxAge: "720h",
+		},
+		JikanAPI: JikanAPIConfig{
+			Enabled:     false,
+			CacheDir:    getDefaultJikanCacheDir(),
+			CacheMaxAge: "168h",
 		},
 	}
 }
