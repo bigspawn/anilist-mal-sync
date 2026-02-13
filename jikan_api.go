@@ -263,7 +263,7 @@ func findBestJikanMatch(results []JikanMangaData, srcTitleEN, srcTitleJP, srcTit
 // searchTitlesForJikan returns a list of search queries to try against Jikan API
 // for a given manga source, in order of preference.
 func searchTitlesForJikan(titleEN, _, titleRomaji string) []string {
-	var titles []string
+	titles := make([]string, 0, 2)
 	seen := make(map[string]struct{})
 
 	for _, t := range []string{titleRomaji, titleEN} {
