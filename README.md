@@ -119,6 +119,7 @@ Done!
 | | `--offline-db-force-refresh` | Force re-download offline database |
 | | `--arm-api` | Enable ARM API for anime ID mapping (default: `false`, ignored for `--manga`) |
 | | `--arm-api-url` | ARM API base URL |
+| | `--jikan-api` | Enable Jikan API for manga ID mapping (default: `false`, ignored for anime) |
 
 **Watch options:**
 | Short | Long | Description |
