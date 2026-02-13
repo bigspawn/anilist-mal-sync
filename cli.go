@@ -63,6 +63,10 @@ var syncFlags = []cli.Flag{
 		Name:  "arm-api-url",
 		Usage: "ARM API base URL",
 	},
+	&cli.BoolFlag{
+		Name:  "jikan-api",
+		Usage: "enable Jikan API for manga ID mapping (default: false)",
+	},
 }
 
 // setSyncFlagsFromCmd sets global sync variables from command flags and returns verbose value
@@ -99,6 +103,9 @@ func applySyncFlagsToConfig(cmd *cli.Command, cfg *Config) {
 		if v := cmd.String("arm-api-url"); v != "" {
 			cfg.ARMAPI.BaseURL = v
 		}
+	}
+	if cmd.IsSet("jikan-api") {
+		cfg.JikanAPI.Enabled = cmd.Bool("jikan-api")
 	}
 }
 
@@ -163,6 +170,11 @@ func NewCLI() *cli.Command {
 		Usage: "ARM API base URL",
 		Local: true,
 	}
+	jikanAPIFlag := &cli.BoolFlag{
+		Name:  "jikan-api",
+		Usage: "enable Jikan API for manga ID mapping (default: false)",
+		Local: true,
+	}
 
 	return &cli.Command{
 		Name:        "anilist-mal-sync",
@@ -181,6 +193,7 @@ func NewCLI() *cli.Command {
 			offlineDbForceRefreshFlag,
 			armAPIFlag,
 			armAPIURLFlag,
+			jikanAPIFlag,
 		},
 		Commands: []*cli.Command{
 			newLoginCommand(),

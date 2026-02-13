@@ -20,6 +20,7 @@ type App struct {
 	anilist            *AnilistClient
 	anilistScoreFormat verniy.ScoreFormat
 	hatoClient         *HatoClient
+	jikanClient        *JikanClient
 
 	animeUpdater        *Updater
 	mangaUpdater        *Updater
@@ -68,7 +69,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 	// Determine if anime synchronization will be performed.
 	// Offline database and ARM API are only needed for anime, not for manga.
 	needsAnime := !(*mangaSync) || *allSync
-	offlineStrategy, hatoStrategy, hatoClient, armStrategy := loadIDMappingStrategies(ctx, config, needsAnime)
+	offlineStrategy, hatoStrategy, hatoClient, armStrategy, jikanStrategy, jikanClient := loadIDMappingStrategies(ctx, config, needsAnime)
 
 	// Default ignore titles
 	defaultIgnoreTitles := map[string]struct{}{
@@ -105,6 +106,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 			IDStrategy{},
 			hatoStrategy,
 			TitleStrategy{},
+			jikanStrategy,
 			APISearchStrategy{Service: malMangaService},
 		),
 	}
@@ -138,6 +140,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 			IDStrategy{},
 			hatoStrategy,
 			TitleStrategy{},
+			jikanStrategy,
 			MALIDStrategy{Service: anilistMangaService},
 			APISearchStrategy{Service: anilistMangaService},
 		),
@@ -153,6 +156,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		anilist:             anilistClient,
 		anilistScoreFormat:  scoreFormat,
 		hatoClient:          hatoClient,
+		jikanClient:         jikanClient,
 		animeUpdater:        animeUpdater,
 		mangaUpdater:        mangaUpdater,
 		reverseAnimeUpdater: reverseAnimeUpdater,
@@ -171,7 +175,7 @@ func loadIDMappingStrategies(
 	ctx context.Context,
 	config Config,
 	needsAnime bool,
-) (OfflineDatabaseStrategy, HatoAPIStrategy, *HatoClient, ARMAPIStrategy) {
+) (OfflineDatabaseStrategy, HatoAPIStrategy, *HatoClient, ARMAPIStrategy, JikanAPIStrategy, *JikanClient) {
 	var offlineDB *OfflineDatabase
 	// Only load offline database for anime synchronization
 	if needsAnime && config.OfflineDatabase.Enabled {
@@ -198,10 +202,18 @@ func loadIDMappingStrategies(
 		LogInfoSuccess(ctx, "ARM API enabled (%s)", config.ARMAPI.BaseURL)
 	}
 
+	var jikanClient *JikanClient
+	if config.JikanAPI.Enabled {
+		jikanClient = NewJikanClient(ctx, config.JikanAPI.CacheDir, config.JikanAPI.CacheMaxAge)
+		LogInfoSuccess(ctx, "Jikan API enabled (manga ID mapping)")
+	}
+
 	return OfflineDatabaseStrategy{Database: offlineDB},
 		HatoAPIStrategy{Client: hatoClient},
 		hatoClient,
-		ARMAPIStrategy{Client: armClient}
+		ARMAPIStrategy{Client: armClient},
+		JikanAPIStrategy{Client: jikanClient},
+		jikanClient
 }
 
 func (a *App) Run(ctx context.Context) error {
@@ -254,6 +266,13 @@ func (a *App) runNormalSync(ctx context.Context) error {
 		}
 	}
 
+	// Save Jikan cache if enabled
+	if a.jikanClient != nil {
+		if err := a.jikanClient.SaveCache(ctx); err != nil {
+			LogWarn(ctx, "Failed to save Jikan cache: %v", err)
+		}
+	}
+
 	return nil
 }
 
@@ -274,6 +293,13 @@ func (a *App) runReverseSync(ctx context.Context) error {
 	if a.hatoClient != nil {
 		if err := a.hatoClient.SaveCache(ctx); err != nil {
 			LogWarn(ctx, "Failed to save Hato cache: %v", err)
+		}
+	}
+
+	// Save Jikan cache if enabled
+	if a.jikanClient != nil {
+		if err := a.jikanClient.SaveCache(ctx); err != nil {
+			LogWarn(ctx, "Failed to save Jikan cache: %v", err)
 		}
 	}
 
