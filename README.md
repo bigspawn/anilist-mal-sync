@@ -119,6 +119,7 @@ Done!
 | | `--offline-db-force-refresh` | Force re-download offline database |
 | | `--arm-api` | Enable ARM API for anime ID mapping (default: `false`, ignored for `--manga`) |
 | | `--arm-api-url` | ARM API base URL |
+| | `--jikan-api` | Enable Jikan API for manga ID mapping (default: `false`, ignored for anime) |
 
 **Watch options:**
 | Short | Long | Description |
@@ -166,6 +167,10 @@ hato_api:
   enabled: true  # Enable Hato API for ID mapping (default: true)
   base_url: "https://hato.malupdaterosx.moe"  # Hato API base URL
   cache_dir: ""  # Leave empty for default: ~/.config/anilist-mal-sync/hato-cache
+jikan_api:
+  enabled: false  # Enable Jikan API for manga ID mapping (default: false)
+  cache_dir: ""  # Default: ~/.config/anilist-mal-sync/jikan-cache
+  cache_max_age: "168h"  # Cache max age (default: 168h / 7 days)
   cache_max_age: "720h"  # Cache max age (default: 720h / 30 days)
 ```
 
@@ -180,7 +185,9 @@ When syncing anime (default or `--all` mode), the following strategies are used 
 3. **Hato API** (optional, enabled by default) - Online API for anime/manga ID mapping
 4. **ARM API** (optional, disabled by default) - Online fallback to [arm-server](https://arm.haglund.dev)
 5. **Title matching** - Match by title similarity
-6. **API search** - Search the target service API
+3. **Jikan API** (optional, disabled by default) - Online API for manga ID mapping via Jikan (unofficial MAL API)
+4. **Title matching** - Match by title similarity
+5. **API search** - Search the target service API
 
 ### Manga ID Mapping
 When syncing manga (`--manga` mode), the following strategies are used:
@@ -221,6 +228,9 @@ Configuration can be provided entirely via environment variables (recommended fo
 - `HATO_API_CACHE_MAX_AGE` - Hato API cache max age (default: `720h` / 30 days)
 - `ARM_API_ENABLED` - Enable ARM API for anime ID mapping (default: `false`, not used for manga-only sync)
 - `ARM_API_URL` - ARM API base URL (default: `https://arm.haglund.dev`)
+- `JIKAN_API_ENABLED` - Enable Jikan API for manga ID mapping (default: `false`, not used for anime sync)
+- `JIKAN_API_CACHE_DIR` - Jikan API cache directory (default: `~/.config/anilist-mal-sync/jikan-cache`)
+- `JIKAN_API_CACHE_MAX_AGE` - Jikan API cache max age (default: `168h` / 7 days)
 
 ## Advanced
 
@@ -305,3 +315,4 @@ This project is not affiliated with AniList or MyAnimeList. Use at your own risk
 - [anime-offline-database](https://github.com/manami-project/anime-offline-database) for JSON based anime dataset
 - [arm-server](https://github.com/BeeeQueue/arm-server) for API anime dataset
 - [Hato](https://github.com/Atelier-Shiori/Hato) for JSON API anime and manga
+- [Jikan](https://jikan.moe/) for unofficial MyAnimeList API

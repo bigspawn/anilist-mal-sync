@@ -25,6 +25,9 @@ services:
       # - HATO_API_CACHE_MAX_AGE=720h  # Cache max age (default: 720h / 30 days)
       # - ARM_API_ENABLED=false  # Enable ARM API (default: false)
       # - ARM_API_URL=https://arm.haglund.dev  # ARM API base URL
+      # - JIKAN_API_ENABLED=false  # Enable Jikan API for manga ID mapping
+      # - JIKAN_API_CACHE_DIR=/home/appuser/.config/anilist-mal-sync/jikan-cache
+      # - JIKAN_API_CACHE_MAX_AGE=168h
     volumes:
       - tokens:/home/appuser/.config/anilist-mal-sync
     restart: unless-stopped
