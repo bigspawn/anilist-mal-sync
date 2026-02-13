@@ -228,6 +228,9 @@ Configuration can be provided entirely via environment variables (recommended fo
 - `HATO_API_CACHE_MAX_AGE` - Hato API cache max age (default: `720h` / 30 days)
 - `ARM_API_ENABLED` - Enable ARM API for anime ID mapping (default: `false`, not used for manga-only sync)
 - `ARM_API_URL` - ARM API base URL (default: `https://arm.haglund.dev`)
+- `JIKAN_API_ENABLED` - Enable Jikan API for manga ID mapping (default: `false`, not used for anime sync)
+- `JIKAN_API_CACHE_DIR` - Jikan API cache directory (default: `~/.config/anilist-mal-sync/jikan-cache`)
+- `JIKAN_API_CACHE_MAX_AGE` - Jikan API cache max age (default: `168h` / 7 days)
 
 ## Advanced
 
