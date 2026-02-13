@@ -185,7 +185,9 @@ When syncing anime (default or `--all` mode), the following strategies are used 
 3. **Hato API** (optional, enabled by default) - Online API for anime/manga ID mapping
 4. **ARM API** (optional, disabled by default) - Online fallback to [arm-server](https://arm.haglund.dev)
 5. **Title matching** - Match by title similarity
-6. **API search** - Search the target service API
+3. **Jikan API** (optional, disabled by default) - Online API for manga ID mapping via Jikan (unofficial MAL API)
+4. **Title matching** - Match by title similarity
+5. **API search** - Search the target service API
 
 ### Manga ID Mapping
 When syncing manga (`--manga` mode), the following strategies are used:
