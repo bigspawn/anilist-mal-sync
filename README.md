@@ -167,6 +167,10 @@ hato_api:
   enabled: true  # Enable Hato API for ID mapping (default: true)
   base_url: "https://hato.malupdaterosx.moe"  # Hato API base URL
   cache_dir: ""  # Leave empty for default: ~/.config/anilist-mal-sync/hato-cache
+jikan_api:
+  enabled: false  # Enable Jikan API for manga ID mapping (default: false)
+  cache_dir: ""  # Default: ~/.config/anilist-mal-sync/jikan-cache
+  cache_max_age: "168h"  # Cache max age (default: 168h / 7 days)
   cache_max_age: "720h"  # Cache max age (default: 720h / 30 days)
 ```
 
