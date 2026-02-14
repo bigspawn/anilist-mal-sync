@@ -25,8 +25,10 @@ type IgnoreEntry struct {
 // IgnoreConfig holds lists of entries to ignore during sync.
 type IgnoreConfig struct {
 	AniListIDs []int               `yaml:"anilist_ids,omitempty"`
+	MALIDs     []int               `yaml:"mal_ids,omitempty"`
 	Titles     []string            `yaml:"titles,omitempty"`
-	metadata   map[int]IgnoreEntry // unexported, not in YAML
+	metadata   map[int]IgnoreEntry // unexported, not in YAML (AniList IDs)
+	malMeta    map[int]IgnoreEntry // unexported, not in YAML (MAL IDs)
 }
 
 // MappingsConfig holds user-editable mappings and ignore rules.
@@ -132,6 +134,31 @@ func (m *MappingsConfig) AddIgnoreByID(anilistID int, title string, reason strin
 		m.Ignore.metadata = make(map[int]IgnoreEntry)
 	}
 	m.Ignore.metadata[anilistID] = IgnoreEntry{Title: title, Reason: reason}
+}
+
+// IsIgnoredByMALID checks if an entry should be ignored by MAL ID.
+func (m *MappingsConfig) IsIgnoredByMALID(malID int) bool {
+	for _, id := range m.Ignore.MALIDs {
+		if id == malID {
+			return true
+		}
+	}
+	return false
+}
+
+// AddIgnoreByMALID adds a MAL ID to the ignore list with optional metadata.
+func (m *MappingsConfig) AddIgnoreByMALID(malID int, title string, reason string) {
+	for _, id := range m.Ignore.MALIDs {
+		if id == malID {
+			return
+		}
+	}
+	m.Ignore.MALIDs = append(m.Ignore.MALIDs, malID)
+
+	if m.Ignore.malMeta == nil {
+		m.Ignore.malMeta = make(map[int]IgnoreEntry)
+	}
+	m.Ignore.malMeta[malID] = IgnoreEntry{Title: title, Reason: reason}
 }
 
 // AddManualMapping adds a manual mapping if not already present.

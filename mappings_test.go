@@ -139,6 +139,37 @@ func TestMappingsConfig_AddIgnoreByID(t *testing.T) {
 	assert.Equal(t, []int{100, 200}, cfg.Ignore.AniListIDs)
 }
 
+func TestMappingsConfig_IsIgnoredByMALID(t *testing.T) {
+	cfg := &MappingsConfig{
+		Ignore: IgnoreConfig{
+			MALIDs: []int{500, 600},
+		},
+	}
+
+	assert.True(t, cfg.IsIgnoredByMALID(500))
+	assert.True(t, cfg.IsIgnoredByMALID(600))
+	assert.False(t, cfg.IsIgnoredByMALID(999))
+}
+
+func TestMappingsConfig_AddIgnoreByMALID(t *testing.T) {
+	cfg := &MappingsConfig{}
+
+	cfg.AddIgnoreByMALID(500, "Test Title", "Test Reason")
+	assert.Equal(t, []int{500}, cfg.Ignore.MALIDs)
+
+	// Should not add duplicate
+	cfg.AddIgnoreByMALID(500, "New Title", "New Reason")
+	assert.Equal(t, []int{500}, cfg.Ignore.MALIDs)
+
+	cfg.AddIgnoreByMALID(600, "Another Title", "")
+	assert.Equal(t, []int{500, 600}, cfg.Ignore.MALIDs)
+
+	// Check metadata is stored
+	assert.NotNil(t, cfg.Ignore.malMeta)
+	assert.Equal(t, IgnoreEntry{Title: "Test Title", Reason: "Test Reason"}, cfg.Ignore.malMeta[500])
+	assert.Equal(t, IgnoreEntry{Title: "Another Title", Reason: ""}, cfg.Ignore.malMeta[600])
+}
+
 func TestMappingsConfig_AddManualMapping(t *testing.T) {
 	cfg := &MappingsConfig{}
 
