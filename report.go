@@ -2,9 +2,10 @@ package main
 
 import "sync"
 
-// SyncReport accumulates warnings and conflicts for deferred printing
+// SyncReport accumulates warnings and unmapped entries for deferred printing
 type SyncReport struct {
 	Warnings           []Warning
+	UnmappedItems      []UnmappedEntry
 	DuplicateConflicts []DuplicateConflict
 	mu                 sync.Mutex
 }
@@ -52,6 +53,23 @@ func (r *SyncReport) HasWarnings() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return len(r.Warnings) > 0
+}
+
+// AddUnmappedItems adds unmapped entries to the report (thread-safe)
+func (r *SyncReport) AddUnmappedItems(items []UnmappedEntry) {
+	if len(items) == 0 {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.UnmappedItems = append(r.UnmappedItems, items...)
+}
+
+// HasUnmappedItems returns true if there are unmapped entries (thread-safe)
+func (r *SyncReport) HasUnmappedItems() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.UnmappedItems) > 0
 }
 
 // AddDuplicateConflict adds a duplicate conflict to the report (thread-safe)

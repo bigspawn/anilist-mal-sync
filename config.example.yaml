@@ -14,6 +14,7 @@ myanimelist:
   token_url: "https://myanimelist.net/v1/oauth2/token"
   username: "username" # Your MyAnimeList username.
 token_file_path: "" # Absolute path to token file, empty string use default path.
+mappings_file_path: "" # Path to manual mappings YAML file, empty string use default path (~/.config/anilist-mal-sync/mappings.yaml).
 watch:
   interval: "24h" # Sync interval for watch mode (1h-168h). Can be overridden with --interval flag.
 # HTTP client timeout for API requests (default: 30s).

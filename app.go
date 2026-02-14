@@ -270,10 +270,39 @@ func (a *App) Run(ctx context.Context) error {
 		stats = append(stats, u.Statistics)
 	}
 
+	// Collect unmapped entries from all updaters and save state
+	a.saveUnmappedState(ctx, updaters)
+
 	// Print global summary
 	PrintGlobalSummary(ctx, stats, a.syncReport, time.Since(startTime))
 
 	return err
+}
+
+func (a *App) saveUnmappedState(ctx context.Context, updaters []*Updater) {
+	totalUnmapped := 0
+	for _, u := range updaters {
+		totalUnmapped += len(u.UnmappedList)
+	}
+	allUnmapped := make([]UnmappedEntry, 0, totalUnmapped)
+	for _, u := range updaters {
+		allUnmapped = append(allUnmapped, u.UnmappedList...)
+	}
+
+	// Add unmapped to sync report for display
+	a.syncReport.AddUnmappedItems(allUnmapped)
+
+	if len(allUnmapped) == 0 {
+		return
+	}
+
+	state := &UnmappedState{
+		Entries:   allUnmapped,
+		UpdatedAt: time.Now(),
+	}
+	if saveErr := state.Save(""); saveErr != nil {
+		LogWarn(ctx, "Failed to save unmapped state: %v", saveErr)
+	}
 }
 
 func (a *App) runNormalSync(ctx context.Context) error {

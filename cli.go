@@ -201,6 +201,7 @@ func NewCLI() *cli.Command {
 			newStatusCommand(),
 			newSyncCommand(),
 			newWatchCommand(),
+			newUnmappedCommand(),
 		},
 		// Default action when no command specified - runs sync for backward compatibility
 		Action: func(ctx context.Context, cmd *cli.Command) error {
