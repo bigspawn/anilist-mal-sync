@@ -269,6 +269,59 @@ func TestMappingsConfig_BackwardCompatibility(t *testing.T) {
 	assert.Nil(t, cfg.Ignore.metadata)
 }
 
+func TestMappingsConfig_SaveAndLoad_WithMALIDs(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "mappings.yaml")
+
+	cfg := &MappingsConfig{
+		ManualMappings: []ManualMapping{
+			{AniListID: 1, MALID: 2, Comment: "test"},
+		},
+		Ignore: IgnoreConfig{
+			AniListIDs: []int{10, 20},
+			MALIDs:     []int{30, 40},
+			Titles:     []string{"ignore me"},
+		},
+	}
+
+	if err := cfg.Save(path); err != nil {
+		t.Fatal(err)
+	}
+
+	loaded, err := LoadMappings(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, cfg.ManualMappings, loaded.ManualMappings)
+	assert.Equal(t, cfg.Ignore.AniListIDs, loaded.Ignore.AniListIDs)
+	assert.Equal(t, cfg.Ignore.MALIDs, loaded.Ignore.MALIDs)
+	assert.Equal(t, cfg.Ignore.Titles, loaded.Ignore.Titles)
+}
+
+func TestMappingsConfig_MarshalYAML_CombinedIgnore(t *testing.T) {
+	cfg := &MappingsConfig{
+		Ignore: IgnoreConfig{
+			AniListIDs: []int{100},
+			MALIDs:     []int{500},
+		},
+	}
+	cfg.Ignore.metadata = map[int]IgnoreEntry{
+		100: {Title: "AniList Entry"},
+	}
+	cfg.Ignore.malMeta = map[int]IgnoreEntry{
+		500: {Title: "MAL Entry", Reason: "reverse"},
+	}
+
+	data, err := yaml.Marshal(cfg)
+	assert.NoError(t, err)
+
+	yamlStr := string(data)
+	assert.Contains(t, yamlStr, "anilist_ids")
+	assert.Contains(t, yamlStr, "mal_ids")
+	assert.Contains(t, yamlStr, "# AniList Entry")
+	assert.Contains(t, yamlStr, "# MAL Entry : reverse")
+}
+
 func TestIgnoreConfig_Metadata(t *testing.T) {
 	cfg := &MappingsConfig{}
 
