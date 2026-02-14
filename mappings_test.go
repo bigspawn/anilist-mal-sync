@@ -222,6 +222,27 @@ func TestMappingsConfig_MarshalWithComments(t *testing.T) {
 	assert.Contains(t, yamlStr, "# Another Anime")
 }
 
+func TestMappingsConfig_MarshalWithMALIDComments(t *testing.T) {
+	cfg := &MappingsConfig{
+		Ignore: IgnoreConfig{
+			MALIDs: []int{500, 600},
+		},
+	}
+
+	cfg.Ignore.malMeta = map[int]IgnoreEntry{
+		500: {Title: "MAL Anime", Reason: "reverse sync"},
+		600: {Title: "Another MAL Anime"},
+	}
+
+	data, err := yaml.Marshal(cfg)
+	assert.NoError(t, err)
+
+	yamlStr := string(data)
+	assert.Contains(t, yamlStr, "mal_ids")
+	assert.Contains(t, yamlStr, "# MAL Anime : reverse sync")
+	assert.Contains(t, yamlStr, "# Another MAL Anime")
+}
+
 func TestMappingsConfig_BackwardCompatibility(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "mappings.yaml")
