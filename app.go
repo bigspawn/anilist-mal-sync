@@ -90,10 +90,15 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		defaultIgnoreTitles[strings.ToLower(t)] = struct{}{}
 	}
 
-	// Build ignore IDs from mappings
-	ignoreIDs := make(map[int]struct{}, len(mappings.Ignore.AniListIDs))
+	// Build ignore IDs from mappings: separate maps for forward and reverse updaters
+	ignoreAniListIDs := make(map[int]struct{}, len(mappings.Ignore.AniListIDs))
 	for _, id := range mappings.Ignore.AniListIDs {
-		ignoreIDs[id] = struct{}{}
+		ignoreAniListIDs[id] = struct{}{}
+	}
+
+	ignoreMALIDs := make(map[int]struct{}, len(mappings.Ignore.MALIDs))
+	for _, id := range mappings.Ignore.MALIDs {
+		ignoreMALIDs[id] = struct{}{}
 	}
 
 	// Create updaters
@@ -102,7 +107,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		Service:      malAnimeService,
 		Statistics:   NewStatistics(),
 		IgnoreTitles: defaultIgnoreTitles,
-		IgnoreIDs:    ignoreIDs,
+		IgnoreIDs:    ignoreAniListIDs,
 		ForceSync:    *forceSync,
 		DryRun:       *dryRun,
 		MediaType:    mediaTypeAnime,
@@ -122,7 +127,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		Service:      malMangaService,
 		Statistics:   NewStatistics(),
 		IgnoreTitles: map[string]struct{}{},
-		IgnoreIDs:    ignoreIDs,
+		IgnoreIDs:    ignoreAniListIDs,
 		ForceSync:    *forceSync,
 		DryRun:       *dryRun,
 		MediaType:    mediaTypeManga,
@@ -141,7 +146,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		Service:      anilistAnimeService,
 		Statistics:   NewStatistics(),
 		IgnoreTitles: map[string]struct{}{},
-		IgnoreIDs:    ignoreIDs,
+		IgnoreIDs:    ignoreMALIDs,
 		ForceSync:    *forceSync,
 		DryRun:       *dryRun,
 		MediaType:    mediaTypeAnime,
@@ -162,7 +167,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		Service:      anilistMangaService,
 		Statistics:   NewStatistics(),
 		IgnoreTitles: map[string]struct{}{},
-		IgnoreIDs:    ignoreIDs,
+		IgnoreIDs:    ignoreMALIDs,
 		ForceSync:    *forceSync,
 		DryRun:       *dryRun,
 		MediaType:    mediaTypeManga,
