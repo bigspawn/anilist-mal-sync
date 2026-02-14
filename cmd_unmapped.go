@@ -84,6 +84,10 @@ func printUnmappedEntry(num int, entry UnmappedEntry) {
 	log.Println(formatUnmappedLine(num, entry, mediaLabel))
 }
 
+func isReverseEntry(entry UnmappedEntry) bool {
+	return entry.Direction == SyncDirectionReverse
+}
+
 func runUnmappedIgnoreAll(state *UnmappedState, mappingsPath string) error {
 	mappings, err := LoadMappings(mappingsPath)
 	if err != nil {
@@ -92,10 +96,9 @@ func runUnmappedIgnoreAll(state *UnmappedState, mappingsPath string) error {
 
 	added := 0
 	for _, entry := range state.Entries {
-		if entry.AniListID > 0 && !mappings.IsIgnored(entry.AniListID, entry.Title) {
-			mappings.AddIgnoreByID(entry.AniListID, entry.Title, entry.Reason)
+		if addIgnoreEntry(entry, mappings) {
+			logIgnoredEntry(entry)
 			added++
-			log.Printf("  + %q (AniList: %d)", entry.Title, entry.AniListID)
 		}
 	}
 
@@ -116,6 +119,29 @@ func runUnmappedIgnoreAll(state *UnmappedState, mappingsPath string) error {
 	return nil
 }
 
+func addIgnoreEntry(entry UnmappedEntry, mappings *MappingsConfig) bool {
+	if isReverseEntry(entry) {
+		if entry.MALID > 0 && !mappings.IsIgnoredByMALID(entry.MALID) {
+			mappings.AddIgnoreByMALID(entry.MALID, entry.Title, entry.Reason)
+			return true
+		}
+		return false
+	}
+	if entry.AniListID > 0 && !mappings.IsIgnored(entry.AniListID, entry.Title) {
+		mappings.AddIgnoreByID(entry.AniListID, entry.Title, entry.Reason)
+		return true
+	}
+	return false
+}
+
+func logIgnoredEntry(entry UnmappedEntry) {
+	if isReverseEntry(entry) {
+		log.Printf("  + %q (MAL: %d)", entry.Title, entry.MALID)
+	} else {
+		log.Printf("  + %q (AniList: %d)", entry.Title, entry.AniListID)
+	}
+}
+
 func runUnmappedFix(state *UnmappedState, mappingsPath string) error {
 	mappings, err := LoadMappings(mappingsPath)
 	if err != nil {
@@ -128,7 +154,7 @@ func runUnmappedFix(state *UnmappedState, mappingsPath string) error {
 	for i, entry := range state.Entries {
 		printFixHeader(i+1, len(state.Entries), entry)
 
-		action := promptFixAction(reader)
+		action := promptFixAction(reader, entry)
 		changed = applyFixAction(action, entry, mappings, reader) || changed
 		if action == "q" {
 			break
@@ -160,8 +186,12 @@ func printFixHeader(num, total int, entry UnmappedEntry) {
 	}
 }
 
-func promptFixAction(reader *bufio.Reader) string {
-	log.Print("\nAction: [i]gnore  [m]ap to MAL ID  [s]kip  [q]uit\n> ")
+func promptFixAction(reader *bufio.Reader, entry UnmappedEntry) string {
+	mapLabel := "MAL ID"
+	if isReverseEntry(entry) {
+		mapLabel = "AniList ID"
+	}
+	log.Printf("\nAction: [i]gnore  [m]ap to %s  [s]kip  [q]uit\n> ", mapLabel)
 	input, err := reader.ReadString('\n')
 	if err != nil {
 		return "s"
@@ -172,19 +202,9 @@ func promptFixAction(reader *bufio.Reader) string {
 func applyFixAction(action string, entry UnmappedEntry, mappings *MappingsConfig, reader *bufio.Reader) bool {
 	switch action {
 	case "i":
-		if entry.AniListID > 0 {
-			mappings.AddIgnoreByID(entry.AniListID, entry.Title, entry.Reason)
-			log.Printf("  -> Added AniList ID %d to ignore list", entry.AniListID)
-			return true
-		}
-		log.Println("  -> Cannot ignore: no AniList ID available")
+		return applyIgnoreAction(entry, mappings)
 	case "m":
-		malID, ok := promptMALID(reader)
-		if ok && entry.AniListID > 0 {
-			mappings.AddManualMapping(entry.AniListID, malID, entry.Title)
-			log.Printf("  -> Mapped AniList %d -> MAL %d", entry.AniListID, malID)
-			return true
-		}
+		return applyMapAction(entry, mappings, reader)
 	case "q":
 		log.Println("Quitting...")
 	default:
@@ -193,8 +213,46 @@ func applyFixAction(action string, entry UnmappedEntry, mappings *MappingsConfig
 	return false
 }
 
-func promptMALID(reader *bufio.Reader) (int, bool) {
-	log.Print("  Enter MAL ID: ")
+func applyIgnoreAction(entry UnmappedEntry, mappings *MappingsConfig) bool {
+	if isReverseEntry(entry) {
+		if entry.MALID > 0 {
+			mappings.AddIgnoreByMALID(entry.MALID, entry.Title, entry.Reason)
+			log.Printf("  -> Added MAL ID %d to ignore list", entry.MALID)
+			return true
+		}
+		log.Println("  -> Cannot ignore: no MAL ID available")
+		return false
+	}
+	if entry.AniListID > 0 {
+		mappings.AddIgnoreByID(entry.AniListID, entry.Title, entry.Reason)
+		log.Printf("  -> Added AniList ID %d to ignore list", entry.AniListID)
+		return true
+	}
+	log.Println("  -> Cannot ignore: no AniList ID available")
+	return false
+}
+
+func applyMapAction(entry UnmappedEntry, mappings *MappingsConfig, reader *bufio.Reader) bool {
+	if isReverseEntry(entry) {
+		anilistID, ok := promptID(reader, "AniList")
+		if ok && entry.MALID > 0 {
+			mappings.AddManualMapping(anilistID, entry.MALID, entry.Title)
+			log.Printf("  -> Mapped AniList %d -> MAL %d", anilistID, entry.MALID)
+			return true
+		}
+		return false
+	}
+	malID, ok := promptID(reader, "MAL")
+	if ok && entry.AniListID > 0 {
+		mappings.AddManualMapping(entry.AniListID, malID, entry.Title)
+		log.Printf("  -> Mapped AniList %d -> MAL %d", entry.AniListID, malID)
+		return true
+	}
+	return false
+}
+
+func promptID(reader *bufio.Reader, label string) (int, bool) {
+	log.Printf("  Enter %s ID: ", label)
 	input, err := reader.ReadString('\n')
 	if err != nil {
 		return 0, false
@@ -202,7 +260,7 @@ func promptMALID(reader *bufio.Reader) (int, bool) {
 	input = strings.TrimSpace(input)
 	id, err := strconv.Atoi(input)
 	if err != nil || id <= 0 {
-		log.Println("  Invalid MAL ID")
+		log.Printf("  Invalid %s ID", label)
 		return 0, false
 	}
 	return id, true
