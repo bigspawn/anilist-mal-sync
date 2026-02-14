@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"sort"
 	"strings"
@@ -230,6 +231,7 @@ func PrintGlobalSummary(ctx context.Context, stats []*Statistics, report *SyncRe
 	printGlobalSkipReasons(logger, totals.skipReasons)
 	printGlobalUpdates(logger, totals.updatedItems)
 	printGlobalDryRunUpdates(logger, totals.dryRunItems)
+	printGlobalUnmapped(logger, report)
 	printGlobalWarnings(logger, report)
 	printGlobalDuplicateConflicts(logger, report)
 	printGlobalErrors(logger, totals.errorItems)
@@ -279,6 +281,22 @@ func printGlobalSkipReasons(logger *Logger, skipReasons map[string]int) {
 	for _, reason := range sortedKeys(skipReasons) {
 		logger.Info("  %s: %d", reason, skipReasons[reason])
 	}
+}
+
+func printGlobalUnmapped(logger *Logger, report *SyncReport) {
+	if report == nil || !report.HasUnmappedItems() {
+		return
+	}
+
+	logger.Info("")
+	logger.Warn("Unmapped entries (%d):", len(report.UnmappedItems))
+	for i, item := range report.UnmappedItems {
+		mediaLabel := capitalizeFirst(item.MediaType)
+		line := formatUnmappedLine(i+1, item, mediaLabel)
+		logger.Warn("%s", line)
+	}
+	logger.Info("")
+	logger.Info("Hint: run 'anilist-mal-sync unmapped --fix' to manage these entries")
 }
 
 func printGlobalWarnings(logger *Logger, report *SyncReport) {
@@ -363,6 +381,22 @@ func sortedKeys(m map[string]int) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+func formatUnmappedLine(num int, item UnmappedEntry, mediaLabel string) string {
+	var base string
+	switch {
+	case item.AniListID > 0:
+		base = fmt.Sprintf("  %d. %q (AniList: %d) [%s]", num, item.Title, item.AniListID, mediaLabel)
+	case item.MALID > 0:
+		base = fmt.Sprintf("  %d. %q (MAL: %d) [%s]", num, item.Title, item.MALID, mediaLabel)
+	default:
+		base = fmt.Sprintf("  %d. %q [%s]", num, item.Title, mediaLabel)
+	}
+	if item.Reason != "" {
+		return base + " - " + item.Reason
+	}
+	return base
 }
 
 func capitalizeFirst(s string) string {
