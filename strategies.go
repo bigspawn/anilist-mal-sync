@@ -42,6 +42,89 @@ func (sc *StrategyChain) FindTarget(
 	return nil, fmt.Errorf("no target found for source: %s", src.GetTitle())
 }
 
+// ManualMappingStrategy finds targets using user-defined manual mappings.
+// This should be the first strategy in the chain.
+type ManualMappingStrategy struct {
+	Mappings *MappingsConfig
+}
+
+func (s ManualMappingStrategy) Name() string {
+	return "ManualMappingStrategy"
+}
+
+func (s ManualMappingStrategy) FindTarget(
+	ctx context.Context,
+	src Source,
+	existingTargets map[TargetID]Target,
+	prefix string,
+	_ *SyncReport,
+) (Target, bool, error) {
+	if s.Mappings == nil {
+		return nil, false, nil
+	}
+
+	targetID, found := s.lookupManualMapping(src)
+	if !found {
+		return nil, false, nil
+	}
+
+	tgtID := TargetID(targetID)
+	if target, exists := existingTargets[tgtID]; exists {
+		LogDebugDecision(ctx, "[%s] Found target by manual mapping: ID %d -> %s", prefix, targetID, target.GetTitle())
+		return target, true, nil
+	}
+
+	LogDebugDecision(ctx, "[%s] Manual mapping found ID %d but not in user's list", prefix, targetID)
+	return nil, false, nil
+}
+
+func (s ManualMappingStrategy) lookupManualMapping(src Source) (int, bool) {
+	switch v := src.(type) {
+	case Anime:
+		return s.lookupByIDs(v.IDAnilist, v.IDMal)
+	case Manga:
+		return s.lookupByIDs(v.IDAnilist, v.IDMal)
+	}
+	return 0, false
+}
+
+func (s ManualMappingStrategy) lookupByIDs(anilistID, malID int) (int, bool) {
+	if *reverseDirection {
+		return s.lookupReverse(anilistID, malID)
+	}
+	return s.lookupForward(anilistID, malID)
+}
+
+func (s ManualMappingStrategy) lookupForward(anilistID, malID int) (int, bool) {
+	// AniList→MAL: source has AniList ID, need MAL ID
+	if anilistID > 0 {
+		if id, ok := s.Mappings.GetManualMALID(anilistID); ok {
+			return id, true
+		}
+	}
+	if malID > 0 {
+		if id, ok := s.Mappings.GetManualMALID(malID); ok {
+			return id, true
+		}
+	}
+	return 0, false
+}
+
+func (s ManualMappingStrategy) lookupReverse(anilistID, malID int) (int, bool) {
+	// MAL→AniList: source has MAL ID, need AniList ID
+	if malID > 0 {
+		if id, ok := s.Mappings.GetManualAniListID(malID); ok {
+			return id, true
+		}
+	}
+	if anilistID > 0 {
+		if id, ok := s.Mappings.GetManualAniListID(anilistID); ok {
+			return id, true
+		}
+	}
+	return 0, false
+}
+
 // IDStrategy finds targets by TargetID in existing targets map
 type IDStrategy struct{}
 
