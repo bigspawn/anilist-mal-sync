@@ -649,15 +649,15 @@ func TestManga_GetSourceID(t *testing.T) {
 // TestStrategy_Name tests the Name() method for all strategies
 func TestIDStrategy_Name(t *testing.T) {
 	strategy := IDStrategy{}
-	if got := strategy.Name(); got != "IDStrategy" {
-		t.Errorf("Name() = %v, want %v", got, "IDStrategy")
+	if got := strategy.Name(); got != StrategyNameID {
+		t.Errorf("Name() = %v, want %v", got, StrategyNameID)
 	}
 }
 
 func TestTitleStrategy_Name(t *testing.T) {
 	strategy := TitleStrategy{}
-	if got := strategy.Name(); got != "TitleStrategy" {
-		t.Errorf("Name() = %v, want %v", got, "TitleStrategy")
+	if got := strategy.Name(); got != StrategyNameTitle {
+		t.Errorf("Name() = %v, want %v", got, StrategyNameTitle)
 	}
 }
 
@@ -1052,6 +1052,114 @@ func TestManualMappingStrategy_NoMapping(t *testing.T) {
 	}
 	if target != nil {
 		t.Error("Expected nil target")
+	}
+}
+
+// TestFindTargetWithMeta_ReturnsMetadata tests that FindTargetWithMeta returns strategy name and index
+func TestFindTargetWithMeta_ReturnsMetadata(t *testing.T) {
+	ctx := context.Background()
+
+	source := Anime{
+		IDMal:       0, // No MAL ID, so IDStrategy won't find it
+		TitleEN:     "Test Anime",
+		NumEpisodes: 12,
+	}
+
+	existingTargets := map[TargetID]Target{
+		12345: Anime{
+			IDMal:       12345,
+			TitleEN:     "Test Anime",
+			NumEpisodes: 12,
+		},
+	}
+
+	chain := NewStrategyChain(
+		IDStrategy{},    // idx=0: won't match (no MAL ID)
+		TitleStrategy{}, // idx=1: will match by title
+	)
+
+	result, err := chain.FindTargetWithMeta(ctx, source, existingTargets, "[Test]", nil)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	if result == nil {
+		t.Fatal("Expected non-nil result")
+	}
+
+	if result.StrategyName != StrategyNameTitle {
+		t.Errorf("Expected strategy name %s, got %s", StrategyNameTitle, result.StrategyName)
+	}
+
+	if result.StrategyIdx != 1 {
+		t.Errorf("Expected strategy index 1, got %d", result.StrategyIdx)
+	}
+
+	if result.Target == nil {
+		t.Error("Expected non-nil target")
+	}
+}
+
+// TestFindTargetWithMeta_FirstStrategy tests that FindTargetWithMeta returns idx=0 for first strategy
+func TestFindTargetWithMeta_FirstStrategy(t *testing.T) {
+	ctx := context.Background()
+
+	source := Anime{
+		IDMal:       12345,
+		TitleEN:     "Test Anime",
+		NumEpisodes: 12,
+	}
+
+	existingTargets := map[TargetID]Target{
+		12345: Anime{
+			IDMal:       12345,
+			TitleEN:     "Test Anime",
+			NumEpisodes: 12,
+		},
+	}
+
+	chain := NewStrategyChain(
+		IDStrategy{},    // idx=0: will match
+		TitleStrategy{}, // idx=1: won't be reached
+	)
+
+	result, err := chain.FindTargetWithMeta(ctx, source, existingTargets, "[Test]", nil)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	if result.StrategyName != StrategyNameID {
+		t.Errorf("Expected strategy name %s, got %s", StrategyNameID, result.StrategyName)
+	}
+
+	if result.StrategyIdx != 0 {
+		t.Errorf("Expected strategy index 0, got %d", result.StrategyIdx)
+	}
+}
+
+// TestFindTargetWithMeta_NoMatch tests that FindTargetWithMeta returns error when no strategy matches
+func TestFindTargetWithMeta_NoMatch(t *testing.T) {
+	ctx := context.Background()
+
+	source := Anime{
+		IDMal:       99999,
+		TitleEN:     "Non-existent Anime",
+		NumEpisodes: 12,
+	}
+
+	existingTargets := map[TargetID]Target{}
+
+	chain := NewStrategyChain(
+		IDStrategy{},
+		TitleStrategy{},
+	)
+
+	result, err := chain.FindTargetWithMeta(ctx, source, existingTargets, "[Test]", nil)
+	if err == nil {
+		t.Error("Expected error, got nil")
+	}
+	if result != nil {
+		t.Errorf("Expected nil result, got %v", result)
 	}
 }
 

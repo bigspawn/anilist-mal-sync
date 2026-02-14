@@ -9,6 +9,19 @@ import (
 	"strings"
 )
 
+// MatchResult holds a matched target with metadata about how it was found.
+type MatchResult struct {
+	Target       Target
+	StrategyName string
+	StrategyIdx  int // position in chain, lower = higher priority
+}
+
+// Strategy name constants used by Name() methods.
+const (
+	StrategyNameID    = "IDStrategy"
+	StrategyNameTitle = "TitleStrategy"
+)
+
 // TargetFindStrategy defines a strategy for finding targets
 type TargetFindStrategy interface {
 	FindTarget(ctx context.Context, src Source, existingTargets map[TargetID]Target, prefix string, report *SyncReport) (Target, bool, error)
@@ -37,6 +50,27 @@ func (sc *StrategyChain) FindTarget(
 		if found {
 			LogDebugDecision(ctx, "[%s] Found target using strategy: %s", prefix, strategy.Name())
 			return target, nil
+		}
+	}
+	return nil, fmt.Errorf("no target found for source: %s", src.GetTitle())
+}
+
+// FindTargetWithMeta executes strategies in order and returns match metadata.
+func (sc *StrategyChain) FindTargetWithMeta(
+	ctx context.Context, src Source, existingTargets map[TargetID]Target, prefix string, report *SyncReport,
+) (*MatchResult, error) {
+	for idx, strategy := range sc.strategies {
+		target, found, err := strategy.FindTarget(ctx, src, existingTargets, prefix, report)
+		if err != nil {
+			return nil, fmt.Errorf("strategy %s failed: %w", strategy.Name(), err)
+		}
+		if found {
+			LogDebugDecision(ctx, "[%s] Found target using strategy: %s", prefix, strategy.Name())
+			return &MatchResult{
+				Target:       target,
+				StrategyName: strategy.Name(),
+				StrategyIdx:  idx,
+			}, nil
 		}
 	}
 	return nil, fmt.Errorf("no target found for source: %s", src.GetTitle())
@@ -129,7 +163,7 @@ func (s ManualMappingStrategy) lookupReverse(anilistID, malID int) (int, bool) {
 type IDStrategy struct{}
 
 func (s IDStrategy) Name() string {
-	return "IDStrategy"
+	return StrategyNameID
 }
 
 func (s IDStrategy) FindTarget(
@@ -149,7 +183,7 @@ func (s IDStrategy) FindTarget(
 type TitleStrategy struct{}
 
 func (s TitleStrategy) Name() string {
-	return "TitleStrategy"
+	return StrategyNameTitle
 }
 
 // shouldRejectMatch checks if a potential match should be rejected
@@ -355,6 +389,13 @@ func (s APISearchStrategy) FindTarget(
 		if existingTarget, exists := existingTargets[tgt.GetTargetID()]; exists {
 			// Check for potential mismatches before accepting API search result
 			if shouldRejectMatch(ctx, src, existingTarget, prefix, report) {
+				continue
+			}
+			// Verify title similarity to avoid matching different entries
+			// (e.g., multiple AniList volumes matching a single MAL umbrella series)
+			if !src.SameTitleWithTarget(existingTarget) {
+				LogDebugDecision(ctx, "[%s] Rejecting API name search match due to title mismatch: %q vs %q",
+					prefix, src.GetTitle(), existingTarget.GetTitle())
 				continue
 			}
 			LogDebugDecision(ctx, "[%s] Found target by API name search in user's list: %s", prefix, tgt.GetTitle())
