@@ -77,16 +77,17 @@ type JikanAPIConfig struct {
 }
 
 type Config struct {
-	OAuth           OAuthConfig           `yaml:"oauth"`
-	Anilist         SiteConfig            `yaml:"anilist"`
-	MyAnimeList     SiteConfig            `yaml:"myanimelist"`
-	TokenFilePath   string                `yaml:"token_file_path"`
-	Watch           WatchConfig           `yaml:"watch"`
-	HTTPTimeout     string                `yaml:"http_timeout"`
-	OfflineDatabase OfflineDatabaseConfig `yaml:"offline_database"`
-	ARMAPI          ARMAPIConfig          `yaml:"arm_api"`
-	HatoAPI         HatoAPIConfig         `yaml:"hato_api"`
-	JikanAPI        JikanAPIConfig        `yaml:"jikan_api"`
+	OAuth            OAuthConfig           `yaml:"oauth"`
+	Anilist          SiteConfig            `yaml:"anilist"`
+	MyAnimeList      SiteConfig            `yaml:"myanimelist"`
+	TokenFilePath    string                `yaml:"token_file_path"`
+	Watch            WatchConfig           `yaml:"watch"`
+	HTTPTimeout      string                `yaml:"http_timeout"`
+	OfflineDatabase  OfflineDatabaseConfig `yaml:"offline_database"`
+	ARMAPI           ARMAPIConfig          `yaml:"arm_api"`
+	HatoAPI          HatoAPIConfig         `yaml:"hato_api"`
+	JikanAPI         JikanAPIConfig        `yaml:"jikan_api"`
+	MappingsFilePath string                `yaml:"mappings_file_path"`
 }
 
 // loadConfigFromEnv loads configuration from environment variables
@@ -140,6 +141,7 @@ func loadConfigFromEnv() (Config, error) {
 			CacheDir:    getEnvOrDefault("JIKAN_API_CACHE_DIR", getDefaultJikanCacheDir()),
 			CacheMaxAge: getEnvOrDefault("JIKAN_API_CACHE_MAX_AGE", "168h"),
 		},
+		MappingsFilePath: getEnvOrDefault("MAPPINGS_FILE_PATH", getDefaultMappingsPath()),
 	}
 	return cfg, nil
 }
@@ -187,6 +189,7 @@ func overrideConfigFromEnv(cfg *Config) {
 	overrideARMAPIFromEnv(&cfg.ARMAPI)
 	overrideHatoAPIFromEnv(&cfg.HatoAPI)
 	overrideJikanAPIFromEnv(&cfg.JikanAPI)
+	overrideStringFromEnv(&cfg.MappingsFilePath, "MAPPINGS_FILE_PATH")
 }
 
 func overrideOAuthFromEnv(oauth *OAuthConfig) {
@@ -383,6 +386,7 @@ func configWithDefaults() Config {
 			CacheDir:    getDefaultJikanCacheDir(),
 			CacheMaxAge: "168h",
 		},
+		MappingsFilePath: getDefaultMappingsPath(),
 	}
 }
 

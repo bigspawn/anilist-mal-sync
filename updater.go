@@ -33,6 +33,7 @@ type Updater struct {
 	Prefix        string
 	Statistics    *Statistics
 	IgnoreTitles  map[string]struct{}
+	IgnoreIDs     map[int]struct{}
 	StrategyChain *StrategyChain
 	Service       MediaService // Replaces callback
 	ForceSync     bool         // Skip matching logic, force sync all
@@ -96,6 +97,20 @@ func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target, repo
 				SkipReason: "in ignore list",
 			})
 			continue
+		}
+
+		if len(u.IgnoreIDs) > 0 {
+			if _, ok := u.IgnoreIDs[src.GetSourceID()]; ok {
+				LogDebug(ctx, "[%s] Ignoring entry by ID: %s (ID: %d)",
+					u.Prefix, src.GetTitle(), src.GetSourceID())
+				u.Statistics.RecordSkip(UpdateResult{
+					Title:      src.GetTitle(),
+					Status:     src.GetStatusString(),
+					Skipped:    true,
+					SkipReason: "in ignore list",
+				})
+				continue
+			}
 		}
 
 		u.updateSourceByTargets(ctx, src, tgtsByID, report)

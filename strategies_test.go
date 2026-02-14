@@ -908,3 +908,181 @@ func TestAPISearchStrategy_FindTarget_IgnoresTypeMismatch(t *testing.T) {
 		t.Error("Expected nil target when not found")
 	}
 }
+
+func TestManualMappingStrategy_Name(t *testing.T) {
+	strategy := ManualMappingStrategy{}
+	if got := strategy.Name(); got != "ManualMappingStrategy" {
+		t.Errorf("Name() = %v, want ManualMappingStrategy", got)
+	}
+}
+
+func TestManualMappingStrategy_NilMappings(t *testing.T) {
+	ctx := context.Background()
+	strategy := ManualMappingStrategy{Mappings: nil}
+
+	source := Anime{IDAnilist: 100, IDMal: 0, TitleEN: "Test"}
+	target, found, err := strategy.FindTarget(ctx, source, map[TargetID]Target{}, "[Test]", nil)
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+	if found {
+		t.Error("Expected not to find target with nil mappings")
+	}
+	if target != nil {
+		t.Error("Expected nil target")
+	}
+}
+
+func TestManualMappingStrategy_FindsAnimeTarget(t *testing.T) {
+	origReverse := reverseDirection
+	defer func() { reverseDirection = origReverse }()
+	falseVal := false
+	reverseDirection = &falseVal
+
+	ctx := context.Background()
+	mappings := &MappingsConfig{
+		ManualMappings: []ManualMapping{
+			{AniListID: 100, MALID: 200},
+		},
+	}
+	strategy := ManualMappingStrategy{Mappings: mappings}
+
+	source := Anime{IDAnilist: 100, IDMal: 0, TitleEN: "Test Anime"}
+	existingTargets := map[TargetID]Target{
+		200: Anime{IDMal: 200, TitleEN: "Test Anime MAL"},
+	}
+
+	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]", nil)
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+	if !found {
+		t.Error("Expected to find target by manual mapping")
+	}
+	if target == nil {
+		t.Error("Expected non-nil target")
+	}
+}
+
+func TestManualMappingStrategy_FindsMangaTarget(t *testing.T) {
+	origReverse := reverseDirection
+	defer func() { reverseDirection = origReverse }()
+	falseVal := false
+	reverseDirection = &falseVal
+
+	ctx := context.Background()
+	mappings := &MappingsConfig{
+		ManualMappings: []ManualMapping{
+			{AniListID: 300, MALID: 400},
+		},
+	}
+	strategy := ManualMappingStrategy{Mappings: mappings}
+
+	source := Manga{IDAnilist: 300, IDMal: 0, TitleEN: "Test Manga"}
+	existingTargets := map[TargetID]Target{
+		400: Manga{IDMal: 400, TitleEN: "Test Manga MAL"},
+	}
+
+	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]", nil)
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+	if !found {
+		t.Error("Expected to find target by manual mapping")
+	}
+	if target == nil {
+		t.Error("Expected non-nil target")
+	}
+}
+
+func TestManualMappingStrategy_NotInUserList(t *testing.T) {
+	origReverse := reverseDirection
+	defer func() { reverseDirection = origReverse }()
+	falseVal := false
+	reverseDirection = &falseVal
+
+	ctx := context.Background()
+	mappings := &MappingsConfig{
+		ManualMappings: []ManualMapping{
+			{AniListID: 100, MALID: 200},
+		},
+	}
+	strategy := ManualMappingStrategy{Mappings: mappings}
+
+	source := Anime{IDAnilist: 100, IDMal: 0, TitleEN: "Test"}
+	existingTargets := map[TargetID]Target{} // empty - target 200 not in user's list
+
+	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]", nil)
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+	if found {
+		t.Error("Expected not to find target when it's not in user's list")
+	}
+	if target != nil {
+		t.Error("Expected nil target")
+	}
+}
+
+func TestManualMappingStrategy_NoMapping(t *testing.T) {
+	origReverse := reverseDirection
+	defer func() { reverseDirection = origReverse }()
+	falseVal := false
+	reverseDirection = &falseVal
+
+	ctx := context.Background()
+	mappings := &MappingsConfig{
+		ManualMappings: []ManualMapping{
+			{AniListID: 100, MALID: 200},
+		},
+	}
+	strategy := ManualMappingStrategy{Mappings: mappings}
+
+	source := Anime{IDAnilist: 999, IDMal: 0, TitleEN: "Other Anime"}
+	existingTargets := map[TargetID]Target{
+		200: Anime{IDMal: 200, TitleEN: "Test Anime MAL"},
+	}
+
+	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]", nil)
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+	if found {
+		t.Error("Expected not to find target for unmapped source")
+	}
+	if target != nil {
+		t.Error("Expected nil target")
+	}
+}
+
+func TestManualMappingStrategy_ReverseSync(t *testing.T) {
+	origReverse := reverseDirection
+	defer func() { reverseDirection = origReverse }()
+	trueVal := true
+	reverseDirection = &trueVal
+
+	ctx := context.Background()
+	mappings := &MappingsConfig{
+		ManualMappings: []ManualMapping{
+			{AniListID: 100, MALID: 200},
+		},
+	}
+	strategy := ManualMappingStrategy{Mappings: mappings}
+
+	// In reverse sync: source has MAL ID, target is AniList
+	source := Anime{IDMal: 200, IDAnilist: 0, TitleEN: "Test Anime"}
+	existingTargets := map[TargetID]Target{
+		100: Anime{IDAnilist: 100, TitleEN: "Test Anime AniList"},
+	}
+
+	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]", nil)
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+	if !found {
+		t.Error("Expected to find target in reverse sync")
+	}
+	if target == nil {
+		t.Error("Expected non-nil target")
+	}
+}

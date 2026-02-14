@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/rl404/verniy"
@@ -21,6 +22,7 @@ type App struct {
 	anilistScoreFormat verniy.ScoreFormat
 	hatoClient         *HatoClient
 	jikanClient        *JikanClient
+	mappings           *MappingsConfig
 
 	animeUpdater        *Updater
 	mangaUpdater        *Updater
@@ -71,10 +73,27 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 	needsAnime := !(*mangaSync) || *allSync
 	offlineStrategy, hatoStrategy, hatoClient, armStrategy, jikanStrategy, jikanClient := loadIDMappingStrategies(ctx, config, needsAnime)
 
-	// Default ignore titles
+	// Load user mappings
+	mappings, err := LoadMappings(config.MappingsFilePath)
+	if err != nil {
+		LogWarn(ctx, "Failed to load mappings: %v (continuing without)", err)
+		mappings = &MappingsConfig{}
+	}
+	manualStrategy := ManualMappingStrategy{Mappings: mappings}
+
+	// Build ignore titles from mappings + hardcoded defaults
 	defaultIgnoreTitles := map[string]struct{}{
 		"scott pilgrim takes off":       {},
 		"bocchi the rock! recap part 2": {},
+	}
+	for _, t := range mappings.Ignore.Titles {
+		defaultIgnoreTitles[strings.ToLower(t)] = struct{}{}
+	}
+
+	// Build ignore IDs from mappings
+	ignoreIDs := make(map[int]struct{}, len(mappings.Ignore.AniListIDs))
+	for _, id := range mappings.Ignore.AniListIDs {
+		ignoreIDs[id] = struct{}{}
 	}
 
 	// Create updaters
@@ -83,9 +102,11 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		Service:      malAnimeService,
 		Statistics:   NewStatistics(),
 		IgnoreTitles: defaultIgnoreTitles,
+		IgnoreIDs:    ignoreIDs,
 		ForceSync:    *forceSync,
 		DryRun:       *dryRun,
 		StrategyChain: NewStrategyChain(
+			manualStrategy,
 			IDStrategy{},
 			offlineStrategy,
 			hatoStrategy,
@@ -100,9 +121,11 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		Service:      malMangaService,
 		Statistics:   NewStatistics(),
 		IgnoreTitles: map[string]struct{}{},
+		IgnoreIDs:    ignoreIDs,
 		ForceSync:    *forceSync,
 		DryRun:       *dryRun,
 		StrategyChain: NewStrategyChain(
+			manualStrategy,
 			IDStrategy{},
 			hatoStrategy,
 			TitleStrategy{},
@@ -116,9 +139,11 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		Service:      anilistAnimeService,
 		Statistics:   NewStatistics(),
 		IgnoreTitles: map[string]struct{}{},
+		IgnoreIDs:    ignoreIDs,
 		ForceSync:    *forceSync,
 		DryRun:       *dryRun,
 		StrategyChain: NewStrategyChain(
+			manualStrategy,
 			IDStrategy{},
 			offlineStrategy,
 			hatoStrategy,
@@ -134,9 +159,11 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		Service:      anilistMangaService,
 		Statistics:   NewStatistics(),
 		IgnoreTitles: map[string]struct{}{},
+		IgnoreIDs:    ignoreIDs,
 		ForceSync:    *forceSync,
 		DryRun:       *dryRun,
 		StrategyChain: NewStrategyChain(
+			manualStrategy,
 			IDStrategy{},
 			hatoStrategy,
 			TitleStrategy{},
@@ -157,6 +184,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		anilistScoreFormat:  scoreFormat,
 		hatoClient:          hatoClient,
 		jikanClient:         jikanClient,
+		mappings:            mappings,
 		animeUpdater:        animeUpdater,
 		mangaUpdater:        mangaUpdater,
 		reverseAnimeUpdater: reverseAnimeUpdater,
