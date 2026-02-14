@@ -174,7 +174,7 @@ func (u *Updater) resolveAllMappings(
 	ctx context.Context, srcs []Source, tgtsByID map[TargetID]Target, report *SyncReport,
 ) ([]resolvedMapping, []Source) {
 	var (
-		resolved  []resolvedMapping
+		resolved  = make([]resolvedMapping, 0, len(srcs))
 		unmapped  []Source
 		statusStr string
 	)
@@ -225,7 +225,7 @@ func (u *Updater) deduplicateMappings(
 		groups[tid] = append(groups[tid], m)
 	}
 
-	var kept []resolvedMapping
+	kept := make([]resolvedMapping, 0, len(mappings))
 	var conflicts []duplicateConflict
 
 	for _, group := range groups {
