@@ -231,6 +231,7 @@ func PrintGlobalSummary(ctx context.Context, stats []*Statistics, report *SyncRe
 	printGlobalUpdates(logger, totals.updatedItems)
 	printGlobalDryRunUpdates(logger, totals.dryRunItems)
 	printGlobalWarnings(logger, report)
+	printGlobalDuplicateConflicts(logger, report)
 	printGlobalErrors(logger, totals.errorItems)
 }
 
@@ -296,6 +297,20 @@ func printGlobalWarnings(logger *Logger, report *SyncReport) {
 	}
 }
 
+func printGlobalDuplicateConflicts(logger *Logger, report *SyncReport) {
+	if report == nil || !report.HasDuplicateConflicts() {
+		return
+	}
+
+	logger.Info("")
+	logger.Warn("Duplicate target conflicts (%d):", len(report.DuplicateConflicts))
+	for _, c := range report.DuplicateConflicts {
+		mediaLabel := capitalizeFirst(c.MediaType)
+		logger.Warn("  %q -> target %q [%s]", c.LoserTitle, c.TargetTitle, mediaLabel)
+		logger.Warn("    Kept: %q via %s", c.WinnerTitle, c.WinnerStrat)
+	}
+}
+
 func printGlobalUpdates(logger *Logger, updatedItems []UpdateResult) {
 	if len(updatedItems) == 0 {
 		return
@@ -348,4 +363,11 @@ func sortedKeys(m map[string]int) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+func capitalizeFirst(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
 }

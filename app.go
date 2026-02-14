@@ -105,6 +105,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		IgnoreIDs:    ignoreIDs,
 		ForceSync:    *forceSync,
 		DryRun:       *dryRun,
+		MediaType:    mediaTypeAnime,
 		StrategyChain: NewStrategyChain(
 			manualStrategy,
 			IDStrategy{},
@@ -124,6 +125,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		IgnoreIDs:    ignoreIDs,
 		ForceSync:    *forceSync,
 		DryRun:       *dryRun,
+		MediaType:    mediaTypeManga,
 		StrategyChain: NewStrategyChain(
 			manualStrategy,
 			IDStrategy{},
@@ -142,6 +144,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		IgnoreIDs:    ignoreIDs,
 		ForceSync:    *forceSync,
 		DryRun:       *dryRun,
+		MediaType:    mediaTypeAnime,
 		StrategyChain: NewStrategyChain(
 			manualStrategy,
 			IDStrategy{},
@@ -162,6 +165,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		IgnoreIDs:    ignoreIDs,
 		ForceSync:    *forceSync,
 		DryRun:       *dryRun,
+		MediaType:    mediaTypeManga,
 		StrategyChain: NewStrategyChain(
 			manualStrategy,
 			IDStrategy{},
@@ -255,17 +259,15 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	// Collect statistics for global summary
-	var stats []*Statistics
+	var updaters []*Updater
 	if *reverseDirection {
-		stats = []*Statistics{
-			a.reverseAnimeUpdater.Statistics,
-			a.reverseMangaUpdater.Statistics,
-		}
+		updaters = []*Updater{a.reverseAnimeUpdater, a.reverseMangaUpdater}
 	} else {
-		stats = []*Statistics{
-			a.animeUpdater.Statistics,
-			a.mangaUpdater.Statistics,
-		}
+		updaters = []*Updater{a.animeUpdater, a.mangaUpdater}
+	}
+	stats := make([]*Statistics, 0, len(updaters))
+	for _, u := range updaters {
+		stats = append(stats, u.Statistics)
 	}
 
 	// Print global summary

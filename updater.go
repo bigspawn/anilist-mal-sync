@@ -38,82 +38,317 @@ type Updater struct {
 	Service       MediaService // Replaces callback
 	ForceSync     bool         // Skip matching logic, force sync all
 	DryRun        bool         // Skip actual updates
+	MediaType     string       // "anime" or "manga" — used for unmapped tracking
+	UnmappedList  []UnmappedEntry
+}
+
+// resolvedMapping holds a source→target mapping with strategy metadata.
+type resolvedMapping struct {
+	src          Source
+	target       Target
+	strategyName string
+	strategyIdx  int
+}
+
+// duplicateConflict records when multiple sources map to the same target.
+type duplicateConflict struct {
+	loserSrc    Source
+	winnerSrc   Source
+	target      Target
+	loserStrat  string
+	winnerStrat string
 }
 
 func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target, report *SyncReport) {
+	tgtsByID := buildTargetMap(tgts)
+	srcs = u.sortSources(srcs)
+	filtered := u.filterSources(ctx, srcs)
+
+	if u.ForceSync {
+		u.processForceSyncSources(ctx, filtered, tgtsByID, report)
+		return
+	}
+
+	// Phase 1: Resolve all source→target mappings
+	resolved, unmapped := u.resolveAllMappings(ctx, filtered, tgtsByID, report)
+
+	// Phase 2: Deduplicate (detect N:1 conflicts)
+	kept, conflicts := u.deduplicateMappings(ctx, resolved)
+
+	// Phase 3: Process
+	u.processResolvedMappings(ctx, kept, report)
+	u.recordConflicts(ctx, conflicts, report)
+	u.recordUnmapped(unmapped)
+}
+
+func buildTargetMap(tgts []Target) map[TargetID]Target {
 	tgtsByID := make(map[TargetID]Target, len(tgts))
 	for _, tgt := range tgts {
 		tgtsByID[tgt.GetTargetID()] = tgt
 	}
+	return tgtsByID
+}
 
-	var statusStr string
-	processedCount := 0
-
+func (u *Updater) sortSources(srcs []Source) []Source {
 	sort.Slice(srcs, func(i, j int) bool {
 		if srcs[i].GetStatusString() != srcs[j].GetStatusString() {
 			return srcs[i].GetStatusString() < srcs[j].GetStatusString()
 		}
 		return srcs[i].GetTitle() < srcs[j].GetTitle()
 	})
+	return srcs
+}
 
+func (u *Updater) filterSources(ctx context.Context, srcs []Source) []Source {
+	filtered := make([]Source, 0, len(srcs))
 	for _, src := range srcs {
-		// Check for context cancellation
-		select {
-		case <-ctx.Done():
-			LogWarn(ctx, "[%s] Context cancelled, stopping sync", u.Prefix)
-			return
-		default:
-		}
-
 		if src.GetStatusString() == "" {
 			LogDebug(ctx, "[%s] Skipping source with empty status: %s", u.Prefix, src.String())
 			continue
 		}
-
-		u.Statistics.IncrementTotal()
-		processedCount++
-
-		// Show status transitions
-		if statusStr != src.GetStatusString() {
-			statusStr = src.GetStatusString()
-			// Shorten prefix for cleaner output
-			shortPrefix := strings.TrimPrefix(u.Prefix, "AniList to MAL ")
-			shortPrefix = strings.TrimPrefix(shortPrefix, "MAL to AniList ")
-			LogStage(ctx, "[%s] Processing %s...", shortPrefix, statusStr)
+		if u.isIgnored(ctx, src) {
+			continue
 		}
+		u.Statistics.IncrementTotal()
+		filtered = append(filtered, src)
+	}
+	return filtered
+}
 
-		// Show progress (overwrites previous line)
-		LogProgress(ctx, processedCount, len(srcs), statusStr, src.GetTitle())
-
-		LogDebug(ctx, "[%s] Processing: %s", u.Prefix, src.String())
-
-		// Check ignore list
-		if _, ok := u.IgnoreTitles[strings.ToLower(src.GetTitle())]; ok {
-			LogDebug(ctx, "[%s] Ignoring entry: %s", u.Prefix, src.GetTitle())
+func (u *Updater) isIgnored(ctx context.Context, src Source) bool {
+	if _, ok := u.IgnoreTitles[strings.ToLower(src.GetTitle())]; ok {
+		LogDebug(ctx, "[%s] Ignoring entry: %s", u.Prefix, src.GetTitle())
+		u.Statistics.RecordSkip(UpdateResult{
+			Title:      src.GetTitle(),
+			Status:     src.GetStatusString(),
+			Skipped:    true,
+			SkipReason: "in ignore list",
+		})
+		return true
+	}
+	if len(u.IgnoreIDs) > 0 {
+		if _, ok := u.IgnoreIDs[src.GetSourceID()]; ok {
+			LogDebug(ctx, "[%s] Ignoring entry by ID: %s (ID: %d)",
+				u.Prefix, src.GetTitle(), src.GetSourceID())
 			u.Statistics.RecordSkip(UpdateResult{
 				Title:      src.GetTitle(),
 				Status:     src.GetStatusString(),
 				Skipped:    true,
 				SkipReason: "in ignore list",
 			})
+			return true
+		}
+	}
+	return false
+}
+
+func (u *Updater) logStatusTransition(ctx context.Context, prev *string, src Source) {
+	if *prev != src.GetStatusString() {
+		*prev = src.GetStatusString()
+		shortPrefix := strings.TrimPrefix(u.Prefix, "AniList to MAL ")
+		shortPrefix = strings.TrimPrefix(shortPrefix, "MAL to AniList ")
+		LogStage(ctx, "[%s] Processing %s...", shortPrefix, *prev)
+	}
+}
+
+func (u *Updater) processForceSyncSources(
+	ctx context.Context, srcs []Source, tgtsByID map[TargetID]Target, report *SyncReport,
+) {
+	var statusStr string
+	for i, src := range srcs {
+		select {
+		case <-ctx.Done():
+			LogWarn(ctx, "[%s] Context cancelled, stopping sync", u.Prefix)
+			return
+		default:
+		}
+		u.logStatusTransition(ctx, &statusStr, src)
+		LogProgress(ctx, i+1, len(srcs), statusStr, src.GetTitle())
+		LogDebug(ctx, "[%s] Processing: %s", u.Prefix, src.String())
+		u.updateSourceByTargets(ctx, src, tgtsByID, report)
+	}
+}
+
+// Phase 1: resolveAllMappings finds target for each source using strategy chain.
+func (u *Updater) resolveAllMappings(
+	ctx context.Context, srcs []Source, tgtsByID map[TargetID]Target, report *SyncReport,
+) ([]resolvedMapping, []Source) {
+	var (
+		resolved  []resolvedMapping
+		unmapped  []Source
+		statusStr string
+	)
+
+	for i, src := range srcs {
+		select {
+		case <-ctx.Done():
+			LogWarn(ctx, "[%s] Context cancelled, stopping sync", u.Prefix)
+			return resolved, unmapped
+		default:
+		}
+
+		u.logStatusTransition(ctx, &statusStr, src)
+		LogProgress(ctx, i+1, len(srcs), statusStr, src.GetTitle())
+		LogDebug(ctx, "[%s] Processing: %s", u.Prefix, src.String())
+
+		match, err := u.StrategyChain.FindTargetWithMeta(ctx, src, tgtsByID, u.Prefix, report)
+		if err != nil {
+			LogDebug(ctx, "[%s] Error finding target: %v", u.Prefix, err)
+			u.Statistics.RecordSkip(UpdateResult{
+				Title:      src.GetTitle(),
+				Status:     src.GetStatusString(),
+				Skipped:    true,
+				SkipReason: "unmapped",
+			})
+			unmapped = append(unmapped, src)
 			continue
 		}
 
-		if len(u.IgnoreIDs) > 0 {
-			if _, ok := u.IgnoreIDs[src.GetSourceID()]; ok {
-				LogDebug(ctx, "[%s] Ignoring entry by ID: %s (ID: %d)",
-					u.Prefix, src.GetTitle(), src.GetSourceID())
-				u.Statistics.RecordSkip(UpdateResult{
-					Title:      src.GetTitle(),
-					Status:     src.GetStatusString(),
-					Skipped:    true,
-					SkipReason: "in ignore list",
-				})
-				continue
-			}
+		resolved = append(resolved, resolvedMapping{
+			src:          src,
+			target:       match.Target,
+			strategyName: match.StrategyName,
+			strategyIdx:  match.StrategyIdx,
+		})
+	}
+
+	return resolved, unmapped
+}
+
+// Phase 2: deduplicateMappings detects N:1 target conflicts and resolves them.
+func (u *Updater) deduplicateMappings(
+	ctx context.Context, mappings []resolvedMapping,
+) ([]resolvedMapping, []duplicateConflict) {
+	groups := make(map[TargetID][]resolvedMapping)
+	for _, m := range mappings {
+		tid := m.target.GetTargetID()
+		groups[tid] = append(groups[tid], m)
+	}
+
+	var kept []resolvedMapping
+	var conflicts []duplicateConflict
+
+	for _, group := range groups {
+		if len(group) == 1 {
+			kept = append(kept, group[0])
+			continue
+		}
+		winner, losers := u.resolveConflictGroup(ctx, group)
+		kept = append(kept, winner)
+		conflicts = append(conflicts, losers...)
+	}
+
+	return kept, conflicts
+}
+
+// resolveConflictGroup picks the best match from a group sharing the same target.
+func (u *Updater) resolveConflictGroup(
+	ctx context.Context, group []resolvedMapping,
+) (resolvedMapping, []duplicateConflict) {
+	// Sort: lowest strategyIdx wins; on tie, SameTitleWithTarget wins
+	sort.SliceStable(group, func(i, j int) bool {
+		if group[i].strategyIdx != group[j].strategyIdx {
+			return group[i].strategyIdx < group[j].strategyIdx
+		}
+		iTitle := group[i].src.SameTitleWithTarget(group[i].target)
+		jTitle := group[j].src.SameTitleWithTarget(group[j].target)
+		return iTitle && !jTitle
+	})
+
+	winner := group[0]
+	LogDebug(ctx, "[%s] Duplicate target %q claimed by %d sources, keeping %q via %s",
+		u.Prefix, winner.target.GetTitle(), len(group), winner.src.GetTitle(), winner.strategyName)
+
+	conflicts := make([]duplicateConflict, 0, len(group)-1)
+	for _, loser := range group[1:] {
+		conflicts = append(conflicts, duplicateConflict{
+			loserSrc:    loser.src,
+			winnerSrc:   winner.src,
+			target:      winner.target,
+			loserStrat:  loser.strategyName,
+			winnerStrat: winner.strategyName,
+		})
+	}
+	return winner, conflicts
+}
+
+// Phase 3: processResolvedMappings checks progress and updates/dry-runs kept mappings.
+func (u *Updater) processResolvedMappings(
+	ctx context.Context, kept []resolvedMapping, _ *SyncReport,
+) {
+	for _, m := range kept {
+		select {
+		case <-ctx.Done():
+			LogWarn(ctx, "[%s] Context cancelled before update", u.Prefix)
+			return
+		default:
 		}
 
-		u.updateSourceByTargets(ctx, src, tgtsByID, report)
+		LogDebug(ctx, "[%s] Target: %s", u.Prefix, m.target.String())
+
+		if m.src.SameProgressWithTarget(m.target) {
+			LogDebug(ctx, "[%s] No changes needed, skipping", u.Prefix)
+			u.Statistics.RecordSkip(UpdateResult{
+				Title:      m.src.GetTitle(),
+				Status:     m.src.GetStatusString(),
+				Skipped:    true,
+				SkipReason: "no changes",
+			})
+			continue
+		}
+
+		LogDebug(ctx, "[%s] Source: %s", u.Prefix, m.src.GetTitle())
+		LogDebug(ctx, "[%s] Target: %s", u.Prefix, m.target.GetTitle())
+		LogDebug(ctx, "[%s] Diff: %s", u.Prefix, m.src.GetStringDiffWithTarget(m.target))
+
+		tgtID := m.target.GetTargetID()
+
+		if u.DryRun {
+			u.Statistics.RecordDryRun(UpdateResult{
+				Title:  m.src.GetTitle(),
+				Status: m.src.GetStatusString(),
+				Detail: "dry run",
+			})
+			continue
+		}
+
+		u.updateTarget(ctx, tgtID, m.src)
+	}
+}
+
+func (u *Updater) recordConflicts(
+	ctx context.Context, conflicts []duplicateConflict, report *SyncReport,
+) {
+	for _, c := range conflicts {
+		reason := fmt.Sprintf("duplicate: same target already matched by %q via %s",
+			c.winnerSrc.GetTitle(), c.winnerStrat)
+		LogDebug(ctx, "[%s] Duplicate conflict: %q lost to %q for target %q",
+			u.Prefix, c.loserSrc.GetTitle(), c.winnerSrc.GetTitle(), c.target.GetTitle())
+
+		u.Statistics.RecordSkip(UpdateResult{
+			Title:      c.loserSrc.GetTitle(),
+			Status:     c.loserSrc.GetStatusString(),
+			Skipped:    true,
+			SkipReason: reason,
+		})
+		u.trackUnmapped(c.loserSrc, reason)
+
+		if report != nil {
+			report.AddDuplicateConflict(
+				c.loserSrc.GetTitle(),
+				c.winnerSrc.GetTitle(),
+				c.target.GetTitle(),
+				c.loserStrat,
+				c.winnerStrat,
+				u.MediaType,
+			)
+		}
+	}
+}
+
+func (u *Updater) recordUnmapped(unmapped []Source) {
+	for _, src := range unmapped {
+		u.trackUnmapped(src, "no matching entry found on target service")
 	}
 }
 
@@ -129,8 +364,9 @@ func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts ma
 				Title:      src.GetTitle(),
 				Status:     src.GetStatusString(),
 				Skipped:    true,
-				SkipReason: "target not found",
+				SkipReason: "unmapped",
 			})
+			u.trackUnmapped(src, "no matching entry found on target service")
 			return
 		}
 
@@ -231,6 +467,23 @@ func generateUpdateDetail(src Source, tgtID TargetID) string {
 		return fmt.Sprintf("(MAL: %d)", malID)
 	}
 	return fmt.Sprintf("(ID: %d)", tgtID)
+}
+
+func (u *Updater) trackUnmapped(src Source, reason string) {
+	entry := UnmappedEntry{
+		Title:     src.GetTitle(),
+		MediaType: u.MediaType,
+		Reason:    reason,
+	}
+	switch v := src.(type) {
+	case Anime:
+		entry.AniListID = v.IDAnilist
+		entry.MALID = v.IDMal
+	case Manga:
+		entry.AniListID = v.IDAnilist
+		entry.MALID = v.IDMal
+	}
+	u.UnmappedList = append(u.UnmappedList, entry)
 }
 
 // DPrintf is deprecated - use LogDebug with context instead
