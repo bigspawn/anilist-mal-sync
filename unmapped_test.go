@@ -23,8 +23,8 @@ func TestUnmappedState_SaveAndLoad(t *testing.T) {
 	now := time.Now().Truncate(time.Second)
 	state := &UnmappedState{
 		Entries: []UnmappedEntry{
-			{AniListID: 100, Title: "Test Manga", MediaType: "manga"},
-			{AniListID: 200, MALID: 300, Title: "Test Anime", MediaType: "anime"},
+			{AniListID: 100, Title: "Test Manga", MediaType: "manga", Direction: SyncDirectionForward},
+			{AniListID: 200, MALID: 300, Title: "Test Anime", MediaType: "anime", Direction: SyncDirectionReverse},
 		},
 		UpdatedAt: now,
 	}
@@ -41,8 +41,10 @@ func TestUnmappedState_SaveAndLoad(t *testing.T) {
 	assert.Equal(t, "Test Manga", loaded.Entries[0].Title)
 	assert.Equal(t, 100, loaded.Entries[0].AniListID)
 	assert.Equal(t, "manga", loaded.Entries[0].MediaType)
+	assert.Equal(t, SyncDirectionForward, loaded.Entries[0].Direction)
 	assert.Equal(t, 200, loaded.Entries[1].AniListID)
 	assert.Equal(t, 300, loaded.Entries[1].MALID)
+	assert.Equal(t, SyncDirectionReverse, loaded.Entries[1].Direction)
 }
 
 func TestLoadUnmappedState_InvalidJSON(t *testing.T) {
