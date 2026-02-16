@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"sort"
 	"strings"
@@ -230,7 +231,9 @@ func PrintGlobalSummary(ctx context.Context, stats []*Statistics, report *SyncRe
 	printGlobalSkipReasons(logger, totals.skipReasons)
 	printGlobalUpdates(logger, totals.updatedItems)
 	printGlobalDryRunUpdates(logger, totals.dryRunItems)
+	printGlobalUnmapped(logger, report)
 	printGlobalWarnings(logger, report)
+	printGlobalDuplicateConflicts(logger, report)
 	printGlobalErrors(logger, totals.errorItems)
 }
 
@@ -280,6 +283,22 @@ func printGlobalSkipReasons(logger *Logger, skipReasons map[string]int) {
 	}
 }
 
+func printGlobalUnmapped(logger *Logger, report *SyncReport) {
+	if report == nil || !report.HasUnmappedItems() {
+		return
+	}
+
+	logger.Info("")
+	logger.Warn("Unmapped entries (%d):", len(report.UnmappedItems))
+	for i, item := range report.UnmappedItems {
+		mediaLabel := capitalizeFirst(item.MediaType)
+		line := formatUnmappedLine(i+1, item, mediaLabel)
+		logger.Warn("%s", line)
+	}
+	logger.Info("")
+	logger.Info("Hint: run 'anilist-mal-sync unmapped --fix' to manage these entries")
+}
+
 func printGlobalWarnings(logger *Logger, report *SyncReport) {
 	if report == nil || !report.HasWarnings() {
 		return
@@ -293,6 +312,20 @@ func printGlobalWarnings(logger *Logger, report *SyncReport) {
 		} else {
 			logger.Warn("  %q - %s", w.Title, w.Reason)
 		}
+	}
+}
+
+func printGlobalDuplicateConflicts(logger *Logger, report *SyncReport) {
+	if report == nil || !report.HasDuplicateConflicts() {
+		return
+	}
+
+	logger.Info("")
+	logger.Warn("Duplicate target conflicts (%d):", len(report.DuplicateConflicts))
+	for _, c := range report.DuplicateConflicts {
+		mediaLabel := capitalizeFirst(c.MediaType)
+		logger.Warn("  %q -> target %q [%s]", c.LoserTitle, c.TargetTitle, mediaLabel)
+		logger.Warn("    Kept: %q via %s", c.WinnerTitle, c.WinnerStrat)
 	}
 }
 
@@ -348,4 +381,27 @@ func sortedKeys(m map[string]int) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+func formatUnmappedLine(num int, item UnmappedEntry, mediaLabel string) string {
+	var base string
+	switch {
+	case item.AniListID > 0:
+		base = fmt.Sprintf("  %d. %q (AniList: %d) [%s]", num, item.Title, item.AniListID, mediaLabel)
+	case item.MALID > 0:
+		base = fmt.Sprintf("  %d. %q (MAL: %d) [%s]", num, item.Title, item.MALID, mediaLabel)
+	default:
+		base = fmt.Sprintf("  %d. %q [%s]", num, item.Title, mediaLabel)
+	}
+	if item.Reason != "" {
+		return base + " - " + item.Reason
+	}
+	return base
+}
+
+func capitalizeFirst(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
 }

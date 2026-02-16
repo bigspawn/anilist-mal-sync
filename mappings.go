@@ -25,8 +25,10 @@ type IgnoreEntry struct {
 // IgnoreConfig holds lists of entries to ignore during sync.
 type IgnoreConfig struct {
 	AniListIDs []int               `yaml:"anilist_ids,omitempty"`
+	MALIDs     []int               `yaml:"mal_ids,omitempty"`
 	Titles     []string            `yaml:"titles,omitempty"`
-	metadata   map[int]IgnoreEntry // unexported, not in YAML
+	metadata   map[int]IgnoreEntry // unexported, not in YAML (AniList IDs)
+	malMeta    map[int]IgnoreEntry // unexported, not in YAML (MAL IDs)
 }
 
 // MappingsConfig holds user-editable mappings and ignore rules.
@@ -134,6 +136,31 @@ func (m *MappingsConfig) AddIgnoreByID(anilistID int, title string, reason strin
 	m.Ignore.metadata[anilistID] = IgnoreEntry{Title: title, Reason: reason}
 }
 
+// IsIgnoredByMALID checks if an entry should be ignored by MAL ID.
+func (m *MappingsConfig) IsIgnoredByMALID(malID int) bool {
+	for _, id := range m.Ignore.MALIDs {
+		if id == malID {
+			return true
+		}
+	}
+	return false
+}
+
+// AddIgnoreByMALID adds a MAL ID to the ignore list with optional metadata.
+func (m *MappingsConfig) AddIgnoreByMALID(malID int, title string, reason string) {
+	for _, id := range m.Ignore.MALIDs {
+		if id == malID {
+			return
+		}
+	}
+	m.Ignore.MALIDs = append(m.Ignore.MALIDs, malID)
+
+	if m.Ignore.malMeta == nil {
+		m.Ignore.malMeta = make(map[int]IgnoreEntry)
+	}
+	m.Ignore.malMeta[malID] = IgnoreEntry{Title: title, Reason: reason}
+}
+
 // AddManualMapping adds a manual mapping if not already present.
 func (m *MappingsConfig) AddManualMapping(anilistID, malID int, comment string) {
 	for i, mapping := range m.ManualMappings {
@@ -156,6 +183,28 @@ func getDefaultMappingsPath() string {
 		return ""
 	}
 	return filepath.Join(configDir, "anilist-mal-sync", "mappings.yaml")
+}
+
+// buildIgnoreIDsNode creates a YAML sequence node for ignore IDs with inline comments.
+func buildIgnoreIDsNode(ids []int, meta map[int]IgnoreEntry) *yaml.Node {
+	seqNode := &yaml.Node{Kind: yaml.SequenceNode}
+	for _, id := range ids {
+		idNode := &yaml.Node{Kind: yaml.ScalarNode, Value: fmt.Sprintf("%d", id)}
+		if meta, ok := meta[id]; ok {
+			var parts []string
+			if meta.Title != "" {
+				parts = append(parts, meta.Title)
+			}
+			if meta.Reason != "" {
+				parts = append(parts, meta.Reason)
+			}
+			if len(parts) > 0 {
+				idNode.LineComment = "# " + strings.Join(parts, " : ")
+			}
+		}
+		seqNode.Content = append(seqNode.Content, idNode)
+	}
+	return seqNode
 }
 
 // MarshalYAML implements custom YAML marshaling with inline comments.
@@ -193,34 +242,22 @@ func (m *MappingsConfig) MarshalYAML() (interface{}, error) { //nolint:unparam /
 		)
 	}
 
-	// Handle ignore.anilist_ids (with comments via LineComment)
-	if len(m.Ignore.AniListIDs) > 0 || len(m.Ignore.Titles) > 0 { //nolint:nestif // Complex YAML structure requires nested blocks
+	// Handle ignore section
+	hasIgnore := len(m.Ignore.AniListIDs) > 0 || len(m.Ignore.MALIDs) > 0 || len(m.Ignore.Titles) > 0
+	if hasIgnore {
 		ignoreNode := &yaml.Node{Kind: yaml.MappingNode}
 
 		if len(m.Ignore.AniListIDs) > 0 {
-			anilistIDsNode := &yaml.Node{Kind: yaml.SequenceNode}
-			for _, id := range m.Ignore.AniListIDs {
-				idNode := &yaml.Node{Kind: yaml.ScalarNode, Value: fmt.Sprintf("%d", id)}
-
-				// Add inline comment if metadata exists
-				if meta, ok := m.Ignore.metadata[id]; ok {
-					var commentParts []string
-					if meta.Title != "" {
-						commentParts = append(commentParts, meta.Title)
-					}
-					if meta.Reason != "" {
-						commentParts = append(commentParts, meta.Reason)
-					}
-					if len(commentParts) > 0 {
-						idNode.LineComment = "# " + strings.Join(commentParts, " : ")
-					}
-				}
-
-				anilistIDsNode.Content = append(anilistIDsNode.Content, idNode)
-			}
 			ignoreNode.Content = append(ignoreNode.Content,
 				&yaml.Node{Kind: yaml.ScalarNode, Value: "anilist_ids"},
-				anilistIDsNode,
+				buildIgnoreIDsNode(m.Ignore.AniListIDs, m.Ignore.metadata),
+			)
+		}
+
+		if len(m.Ignore.MALIDs) > 0 {
+			ignoreNode.Content = append(ignoreNode.Content,
+				&yaml.Node{Kind: yaml.ScalarNode, Value: "mal_ids"},
+				buildIgnoreIDsNode(m.Ignore.MALIDs, m.Ignore.malMeta),
 			)
 		}
 
