@@ -34,29 +34,37 @@ Program to synchronize your AniList and MyAnimeList accounts.
 Download [`docker-compose.example.yaml`](docker-compose.example.yaml) and edit credentials:
 
 ```yaml
-version: "3"
 services:
   sync:
     image: ghcr.io/bigspawn/anilist-mal-sync:latest
     ports:
       - "18080:18080"
     environment:
-      - PUID=1000  # Your UID: id -u
-      - PGID=1000  # Your GID: id -g
+      # User/Group ID for volume permissions (run: id -u / id -g)
+      - PUID=1000
+      - PGID=1000
+      # Required: API credentials
       - ANILIST_CLIENT_ID=your_anilist_client_id
       - ANILIST_CLIENT_SECRET=your_anilist_secret
       - ANILIST_USERNAME=your_anilist_username
       - MAL_CLIENT_ID=your_mal_client_id
       - MAL_CLIENT_SECRET=your_mal_secret
       - MAL_USERNAME=your_mal_username
-      - OFFLINE_DATABASE_ENABLED=true  # Enable offline anime ids DB
-      - HATO_API_ENABLED=true  # Enable Hato API for anime and manga mapping
-      # - HATO_API_URL=https://hato.malupdaterosx.moe
-      # - HATO_API_CACHE_DIR=/home/appuser/.config/anilist-mal-sync/hato-cache
-      # - HATO_API_CACHE_MAX_AGE=720h
-      - ARM_API_ENABLED=true  # Enable ARM API for anime ids DB as a fallback
-      # Optional:
-      # - WATCH_INTERVAL=12h # Enable watch mode (run in period)
+      # Optional: Watch mode interval (e.g., 12h, 1h, 30m)
+      # - WATCH_INTERVAL=12h
+      # Optional: Manual mappings file path
+      # - MAPPINGS_FILE_PATH=/home/appuser/.config/anilist-mal-sync/mappings.yaml
+      # Optional: ID Mapping settings
+      # - OFFLINE_DATABASE_ENABLED=true  # Enable offline DB (default: true)
+      # - HATO_API_ENABLED=true  # Enable Hato API (default: true)
+      # - HATO_API_URL=https://hato.malupdaterosx.moe  # Hato API base URL
+      # - HATO_API_CACHE_DIR=/home/appuser/.config/anilist-mal-sync/hato-cache  # Cache directory
+      # - HATO_API_CACHE_MAX_AGE=720h  # Cache max age (default: 720h / 30 days)
+      # - ARM_API_ENABLED=false  # Enable ARM API (default: false)
+      # - ARM_API_URL=https://arm.haglund.dev  # ARM API base URL
+      # - JIKAN_API_ENABLED=false  # Enable Jikan API for manga ID mapping
+      # - JIKAN_API_CACHE_DIR=/home/appuser/.config/anilist-mal-sync/jikan-cache
+      # - JIKAN_API_CACHE_MAX_AGE=168h
     volumes:
       - tokens:/home/appuser/.config/anilist-mal-sync
     restart: unless-stopped
@@ -167,6 +175,7 @@ token_file_path: ""  # Leave empty for default: ~/.config/anilist-mal-sync/token
 mappings_file_path: ""  # Leave empty for default: ~/.config/anilist-mal-sync/mappings.yaml
 watch:
   interval: "24h"  # Sync interval for watch mode (1h-168h), can be overridden with --interval flag
+http_timeout: "30s"  # HTTP client timeout for API requests (default: 30s)
 offline_database:
   enabled: true
   cache_dir: ""  # Default: ~/.config/anilist-mal-sync/aod-cache
@@ -178,6 +187,7 @@ hato_api:
   enabled: true  # Enable Hato API for ID mapping (default: true)
   base_url: "https://hato.malupdaterosx.moe"  # Hato API base URL
   cache_dir: ""  # Leave empty for default: ~/.config/anilist-mal-sync/hato-cache
+  cache_max_age: "720h"  # Cache max age (default: 720h / 30 days)
 jikan_api:
   enabled: false  # Enable Jikan API for manga ID mapping (default: false)
   cache_dir: ""  # Default: ~/.config/anilist-mal-sync/jikan-cache
@@ -195,9 +205,8 @@ When syncing anime (default or `--all` mode), the following strategies are used 
 3. **Offline Database** (optional, enabled by default) - Local database from [anime-offline-database](https://github.com/manami-project/anime-offline-database)
 4. **Hato API** (optional, enabled by default) - Online API for anime/manga ID mapping
 5. **ARM API** (optional, disabled by default) - Online fallback to [arm-server](https://arm.haglund.dev)
-6. **Jikan API** (optional, disabled by default) - Online API for manga ID mapping via Jikan (unofficial MAL API)
-7. **Title matching** - Match by title similarity
-8. **API search** - Search the target service API
+6. **Title matching** - Match by title similarity
+7. **API search** - Search the target service API
 
 ### Manga ID Mapping
 When syncing manga (`--manga` mode), the following strategies are used:
@@ -205,11 +214,13 @@ When syncing manga (`--manga` mode), the following strategies are used:
 2. **Direct ID lookup** - If the entry already exists in your target list
 3. **Hato API** (optional, enabled by default) - Online API for manga ID mapping
 4. **Title matching** - Match by title similarity
-5. **API search** - Search the target service API
+5. **Jikan API** (optional, disabled by default) - Online API for manga ID mapping via [Jikan](https://jikan.moe/) (unofficial MAL API)
+6. **API search** - Search the target service API
 
 **Note:**
 - The offline database and ARM API are anime-only and automatically disabled when using `--manga` flag (without `--all`) to improve startup performance.
 - Hato API supports both anime and manga and is enabled by default.
+- In reverse sync mode (`--reverse-direction`), an additional **MAL ID lookup** strategy is used before API search to find entries by MAL ID on AniList.
 
 ### Manual Mappings & Ignore Rules
 
@@ -247,10 +258,10 @@ Configuration can be provided entirely via environment variables (recommended fo
 
 **Required:**
 - `ANILIST_CLIENT_ID` - AniList Client ID
-- `ANILIST_CLIENT_SECRET` - AniList Client Secret
+- `ANILIST_CLIENT_SECRET` - AniList Client Secret (also accepts `CLIENT_SECRET_ANILIST`)
 - `ANILIST_USERNAME` - AniList username
 - `MAL_CLIENT_ID` - MyAnimeList Client ID
-- `MAL_CLIENT_SECRET` - MyAnimeList Client Secret
+- `MAL_CLIENT_SECRET` - MyAnimeList Client Secret (also accepts `CLIENT_SECRET_MYANIMELIST`)
 - `MAL_USERNAME` - MyAnimeList username
 
 **Optional:**
