@@ -8,12 +8,19 @@ import (
 	"time"
 )
 
+// Sync direction constants.
+const (
+	SyncDirectionForward = "forward" // AniList → MAL
+	SyncDirectionReverse = "reverse" // MAL → AniList
+)
+
 // UnmappedEntry represents an entry that could not be mapped during sync.
 type UnmappedEntry struct {
 	AniListID int    `json:"anilist_id"`
 	MALID     int    `json:"mal_id,omitempty"`
 	Title     string `json:"title"`
 	MediaType string `json:"media_type"`       // "anime" or "manga"
+	Direction string `json:"direction"`        // "forward" or "reverse"
 	Reason    string `json:"reason,omitempty"` // why it was unmapped
 }
 

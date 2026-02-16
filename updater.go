@@ -470,9 +470,14 @@ func generateUpdateDetail(src Source, tgtID TargetID) string {
 }
 
 func (u *Updater) trackUnmapped(src Source, reason string) {
+	direction := SyncDirectionForward
+	if *reverseDirection {
+		direction = SyncDirectionReverse
+	}
 	entry := UnmappedEntry{
 		Title:     src.GetTitle(),
 		MediaType: u.MediaType,
+		Direction: direction,
 		Reason:    reason,
 	}
 	switch v := src.(type) {

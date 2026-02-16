@@ -17,6 +17,8 @@ services:
       - MAL_USERNAME=your_mal_username
       # Optional: Watch mode interval (e.g., 12h, 1h, 30m)
       # - WATCH_INTERVAL=12h
+      # Optional: Manual mappings file path
+      # - MAPPINGS_FILE_PATH=/home/appuser/.config/anilist-mal-sync/mappings.yaml
       # Optional: ID Mapping settings
       # - OFFLINE_DATABASE_ENABLED=true  # Enable offline DB (default: true)
       # - HATO_API_ENABLED=true  # Enable Hato API (default: true)

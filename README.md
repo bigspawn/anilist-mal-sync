@@ -9,6 +9,9 @@ Program to synchronize your AniList and MyAnimeList accounts.
 - Bidirectional sync between AniList and MyAnimeList (anime and manga)
 - OAuth2 authentication
 - CLI interface
+- Manual ID mappings and ignore rules via `mappings.yaml`
+- Duplicate target detection with automatic conflict resolution
+- Unmapped entries tracking with interactive management (`unmapped` command)
 - Offline ID mapping using anime-offline-database (prevents incorrect season matches)
 - Optional ARM API integration for online ID lookups
 
@@ -99,6 +102,7 @@ Done!
 | `status` | Check authentication status |
 | `sync` | Synchronize anime/manga lists |
 | `watch` | Run sync on interval |
+| `unmapped` | Show and manage unmapped entries from last sync |
 
 **Login/Logout options:**
 | Short | Long | Description |
@@ -129,6 +133,12 @@ Done!
 
 Interval can be set via `--interval` flag or in `config.yaml` under `watch.interval`.
 
+**Unmapped options:**
+| Short | Long | Description |
+|-------|------|-------------|
+| | `--fix` | Interactively fix unmapped entries (ignore or map to MAL ID) |
+| | `--ignore-all` | Add all unmapped entries to ignore list |
+
 For backward compatibility, running `anilist-mal-sync [options]` without a command will execute sync.
 
 ## Configuration
@@ -154,6 +164,7 @@ myanimelist:
   token_url: "https://myanimelist.net/v1/oauth2/token"
   username: "your_username"
 token_file_path: ""  # Leave empty for default: ~/.config/anilist-mal-sync/token.json
+mappings_file_path: ""  # Leave empty for default: ~/.config/anilist-mal-sync/mappings.yaml
 watch:
   interval: "24h"  # Sync interval for watch mode (1h-168h), can be overridden with --interval flag
 offline_database:
@@ -171,7 +182,6 @@ jikan_api:
   enabled: false  # Enable Jikan API for manga ID mapping (default: false)
   cache_dir: ""  # Default: ~/.config/anilist-mal-sync/jikan-cache
   cache_max_age: "168h"  # Cache max age (default: 168h / 7 days)
-  cache_max_age: "720h"  # Cache max age (default: 720h / 30 days)
 ```
 
 ## ID Mapping Strategies
@@ -180,25 +190,56 @@ The tool uses different ID mapping strategies for anime and manga:
 
 ### Anime ID Mapping
 When syncing anime (default or `--all` mode), the following strategies are used in order:
-1. **Direct ID lookup** - If the entry already exists in your target list
-2. **Offline Database** (optional, enabled by default) - Local database from [anime-offline-database](https://github.com/manami-project/anime-offline-database)
-3. **Hato API** (optional, enabled by default) - Online API for anime/manga ID mapping
-4. **ARM API** (optional, disabled by default) - Online fallback to [arm-server](https://arm.haglund.dev)
-5. **Title matching** - Match by title similarity
-3. **Jikan API** (optional, disabled by default) - Online API for manga ID mapping via Jikan (unofficial MAL API)
-4. **Title matching** - Match by title similarity
-5. **API search** - Search the target service API
+1. **Manual Mapping** - User-defined AniList↔MAL mappings from `mappings.yaml`
+2. **Direct ID lookup** - If the entry already exists in your target list
+3. **Offline Database** (optional, enabled by default) - Local database from [anime-offline-database](https://github.com/manami-project/anime-offline-database)
+4. **Hato API** (optional, enabled by default) - Online API for anime/manga ID mapping
+5. **ARM API** (optional, disabled by default) - Online fallback to [arm-server](https://arm.haglund.dev)
+6. **Jikan API** (optional, disabled by default) - Online API for manga ID mapping via Jikan (unofficial MAL API)
+7. **Title matching** - Match by title similarity
+8. **API search** - Search the target service API
 
 ### Manga ID Mapping
 When syncing manga (`--manga` mode), the following strategies are used:
-1. **Direct ID lookup** - If the entry already exists in your target list
-2. **Hato API** (optional, enabled by default) - Online API for manga ID mapping
-3. **Title matching** - Match by title similarity
-4. **API search** - Search the target service API
+1. **Manual Mapping** - User-defined AniList↔MAL mappings from `mappings.yaml`
+2. **Direct ID lookup** - If the entry already exists in your target list
+3. **Hato API** (optional, enabled by default) - Online API for manga ID mapping
+4. **Title matching** - Match by title similarity
+5. **API search** - Search the target service API
 
 **Note:**
 - The offline database and ARM API are anime-only and automatically disabled when using `--manga` flag (without `--all`) to improve startup performance.
 - Hato API supports both anime and manga and is enabled by default.
+
+### Manual Mappings & Ignore Rules
+
+You can define manual ID mappings and ignore rules in a YAML file (`mappings.yaml`):
+
+```yaml
+manual_mappings:
+  - anilist_id: 12345
+    mal_id: 67890
+    comment: "Season 2 mapped manually"
+ignore:
+  anilist_ids:
+    - 99999 # Title Name : reason for ignoring
+  titles:
+    - "Some Title to Ignore"
+```
+
+Default location: `~/.config/anilist-mal-sync/mappings.yaml`
+
+You can also manage ignore rules interactively:
+```bash
+# Show unmapped entries from last sync
+anilist-mal-sync unmapped
+
+# Interactively fix unmapped entries (ignore or map to MAL ID)
+anilist-mal-sync unmapped --fix
+
+# Add all unmapped entries to ignore list
+anilist-mal-sync unmapped --ignore-all
+```
 
 ### Environment variables
 
@@ -218,6 +259,7 @@ Configuration can be provided entirely via environment variables (recommended fo
 - `OAUTH_PORT` - OAuth server port (default: `18080`)
 - `OAUTH_REDIRECT_URI` - OAuth redirect URI (default: `http://localhost:18080/callback`)
 - `TOKEN_FILE_PATH` - Token file path (default: `~/.config/anilist-mal-sync/token.json`)
+- `MAPPINGS_FILE_PATH` - Path to manual mappings YAML file (default: `~/.config/anilist-mal-sync/mappings.yaml`)
 - `PUID` / `PGID` - User/Group ID for Docker volume permissions
 - `OFFLINE_DATABASE_ENABLED` - Enable offline database for anime ID mapping (default: `true`, not used for manga-only sync)
 - `OFFLINE_DATABASE_CACHE_DIR` - Cache directory (default: `~/.config/anilist-mal-sync/aod-cache`)
