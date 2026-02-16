@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/rl404/verniy"
@@ -21,6 +22,7 @@ type App struct {
 	anilistScoreFormat verniy.ScoreFormat
 	hatoClient         *HatoClient
 	jikanClient        *JikanClient
+	mappings           *MappingsConfig
 
 	animeUpdater        *Updater
 	mangaUpdater        *Updater
@@ -71,10 +73,32 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 	needsAnime := !(*mangaSync) || *allSync
 	offlineStrategy, hatoStrategy, hatoClient, armStrategy, jikanStrategy, jikanClient := loadIDMappingStrategies(ctx, config, needsAnime)
 
-	// Default ignore titles
+	// Load user mappings
+	mappings, err := LoadMappings(config.MappingsFilePath)
+	if err != nil {
+		LogWarn(ctx, "Failed to load mappings: %v (continuing without)", err)
+		mappings = &MappingsConfig{}
+	}
+	manualStrategy := ManualMappingStrategy{Mappings: mappings}
+
+	// Build ignore titles from mappings + hardcoded defaults
 	defaultIgnoreTitles := map[string]struct{}{
 		"scott pilgrim takes off":       {},
 		"bocchi the rock! recap part 2": {},
+	}
+	for _, t := range mappings.Ignore.Titles {
+		defaultIgnoreTitles[strings.ToLower(t)] = struct{}{}
+	}
+
+	// Build ignore IDs from mappings: separate maps for forward and reverse updaters
+	ignoreAniListIDs := make(map[int]struct{}, len(mappings.Ignore.AniListIDs))
+	for _, id := range mappings.Ignore.AniListIDs {
+		ignoreAniListIDs[id] = struct{}{}
+	}
+
+	ignoreMALIDs := make(map[int]struct{}, len(mappings.Ignore.MALIDs))
+	for _, id := range mappings.Ignore.MALIDs {
+		ignoreMALIDs[id] = struct{}{}
 	}
 
 	// Create updaters
@@ -83,9 +107,12 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		Service:      malAnimeService,
 		Statistics:   NewStatistics(),
 		IgnoreTitles: defaultIgnoreTitles,
+		IgnoreIDs:    ignoreAniListIDs,
 		ForceSync:    *forceSync,
 		DryRun:       *dryRun,
+		MediaType:    mediaTypeAnime,
 		StrategyChain: NewStrategyChain(
+			manualStrategy,
 			IDStrategy{},
 			offlineStrategy,
 			hatoStrategy,
@@ -100,9 +127,12 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		Service:      malMangaService,
 		Statistics:   NewStatistics(),
 		IgnoreTitles: map[string]struct{}{},
+		IgnoreIDs:    ignoreAniListIDs,
 		ForceSync:    *forceSync,
 		DryRun:       *dryRun,
+		MediaType:    mediaTypeManga,
 		StrategyChain: NewStrategyChain(
+			manualStrategy,
 			IDStrategy{},
 			hatoStrategy,
 			TitleStrategy{},
@@ -116,9 +146,12 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		Service:      anilistAnimeService,
 		Statistics:   NewStatistics(),
 		IgnoreTitles: map[string]struct{}{},
+		IgnoreIDs:    ignoreMALIDs,
 		ForceSync:    *forceSync,
 		DryRun:       *dryRun,
+		MediaType:    mediaTypeAnime,
 		StrategyChain: NewStrategyChain(
+			manualStrategy,
 			IDStrategy{},
 			offlineStrategy,
 			hatoStrategy,
@@ -134,9 +167,12 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		Service:      anilistMangaService,
 		Statistics:   NewStatistics(),
 		IgnoreTitles: map[string]struct{}{},
+		IgnoreIDs:    ignoreMALIDs,
 		ForceSync:    *forceSync,
 		DryRun:       *dryRun,
+		MediaType:    mediaTypeManga,
 		StrategyChain: NewStrategyChain(
+			manualStrategy,
 			IDStrategy{},
 			hatoStrategy,
 			TitleStrategy{},
@@ -157,6 +193,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		anilistScoreFormat:  scoreFormat,
 		hatoClient:          hatoClient,
 		jikanClient:         jikanClient,
+		mappings:            mappings,
 		animeUpdater:        animeUpdater,
 		mangaUpdater:        mangaUpdater,
 		reverseAnimeUpdater: reverseAnimeUpdater,
@@ -227,23 +264,50 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	// Collect statistics for global summary
-	var stats []*Statistics
+	var updaters []*Updater
 	if *reverseDirection {
-		stats = []*Statistics{
-			a.reverseAnimeUpdater.Statistics,
-			a.reverseMangaUpdater.Statistics,
-		}
+		updaters = []*Updater{a.reverseAnimeUpdater, a.reverseMangaUpdater}
 	} else {
-		stats = []*Statistics{
-			a.animeUpdater.Statistics,
-			a.mangaUpdater.Statistics,
-		}
+		updaters = []*Updater{a.animeUpdater, a.mangaUpdater}
 	}
+	stats := make([]*Statistics, 0, len(updaters))
+	for _, u := range updaters {
+		stats = append(stats, u.Statistics)
+	}
+
+	// Collect unmapped entries from all updaters and save state
+	a.saveUnmappedState(ctx, updaters)
 
 	// Print global summary
 	PrintGlobalSummary(ctx, stats, a.syncReport, time.Since(startTime))
 
 	return err
+}
+
+func (a *App) saveUnmappedState(ctx context.Context, updaters []*Updater) {
+	totalUnmapped := 0
+	for _, u := range updaters {
+		totalUnmapped += len(u.UnmappedList)
+	}
+	allUnmapped := make([]UnmappedEntry, 0, totalUnmapped)
+	for _, u := range updaters {
+		allUnmapped = append(allUnmapped, u.UnmappedList...)
+	}
+
+	// Add unmapped to sync report for display
+	a.syncReport.AddUnmappedItems(allUnmapped)
+
+	if len(allUnmapped) == 0 {
+		return
+	}
+
+	state := &UnmappedState{
+		Entries:   allUnmapped,
+		UpdatedAt: time.Now(),
+	}
+	if saveErr := state.Save(""); saveErr != nil {
+		LogWarn(ctx, "Failed to save unmapped state: %v", saveErr)
+	}
 }
 
 func (a *App) runNormalSync(ctx context.Context) error {
