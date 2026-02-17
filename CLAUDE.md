@@ -68,6 +68,7 @@ The codebase uses a **strategy pattern** for matching entries between services:
 | `logger.go` | Leveled logger with color support, context-based logging |
 | `logging.go` | HTTP round-tripper debug logging |
 | `http_retry.go` | Exponential backoff retry logic |
+| `docs/date-sync.md` | Documentation: date synchronization logic and behavior tables |
 
 ### Sync Flow
 
@@ -85,6 +86,8 @@ The codebase uses a **strategy pattern** for matching entries between services:
 
 - **Default**: AniList → MyAnimeList
 - **Reverse** (`--reverse-direction`): MyAnimeList → AniList
+
+Start/end dates are preserved in both directions. See [docs/date-sync.md](docs/date-sync.md) for details.
 
 ## Code Quality Rules
 

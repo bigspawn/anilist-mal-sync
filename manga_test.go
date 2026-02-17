@@ -617,6 +617,190 @@ func TestManga_String(t *testing.T) {
 	}
 }
 
+func TestManga_SameProgressWithTarget_Dates(t *testing.T) {
+	jun1 := timePtr(time.Date(2023, 6, 1, 0, 0, 0, 0, time.UTC))
+	jun15 := timePtr(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC))
+	jul1 := timePtr(time.Date(2023, 7, 1, 0, 0, 0, 0, time.UTC))
+	jul15 := timePtr(time.Date(2023, 7, 15, 0, 0, 0, 0, time.UTC))
+
+	base := Manga{
+		Status:          MangaStatusCompleted,
+		Score:           8,
+		Progress:        50,
+		ProgressVolumes: 5,
+	}
+
+	tests := []struct {
+		name   string
+		source Manga
+		target Target
+		want   bool
+	}{
+		{
+			name: "same everything same dates",
+			source: Manga{
+				Status: base.Status, Score: base.Score, Progress: base.Progress, ProgressVolumes: base.ProgressVolumes,
+				StartedAt: jun1, FinishedAt: jun15,
+			},
+			target: Manga{
+				Status: base.Status, Score: base.Score, Progress: base.Progress, ProgressVolumes: base.ProgressVolumes,
+				StartedAt: jun1, FinishedAt: jun15,
+			},
+			want: true,
+		},
+		{
+			name: "same everything different startedAt",
+			source: Manga{
+				Status: base.Status, Score: base.Score, Progress: base.Progress, ProgressVolumes: base.ProgressVolumes,
+				StartedAt: jun1, FinishedAt: jun15,
+			},
+			target: Manga{
+				Status: base.Status, Score: base.Score, Progress: base.Progress, ProgressVolumes: base.ProgressVolumes,
+				StartedAt: jul1, FinishedAt: jun15,
+			},
+			want: false,
+		},
+		{
+			name: "same everything different finishedAt",
+			source: Manga{
+				Status: base.Status, Score: base.Score, Progress: base.Progress, ProgressVolumes: base.ProgressVolumes,
+				StartedAt: jun1, FinishedAt: jun15,
+			},
+			target: Manga{
+				Status: base.Status, Score: base.Score, Progress: base.Progress, ProgressVolumes: base.ProgressVolumes,
+				StartedAt: jun1, FinishedAt: jul15,
+			},
+			want: false,
+		},
+		{
+			name: "source dates nil target dates set",
+			source: Manga{
+				Status: base.Status, Score: base.Score, Progress: base.Progress, ProgressVolumes: base.ProgressVolumes,
+			},
+			target: Manga{
+				Status: base.Status, Score: base.Score, Progress: base.Progress, ProgressVolumes: base.ProgressVolumes,
+				StartedAt: jun1, FinishedAt: jun15,
+			},
+			want: true,
+		},
+		{
+			name: "source dates set target dates nil",
+			source: Manga{
+				Status: base.Status, Score: base.Score, Progress: base.Progress, ProgressVolumes: base.ProgressVolumes,
+				StartedAt: jun1, FinishedAt: jun15,
+			},
+			target: Manga{
+				Status: base.Status, Score: base.Score, Progress: base.Progress, ProgressVolumes: base.ProgressVolumes,
+			},
+			want: false,
+		},
+		{
+			name: "both dates nil",
+			source: Manga{
+				Status: base.Status, Score: base.Score, Progress: base.Progress, ProgressVolumes: base.ProgressVolumes,
+			},
+			target: Manga{
+				Status: base.Status, Score: base.Score, Progress: base.Progress, ProgressVolumes: base.ProgressVolumes,
+			},
+			want: true,
+		},
+		{
+			name: "non-completed different finishedAt ignored",
+			source: Manga{
+				Status: MangaStatusPlanToRead, Score: 0, Progress: 0, ProgressVolumes: 0,
+				FinishedAt: jun15,
+			},
+			target: Manga{
+				Status: MangaStatusPlanToRead, Score: 0, Progress: 0, ProgressVolumes: 0,
+			},
+			want: true,
+		},
+		{
+			name: "reading different finishedAt ignored",
+			source: Manga{
+				Status: MangaStatusReading, Score: 8, Progress: 10, ProgressVolumes: 2,
+				FinishedAt: jun15,
+			},
+			target: Manga{
+				Status: MangaStatusReading, Score: 8, Progress: 10, ProgressVolumes: 2,
+				FinishedAt: jul15,
+			},
+			want: true,
+		},
+		{
+			name: "completed different finishedAt triggers update",
+			source: Manga{
+				Status: MangaStatusCompleted, Score: 8, Progress: 50, ProgressVolumes: 5,
+				FinishedAt: jun15,
+			},
+			target: Manga{
+				Status: MangaStatusCompleted, Score: 8, Progress: 50, ProgressVolumes: 5,
+				FinishedAt: jul15,
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.source.SameProgressWithTarget(tt.target)
+			if got != tt.want {
+				t.Errorf("SameProgressWithTarget() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestManga_GetStringDiffWithTarget_Dates(t *testing.T) {
+	jun1 := timePtr(time.Date(2023, 6, 1, 0, 0, 0, 0, time.UTC))
+	jul1 := timePtr(time.Date(2023, 7, 1, 0, 0, 0, 0, time.UTC))
+
+	tests := []struct {
+		name       string
+		source     Manga
+		target     Target
+		wantField  string
+		shouldShow bool
+	}{
+		{
+			name: "dates differ shows StartedAt in diff",
+			source: Manga{
+				Status: MangaStatusCompleted, Score: 8, Progress: 50, ProgressVolumes: 5,
+				StartedAt: jun1,
+			},
+			target: Manga{
+				Status: MangaStatusCompleted, Score: 8, Progress: 50, ProgressVolumes: 5,
+				StartedAt: jul1,
+			},
+			wantField:  "StartedAt",
+			shouldShow: true,
+		},
+		{
+			name: "dates same does not show StartedAt in diff",
+			source: Manga{
+				Status: MangaStatusCompleted, Score: 8, Progress: 50, ProgressVolumes: 5,
+				StartedAt: jun1,
+			},
+			target: Manga{
+				Status: MangaStatusCompleted, Score: 8, Progress: 50, ProgressVolumes: 5,
+				StartedAt: jun1,
+			},
+			wantField:  "StartedAt",
+			shouldShow: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.source.GetStringDiffWithTarget(tt.target)
+			contains := strings.Contains(got, tt.wantField)
+			if contains != tt.shouldShow {
+				t.Errorf("GetStringDiffWithTarget() = %q, wantField %q shouldShow=%v", got, tt.wantField, tt.shouldShow)
+			}
+		})
+	}
+}
+
 func TestManga_GetUpdateOptions(t *testing.T) {
 	date1 := time.Date(2024, 12, 18, 0, 0, 0, 0, time.UTC)
 	date2 := time.Date(2024, 12, 19, 0, 0, 0, 0, time.UTC)

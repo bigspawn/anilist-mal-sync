@@ -6,6 +6,120 @@ import (
 	"time"
 )
 
+func TestTimeToFuzzyDateInput(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    *time.Time
+		expected map[string]int
+	}{
+		{
+			name:     "nil time returns nil",
+			input:    nil,
+			expected: nil,
+		},
+		{
+			name:     "valid date",
+			input:    timePtr(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC)),
+			expected: map[string]int{"year": 2023, "month": 6, "day": 15},
+		},
+		{
+			name:     "new year edge",
+			input:    timePtr(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)),
+			expected: map[string]int{"year": 2024, "month": 1, "day": 1},
+		},
+		{
+			name:     "end of year",
+			input:    timePtr(time.Date(2023, 12, 31, 0, 0, 0, 0, time.UTC)),
+			expected: map[string]int{"year": 2023, "month": 12, "day": 31},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := timeToFuzzyDateInput(tt.input)
+			if tt.expected == nil {
+				if got != nil {
+					t.Errorf("timeToFuzzyDateInput() = %v, want nil", got)
+				}
+				return
+			}
+			if got == nil {
+				t.Fatalf("timeToFuzzyDateInput() = nil, want %v", tt.expected)
+			}
+			if got["year"] != tt.expected["year"] || got["month"] != tt.expected["month"] || got["day"] != tt.expected["day"] {
+				t.Errorf("timeToFuzzyDateInput() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestSameDates(t *testing.T) {
+	tests := []struct {
+		name   string
+		a      *time.Time
+		b      *time.Time
+		expect bool
+	}{
+		{
+			name:   "both nil",
+			a:      nil,
+			b:      nil,
+			expect: true,
+		},
+		{
+			name:   "source nil target set",
+			a:      nil,
+			b:      timePtr(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC)),
+			expect: true,
+		},
+		{
+			name:   "source set target nil",
+			a:      timePtr(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC)),
+			b:      nil,
+			expect: false,
+		},
+		{
+			name:   "same date",
+			a:      timePtr(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC)),
+			b:      timePtr(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC)),
+			expect: true,
+		},
+		{
+			name:   "different year",
+			a:      timePtr(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC)),
+			b:      timePtr(time.Date(2024, 6, 15, 0, 0, 0, 0, time.UTC)),
+			expect: false,
+		},
+		{
+			name:   "different month",
+			a:      timePtr(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC)),
+			b:      timePtr(time.Date(2023, 7, 15, 0, 0, 0, 0, time.UTC)),
+			expect: false,
+		},
+		{
+			name:   "different day",
+			a:      timePtr(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC)),
+			b:      timePtr(time.Date(2023, 6, 16, 0, 0, 0, 0, time.UTC)),
+			expect: false,
+		},
+		{
+			name:   "same date different time of day",
+			a:      timePtr(time.Date(2023, 6, 15, 10, 0, 0, 0, time.UTC)),
+			b:      timePtr(time.Date(2023, 6, 15, 20, 0, 0, 0, time.UTC)),
+			expect: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := sameDates(tt.a, tt.b)
+			if got != tt.expect {
+				t.Errorf("sameDates() = %v, want %v", got, tt.expect)
+			}
+		})
+	}
+}
+
 func TestAnime_SameTypeWithTarget(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -926,6 +1040,225 @@ func TestAnime_String(t *testing.T) {
 			// Check that it contains expected format
 			if !strings.Contains(got, "Anime{") || !strings.Contains(got, "}") {
 				t.Errorf("String() has unexpected format: %s", got)
+			}
+		})
+	}
+}
+
+func TestAnime_SameProgressWithTarget_Dates(t *testing.T) {
+	jun1 := timePtr(time.Date(2023, 6, 1, 0, 0, 0, 0, time.UTC))
+	jun15 := timePtr(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC))
+	jul1 := timePtr(time.Date(2023, 7, 1, 0, 0, 0, 0, time.UTC))
+	jul15 := timePtr(time.Date(2023, 7, 15, 0, 0, 0, 0, time.UTC))
+
+	base := Anime{
+		Status:   StatusCompleted,
+		Score:    8,
+		Progress: 12,
+	}
+
+	tests := []struct {
+		name   string
+		source Anime
+		target Target
+		want   bool
+	}{
+		{
+			name: "same everything same dates",
+			source: Anime{
+				Status: base.Status, Score: base.Score, Progress: base.Progress,
+				StartedAt: jun1, FinishedAt: jun15,
+			},
+			target: Anime{
+				Status: base.Status, Score: base.Score, Progress: base.Progress,
+				StartedAt: jun1, FinishedAt: jun15,
+			},
+			want: true,
+		},
+		{
+			name: "same everything different startedAt",
+			source: Anime{
+				Status: base.Status, Score: base.Score, Progress: base.Progress,
+				StartedAt: jun1, FinishedAt: jun15,
+			},
+			target: Anime{
+				Status: base.Status, Score: base.Score, Progress: base.Progress,
+				StartedAt: jul1, FinishedAt: jun15,
+			},
+			want: false,
+		},
+		{
+			name: "same everything different finishedAt",
+			source: Anime{
+				Status: base.Status, Score: base.Score, Progress: base.Progress,
+				StartedAt: jun1, FinishedAt: jun15,
+			},
+			target: Anime{
+				Status: base.Status, Score: base.Score, Progress: base.Progress,
+				StartedAt: jun1, FinishedAt: jul15,
+			},
+			want: false,
+		},
+		{
+			name: "source dates nil target dates set",
+			source: Anime{
+				Status: base.Status, Score: base.Score, Progress: base.Progress,
+			},
+			target: Anime{
+				Status: base.Status, Score: base.Score, Progress: base.Progress,
+				StartedAt: jun1, FinishedAt: jun15,
+			},
+			want: true,
+		},
+		{
+			name: "source dates set target dates nil",
+			source: Anime{
+				Status: base.Status, Score: base.Score, Progress: base.Progress,
+				StartedAt: jun1, FinishedAt: jun15,
+			},
+			target: Anime{
+				Status: base.Status, Score: base.Score, Progress: base.Progress,
+			},
+			want: false,
+		},
+		{
+			name: "both dates nil",
+			source: Anime{
+				Status: base.Status, Score: base.Score, Progress: base.Progress,
+			},
+			target: Anime{
+				Status: base.Status, Score: base.Score, Progress: base.Progress,
+			},
+			want: true,
+		},
+		{
+			name: "different status dates irrelevant",
+			source: Anime{
+				Status: StatusWatching, Score: base.Score, Progress: base.Progress,
+				StartedAt: jun1, FinishedAt: jun15,
+			},
+			target: Anime{
+				Status: StatusCompleted, Score: base.Score, Progress: base.Progress,
+				StartedAt: jun1, FinishedAt: jun15,
+			},
+			want: false,
+		},
+		{
+			name: "non-completed different finishedAt ignored",
+			source: Anime{
+				Status: StatusPlanToWatch, Score: 0, Progress: 0,
+				FinishedAt: jun15,
+			},
+			target: Anime{
+				Status: StatusPlanToWatch, Score: 0, Progress: 0,
+			},
+			want: true,
+		},
+		{
+			name: "plan_to_watch with finishedAt set on source only",
+			source: Anime{
+				Status: StatusPlanToWatch, Score: 0, Progress: 0,
+				StartedAt: jun1, FinishedAt: jun15,
+			},
+			target: Anime{
+				Status: StatusPlanToWatch, Score: 0, Progress: 0,
+				StartedAt: jun1,
+			},
+			want: true,
+		},
+		{
+			name: "watching different finishedAt ignored",
+			source: Anime{
+				Status: StatusWatching, Score: 8, Progress: 5,
+				FinishedAt: jun15,
+			},
+			target: Anime{
+				Status: StatusWatching, Score: 8, Progress: 5,
+				FinishedAt: jul15,
+			},
+			want: true,
+		},
+		{
+			name: "completed different finishedAt triggers update",
+			source: Anime{
+				Status: StatusCompleted, Score: 8, Progress: 12,
+				FinishedAt: jun15,
+			},
+			target: Anime{
+				Status: StatusCompleted, Score: 8, Progress: 12,
+				FinishedAt: jul15,
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.source.SameProgressWithTarget(tt.target)
+			if got != tt.want {
+				t.Errorf("SameProgressWithTarget() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAnime_GetStringDiffWithTarget_Dates(t *testing.T) {
+	jun1 := timePtr(time.Date(2023, 6, 1, 0, 0, 0, 0, time.UTC))
+	jul1 := timePtr(time.Date(2023, 7, 1, 0, 0, 0, 0, time.UTC))
+
+	tests := []struct {
+		name       string
+		source     Anime
+		target     Target
+		wantField  string
+		shouldShow bool
+	}{
+		{
+			name: "dates differ shows StartedAt in diff",
+			source: Anime{
+				Status: StatusCompleted, Score: 8, Progress: 12,
+				StartedAt: jun1,
+			},
+			target: Anime{
+				Status: StatusCompleted, Score: 8, Progress: 12,
+				StartedAt: jul1,
+			},
+			wantField:  "StartedAt",
+			shouldShow: true,
+		},
+		{
+			name: "dates same does not show StartedAt in diff",
+			source: Anime{
+				Status: StatusCompleted, Score: 8, Progress: 12,
+				StartedAt: jun1,
+			},
+			target: Anime{
+				Status: StatusCompleted, Score: 8, Progress: 12,
+				StartedAt: jun1,
+			},
+			wantField:  "StartedAt",
+			shouldShow: false,
+		},
+		{
+			name: "source date nil target date set does not show",
+			source: Anime{
+				Status: StatusCompleted, Score: 8, Progress: 12,
+			},
+			target: Anime{
+				Status: StatusCompleted, Score: 8, Progress: 12,
+				StartedAt: jun1,
+			},
+			wantField:  "StartedAt",
+			shouldShow: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.source.GetStringDiffWithTarget(tt.target)
+			contains := strings.Contains(got, tt.wantField)
+			if contains != tt.shouldShow {
+				t.Errorf("GetStringDiffWithTarget() = %q, wantField %q shouldShow=%v", got, tt.wantField, tt.shouldShow)
 			}
 		})
 	}

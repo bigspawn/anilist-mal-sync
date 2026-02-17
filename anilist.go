@@ -155,15 +155,42 @@ type SaveMediaListEntry struct {
 	} `json:"data"`
 }
 
-// UpdateAnimeEntry updates an anime entry in AniList using GraphQL mutation
+// UpdateAnimeEntry updates an anime entry in AniList using GraphQL mutation.
+//
+// Date handling:
+//
+//	startedAt   | completedAt | Mutation behavior
+//	------------|-------------|------------------------------------------
+//	nil         | nil         | dates omitted, AniList keeps existing dates
+//	set         | nil         | only startedAt sent, completedAt unchanged
+//	nil         | set         | only completedAt sent, startedAt unchanged
+//	set         | set         | both dates sent and updated on AniList
+//
+// Note: nil dates are omitted (not sent as null) to avoid clearing
+// manually-set dates on AniList.
 func (c *AnilistClient) UpdateAnimeEntry(
-	ctx context.Context, mediaID int, status string, progress int, score int, _ string,
+	ctx context.Context, mediaID int, status string, progress int, score int,
+	startedAt *time.Time, completedAt *time.Time,
 ) error {
 	ctx, cancel := withTimeout(ctx, c.httpTimeout)
 	defer cancel()
 	mutation := `
-		mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $score: Float) {
-			SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, score: $score) {
+		mutation (
+			$mediaId: Int,
+			$status: MediaListStatus,
+			$progress: Int,
+			$score: Float,
+			$startedAt: FuzzyDateInput,
+			$completedAt: FuzzyDateInput
+		) {
+			SaveMediaListEntry(
+				mediaId: $mediaId,
+				status: $status,
+				progress: $progress,
+				score: $score,
+				startedAt: $startedAt,
+				completedAt: $completedAt
+			) {
 				id
 				status
 				progress
@@ -177,6 +204,13 @@ func (c *AnilistClient) UpdateAnimeEntry(
 		"status":   status,
 		"progress": progress,
 		"score":    float64(score),
+	}
+
+	if fd := timeToFuzzyDateInput(startedAt); fd != nil {
+		variables["startedAt"] = fd
+	}
+	if fd := timeToFuzzyDateInput(completedAt); fd != nil {
+		variables["completedAt"] = fd
 	}
 
 	requestBody := map[string]interface{}{
@@ -195,13 +229,18 @@ func (c *AnilistClient) UpdateAnimeEntry(
 	}
 
 	if code != 200 {
-		return fmt.Errorf("AniList API returned status code %d: %s", code, string(responseBody))
+		return fmt.Errorf(
+			"AniList API returned status code %d: %s",
+			code, string(responseBody),
+		)
 	}
 
 	// Check for GraphQL errors first
 	var graphqlResp GraphQLResponse
 	if err := json.Unmarshal(responseBody, &graphqlResp); err != nil {
-		return fmt.Errorf("failed to unmarshal GraphQL response: %w", err)
+		return fmt.Errorf(
+			"failed to unmarshal GraphQL response: %w", err,
+		)
 	}
 
 	if len(graphqlResp.Errors) > 0 {
@@ -216,7 +255,9 @@ func (c *AnilistClient) UpdateAnimeEntry(
 	return nil
 }
 
-// UpdateMangaEntry updates a manga entry in AniList using GraphQL mutation
+// UpdateMangaEntry updates a manga entry in AniList using GraphQL mutation.
+//
+// Date handling follows the same rules as UpdateAnimeEntry — see its doc comment.
 func (c *AnilistClient) UpdateMangaEntry(
 	ctx context.Context,
 	mediaID int,
@@ -224,13 +265,30 @@ func (c *AnilistClient) UpdateMangaEntry(
 	progress int,
 	progressVolumes int,
 	score int,
-	_ string,
+	startedAt *time.Time,
+	completedAt *time.Time,
 ) error {
 	ctx, cancel := withTimeout(ctx, c.httpTimeout)
 	defer cancel()
 	mutation := `
-		mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $progressVolumes: Int, $score: Float) {
-			SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, progressVolumes: $progressVolumes, score: $score) {
+		mutation (
+			$mediaId: Int,
+			$status: MediaListStatus,
+			$progress: Int,
+			$progressVolumes: Int,
+			$score: Float,
+			$startedAt: FuzzyDateInput,
+			$completedAt: FuzzyDateInput
+		) {
+			SaveMediaListEntry(
+				mediaId: $mediaId,
+				status: $status,
+				progress: $progress,
+				progressVolumes: $progressVolumes,
+				score: $score,
+				startedAt: $startedAt,
+				completedAt: $completedAt
+			) {
 				id
 				status
 				progress
@@ -246,6 +304,13 @@ func (c *AnilistClient) UpdateMangaEntry(
 		"progress":        progress,
 		"progressVolumes": progressVolumes,
 		"score":           float64(score),
+	}
+
+	if fd := timeToFuzzyDateInput(startedAt); fd != nil {
+		variables["startedAt"] = fd
+	}
+	if fd := timeToFuzzyDateInput(completedAt); fd != nil {
+		variables["completedAt"] = fd
 	}
 
 	requestBody := map[string]interface{}{
@@ -427,6 +492,25 @@ func (c *AnilistClient) GetMangaByMALID(ctx context.Context, malID int) (*verniy
 		return nil, fmt.Errorf("no manga found with MAL ID %d", malID)
 	}
 	return &page.Media[0], nil
+}
+
+// timeToFuzzyDateInput converts a *time.Time to an AniList FuzzyDateInput map.
+//
+// Behavior:
+//
+//	Input   | Output
+//	--------|----------------------------------
+//	nil     | nil (date omitted from mutation)
+//	set     | map[year, month, day]
+func timeToFuzzyDateInput(t *time.Time) map[string]int {
+	if t == nil {
+		return nil
+	}
+	return map[string]int{
+		"year":  t.Year(),
+		"month": int(t.Month()),
+		"day":   t.Day(),
+	}
 }
 
 // GetUserScoreFormat retrieves the user's score format preference from AniList

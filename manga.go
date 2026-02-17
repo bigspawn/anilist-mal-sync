@@ -118,6 +118,8 @@ func (m Manga) GetStringDiffWithTarget(t Target) string {
 		"Score", m.Score, b.Score,
 		"Progress", m.Progress, b.Progress,
 		"ProgressVolumes", m.ProgressVolumes, b.ProgressVolumes,
+		"StartedAt", m.StartedAt, b.StartedAt,
+		"FinishedAt", m.FinishedAt, b.FinishedAt,
 	)
 }
 
@@ -137,6 +139,16 @@ func (m Manga) SameProgressWithTarget(t Target) bool {
 		return false
 	}
 	if m.ProgressVolumes != b.ProgressVolumes {
+		return false
+	}
+	if !sameDates(m.StartedAt, b.StartedAt) {
+		return false
+	}
+	// Compare FinishedAt only when status is COMPLETED.
+	// Non-completed entries may have stale FinishedAt on AniList
+	// that MAL ignores — comparing them would cause infinite
+	// update loops since MAL never accepts the date.
+	if m.Status == MangaStatusCompleted && !sameDates(m.FinishedAt, b.FinishedAt) {
 		return false
 	}
 
