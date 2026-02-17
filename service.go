@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/rl404/verniy"
 )
@@ -147,19 +148,27 @@ func (s *AniListAnimeService) GetByMALID(ctx context.Context, malID int, _ strin
 	return ani, nil
 }
 
-func (s *AniListAnimeService) Update(ctx context.Context, id TargetID, src Source, prefix string) error {
+func (s *AniListAnimeService) Update(ctx context.Context, id TargetID, src Source, _ string) error {
 	a, ok := src.(Anime)
 	if !ok {
 		return fmt.Errorf("source is not an anime")
 	}
 	anilistScore := denormalizeScoreForAniList(a.Score, s.scoreFormat)
+
+	var completedAt *time.Time
+	if a.Status == StatusCompleted {
+		completedAt = a.FinishedAt
+	}
+
 	if err := s.client.UpdateAnimeEntry(
 		ctx,
 		int(id),
 		a.Status.GetAnilistStatus(),
 		a.Progress,
 		anilistScore,
-		prefix); err != nil {
+		a.StartedAt,
+		completedAt,
+	); err != nil {
 		return fmt.Errorf("error updating anilist anime: %w", err)
 	}
 	return nil
@@ -208,12 +217,18 @@ func (s *AniListMangaService) GetByMALID(ctx context.Context, malID int, _ strin
 	return manga, nil
 }
 
-func (s *AniListMangaService) Update(ctx context.Context, id TargetID, src Source, prefix string) error {
+func (s *AniListMangaService) Update(ctx context.Context, id TargetID, src Source, _ string) error {
 	m, ok := src.(Manga)
 	if !ok {
 		return fmt.Errorf("source is not a manga")
 	}
 	anilistScore := denormalizeMangaScoreForAniList(m.Score, s.scoreFormat)
+
+	var completedAt *time.Time
+	if m.Status == MangaStatusCompleted {
+		completedAt = m.FinishedAt
+	}
+
 	if err := s.client.UpdateMangaEntry(
 		ctx,
 		int(id),
@@ -221,7 +236,9 @@ func (s *AniListMangaService) Update(ctx context.Context, id TargetID, src Sourc
 		m.Progress,
 		m.ProgressVolumes,
 		anilistScore,
-		prefix); err != nil {
+		m.StartedAt,
+		completedAt,
+	); err != nil {
 		return fmt.Errorf("error updating anilist manga: %w", err)
 	}
 	return nil
