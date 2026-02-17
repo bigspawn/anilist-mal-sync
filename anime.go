@@ -118,6 +118,8 @@ func (a Anime) GetStringDiffWithTarget(t Target) string {
 		"Score", a.Score, b.Score,
 		"Progress", a.Progress, b.Progress,
 		"NumEpisodes", a.NumEpisodes, b.NumEpisodes,
+		"StartedAt", a.StartedAt, b.StartedAt,
+		"FinishedAt", a.FinishedAt, b.FinishedAt,
 		"TitleEN", a.TitleEN, b.TitleEN,
 		"TitleJP", a.TitleJP, b.TitleJP,
 		"TitleRomaji", a.TitleRomaji, b.TitleRomaji,
@@ -134,6 +136,16 @@ func (a Anime) SameProgressWithTarget(t Target) bool {
 		return false
 	}
 	if a.Score != b.Score {
+		return false
+	}
+	if !sameDates(a.StartedAt, b.StartedAt) {
+		return false
+	}
+	// Compare FinishedAt only when status is COMPLETED.
+	// Non-completed entries may have stale FinishedAt on AniList
+	// that MAL ignores — comparing them would cause infinite
+	// update loops since MAL never accepts the date.
+	if a.Status == StatusCompleted && !sameDates(a.FinishedAt, b.FinishedAt) {
 		return false
 	}
 	progress := a.Progress == b.Progress
@@ -607,6 +619,28 @@ func newAnimeFromVerniyMedia(media verniy.Media) (Anime, error) {
 		StartedAt:   nil, // Will be set from MAL source
 		FinishedAt:  nil, // Will be set from MAL source
 	}, nil
+}
+
+// sameDates compares two date pointers at day-level granularity.
+// Used to detect if dates need syncing between source and target.
+//
+// Behavior:
+//
+//	Source (a) | Target (b) | Result | Action
+//	-----------|------------|--------|-----------------------------
+//	nil        | nil        | true   | no dates, nothing to do
+//	nil        | set        | true   | don't clear existing target date
+//	set        | nil        | false  | sync date to target
+//	same       | same       | true   | already in sync
+//	differ     | differ     | false  | update target date
+func sameDates(a, b *time.Time) bool {
+	if a == nil {
+		return true
+	}
+	if b == nil {
+		return false
+	}
+	return a.Year() == b.Year() && a.Month() == b.Month() && a.Day() == b.Day()
 }
 
 func buildDiffString(pairs ...any) string {
