@@ -7,6 +7,7 @@ import (
 )
 
 func TestNormalizeScoreForMAL(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		score       float64
@@ -68,6 +69,7 @@ func TestNormalizeScoreForMAL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := normalizeScoreForMAL(tt.score, tt.format)
 			if result != tt.expected {
 				t.Errorf("normalizeScoreForMAL(%v, %v) = %v; want %v (%s)",
@@ -78,6 +80,7 @@ func TestNormalizeScoreForMAL(t *testing.T) {
 }
 
 func TestDenormalizeScoreForAniList(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		score       int
@@ -136,6 +139,7 @@ func TestDenormalizeScoreForAniList(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := denormalizeScoreForAniList(tt.score, tt.format)
 			if result != tt.expected {
 				t.Errorf("denormalizeScoreForAniList(%v, %v) = %v; want %v (%s)",
@@ -146,6 +150,7 @@ func TestDenormalizeScoreForAniList(t *testing.T) {
 }
 
 func TestNormalizeMangaScoreForMAL(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		score       float64
@@ -207,6 +212,7 @@ func TestNormalizeMangaScoreForMAL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := normalizeMangaScoreForMAL(tt.score, tt.format)
 			if result != tt.expected {
 				t.Errorf("normalizeMangaScoreForMAL(%v, %v) = %v; want %v (%s)",
@@ -217,6 +223,7 @@ func TestNormalizeMangaScoreForMAL(t *testing.T) {
 }
 
 func TestDenormalizeMangaScoreForAniList(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		score       int
@@ -275,6 +282,7 @@ func TestDenormalizeMangaScoreForAniList(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := denormalizeMangaScoreForAniList(tt.score, tt.format)
 			if result != tt.expected {
 				t.Errorf("denormalizeMangaScoreForAniList(%v, %v) = %v; want %v (%s)",
@@ -285,6 +293,7 @@ func TestDenormalizeMangaScoreForAniList(t *testing.T) {
 }
 
 func TestRoundTripNormalizeDenormalize(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name          string
 		originalScore float64
@@ -300,6 +309,7 @@ func TestRoundTripNormalizeDenormalize(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			normalized := normalizeScoreForMAL(tt.originalScore, tt.format)
 			denormalized := denormalizeScoreForAniList(normalized, tt.format)
 
@@ -320,6 +330,7 @@ func TestRoundTripNormalizeDenormalize(t *testing.T) {
 }
 
 func TestRoundTripNormalizeDenormalizeManga(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name          string
 		originalScore float64
@@ -335,6 +346,7 @@ func TestRoundTripNormalizeDenormalizeManga(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			normalized := normalizeMangaScoreForMAL(tt.originalScore, tt.format)
 			denormalized := denormalizeMangaScoreForAniList(normalized, tt.format)
 

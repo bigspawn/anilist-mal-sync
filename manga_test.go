@@ -7,6 +7,7 @@ import (
 )
 
 func TestManga_SameTypeWithTarget(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		source Manga
@@ -204,10 +205,8 @@ func TestManga_GetTargetID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			origReverse := reverseDirection
-			defer func() { reverseDirection = origReverse }()
-
-			reverseDirection = &tt.reverse
+			t.Parallel()
+			defer withReverseDirection(t, tt.reverse)()
 			got := tt.manga.GetTargetID()
 			if got != tt.wantTargetID {
 				t.Errorf("GetTargetID() = %v, want %v", got, tt.wantTargetID)

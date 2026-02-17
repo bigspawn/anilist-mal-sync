@@ -9,8 +9,19 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
+// withReverseDirection sets reverseDirection for test and restores after
+func withReverseDirection(t *testing.T, reverse bool) func() {
+	t.Helper()
+	origReverse := reverseDirection
+	reverseDirection = &reverse
+	return func() {
+		reverseDirection = origReverse
+	}
+}
+
 // TestIDStrategy_FindsExistingTarget tests that IDStrategy finds targets by ID when they exist
 func TestIDStrategy_FindsExistingTarget(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	strategy := IDStrategy{}
 

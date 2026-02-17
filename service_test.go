@@ -125,6 +125,7 @@ func TestAniListAnimeService_ScoreFormat(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			service := NewAniListAnimeService(nil, tt.scoreFormat)
 
 			if service.scoreFormat != tt.scoreFormat {
@@ -147,6 +148,7 @@ func TestAniListMangaService_ScoreFormat(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			service := NewAniListMangaService(nil, tt.scoreFormat)
 
 			if service.scoreFormat != tt.scoreFormat {

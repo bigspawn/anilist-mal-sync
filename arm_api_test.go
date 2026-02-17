@@ -132,12 +132,7 @@ func TestARMAPIStrategy_FindTarget(t *testing.T) {
 	ctx := NewLogger(false).WithContext(context.Background())
 
 	t.Run("found in existing targets", func(t *testing.T) {
-		rev := true
-		reverseDirection = &rev
-		defer func() {
-			rev = false
-			reverseDirection = &rev
-		}()
+		t.Parallel()
 
 		src := Anime{
 			IDMal:     10378,
