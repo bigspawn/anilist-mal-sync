@@ -60,7 +60,6 @@ func TestStatus_GetMalStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			got, err := tt.status.GetMalStatus()
 			if tt.wantError {
 				if err == nil {
@@ -125,7 +124,6 @@ func TestStatus_GetAnilistStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			got := tt.status.GetAnilistStatus()
 			if got != tt.want {
 				t.Errorf("GetAnilistStatus() = %v, want %v", got, tt.want)
@@ -188,7 +186,6 @@ func TestMangaStatus_GetMalStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			got, err := tt.status.GetMalStatus()
 			if tt.wantError {
 				if err == nil {
@@ -253,7 +250,6 @@ func TestMangaStatus_GetAnilistStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			got := tt.status.GetAnilistStatus()
 			if got != tt.want {
 				t.Errorf("GetAnilistStatus() = %v, want %v", got, tt.want)
