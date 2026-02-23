@@ -741,7 +741,6 @@ func TestTokenSource_ContextAware(t *testing.T) {
 // =============================================================================
 
 func TestConcurrentTokenAccess(t *testing.T) {
-	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
@@ -768,7 +767,6 @@ func TestConcurrentTokenAccess(t *testing.T) {
 }
 
 func TestConcurrentStateAccess(t *testing.T) {
-	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
@@ -795,7 +793,6 @@ func TestConcurrentStateAccess(t *testing.T) {
 }
 
 func TestConcurrentTokenAndStateAccess(t *testing.T) {
-	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
