@@ -18,6 +18,8 @@ func withReverseDirection(t *testing.T, reverse bool) func() {
 // TestIDStrategy_FindsExistingTarget tests that IDStrategy finds targets by ID when they exist
 func TestIDStrategy_FindsExistingTarget(t *testing.T) {
 	t.Parallel()
+	defer setReverseDirectionForTest(false)()
+
 	ctx := context.Background()
 	strategy := IDStrategy{}
 
@@ -52,6 +54,8 @@ func TestIDStrategy_FindsExistingTarget(t *testing.T) {
 // TestIDStrategy_NotFoundInUserList tests that IDStrategy returns false when ID not in user's list
 func TestIDStrategy_NotFoundInUserList(t *testing.T) {
 	t.Parallel()
+	defer setReverseDirectionForTest(false)()
+
 	ctx := context.Background()
 	strategy := IDStrategy{}
 
@@ -87,6 +91,8 @@ func TestIDStrategy_NotFoundInUserList(t *testing.T) {
 // matches entries with different MAL IDs, causing repeated updates
 func TestTitleStrategy_ShouldRejectMismatchedMALIDs(t *testing.T) {
 	t.Parallel()
+	defer setReverseDirectionForTest(false)()
+
 	ctx := context.Background()
 	strategy := TitleStrategy{}
 
@@ -194,6 +200,8 @@ func TestTitleStrategy_ShouldRejectMismatchedMALIDs(t *testing.T) {
 // should reject matches when episode counts differ significantly
 func TestTitleStrategy_ShouldRejectLargeEpisodeCountDifference(t *testing.T) {
 	t.Parallel()
+	defer setReverseDirectionForTest(false)()
+
 	ctx := context.Background()
 	strategy := TitleStrategy{}
 

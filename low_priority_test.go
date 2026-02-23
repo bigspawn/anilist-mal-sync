@@ -133,8 +133,6 @@ func TestCreateDirIfNotExists_ExistingDir(t *testing.T) {
 // ============================================
 
 func TestGetEnvOrDefault(t *testing.T) {
-	t.Parallel()
-
 	// Set a test env var
 	t.Setenv("TEST_VAR", "test_value")
 
