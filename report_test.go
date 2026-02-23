@@ -7,6 +7,7 @@ import (
 )
 
 func TestNewSyncReport(t *testing.T) {
+	t.Parallel()
 	report := NewSyncReport()
 
 	if report.Warnings == nil {
@@ -18,6 +19,7 @@ func TestNewSyncReport(t *testing.T) {
 }
 
 func TestSyncReport_AddWarning(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		title     string
@@ -65,6 +67,7 @@ func TestSyncReport_AddWarning(t *testing.T) {
 }
 
 func TestSyncReport_AddMultipleWarnings(t *testing.T) {
+	t.Parallel()
 	report := NewSyncReport()
 
 	report.AddWarning("Anime 1", "reason 1", "detail 1", "Anime")
@@ -79,6 +82,7 @@ func TestSyncReport_AddMultipleWarnings(t *testing.T) {
 }
 
 func TestSyncReport_HasWarnings(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		setup    func(*SyncReport)
@@ -118,6 +122,7 @@ func TestSyncReport_HasWarnings(t *testing.T) {
 }
 
 func TestSyncReport_WarningsPreserveOrder(t *testing.T) {
+	t.Parallel()
 	report := NewSyncReport()
 
 	// Add warnings in specific order
@@ -132,6 +137,7 @@ func TestSyncReport_WarningsPreserveOrder(t *testing.T) {
 }
 
 func TestSyncReport_WarningStruct(t *testing.T) {
+	t.Parallel()
 	report := NewSyncReport()
 	report.AddWarning("Test Title", "Test Reason", "Test Detail", "Test Media")
 

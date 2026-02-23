@@ -10,6 +10,7 @@ import (
 )
 
 func TestUpdater_Update(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name          string
 		sources       []Source
@@ -214,6 +215,7 @@ func TestUpdater_Update(t *testing.T) {
 }
 
 func TestUpdater_updateTarget(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name         string
 		src          Source
@@ -290,6 +292,7 @@ func TestUpdater_updateTarget(t *testing.T) {
 }
 
 func TestUpdater_updateSourceByTargets(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name         string
 		src          Source
@@ -395,6 +398,7 @@ func TestUpdater_updateSourceByTargets(t *testing.T) {
 }
 
 func TestUpdater_DryRunRecordsInDryRunItems(t *testing.T) {
+	t.Parallel()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -471,6 +475,7 @@ func TestDeduplicateMappings_NoDuplicates(t *testing.T) {
 }
 
 func TestDeduplicateMappings_KeepsHigherPriority(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	updater := &Updater{
@@ -523,6 +528,7 @@ func TestDeduplicateMappings_KeepsHigherPriority(t *testing.T) {
 }
 
 func TestDeduplicateMappings_SamePriority_TitleTiebreaker(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	updater := &Updater{
@@ -564,6 +570,7 @@ func TestDeduplicateMappings_SamePriority_TitleTiebreaker(t *testing.T) {
 }
 
 func TestUpdate_DuplicateTargetDetection(t *testing.T) {
+	t.Parallel()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 

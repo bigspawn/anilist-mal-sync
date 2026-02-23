@@ -17,6 +17,7 @@ func withReverseDirection(t *testing.T, reverse bool) func() {
 
 // TestIDStrategy_FindsExistingTarget tests that IDStrategy finds targets by ID when they exist
 func TestIDStrategy_FindsExistingTarget(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	strategy := IDStrategy{}
 
@@ -50,6 +51,7 @@ func TestIDStrategy_FindsExistingTarget(t *testing.T) {
 
 // TestIDStrategy_NotFoundInUserList tests that IDStrategy returns false when ID not in user's list
 func TestIDStrategy_NotFoundInUserList(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	strategy := IDStrategy{}
 
@@ -84,6 +86,7 @@ func TestIDStrategy_NotFoundInUserList(t *testing.T) {
 // TestTitleStrategy_ShouldRejectMismatchedMALIDs tests the bug where TitleStrategy
 // matches entries with different MAL IDs, causing repeated updates
 func TestTitleStrategy_ShouldRejectMismatchedMALIDs(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	strategy := TitleStrategy{}
 
@@ -190,6 +193,7 @@ func TestTitleStrategy_ShouldRejectMismatchedMALIDs(t *testing.T) {
 // TestTitleStrategy_ShouldRejectLargeEpisodeCountDifference tests that TitleStrategy
 // should reject matches when episode counts differ significantly
 func TestTitleStrategy_ShouldRejectLargeEpisodeCountDifference(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	strategy := TitleStrategy{}
 
@@ -291,6 +295,7 @@ func TestTitleStrategy_ShouldRejectLargeEpisodeCountDifference(t *testing.T) {
 
 // TestStrategyChain_Integration tests the full strategy chain behavior
 func TestStrategyChain_Integration(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	// Real-world scenario: DanMachi OVA not in user's MAL list
@@ -633,6 +638,7 @@ func TestManga_GetSourceID(t *testing.T) {
 
 // TestStrategy_Name tests the Name() method for all strategies
 func TestIDStrategy_Name(t *testing.T) {
+	t.Parallel()
 	strategy := IDStrategy{}
 	if got := strategy.Name(); got != StrategyNameID {
 		t.Errorf("Name() = %v, want %v", got, StrategyNameID)
@@ -640,6 +646,7 @@ func TestIDStrategy_Name(t *testing.T) {
 }
 
 func TestTitleStrategy_Name(t *testing.T) {
+	t.Parallel()
 	strategy := TitleStrategy{}
 	if got := strategy.Name(); got != StrategyNameTitle {
 		t.Errorf("Name() = %v, want %v", got, StrategyNameTitle)
@@ -647,6 +654,7 @@ func TestTitleStrategy_Name(t *testing.T) {
 }
 
 func TestMALIDStrategy_Name(t *testing.T) {
+	t.Parallel()
 	strategy := MALIDStrategy{}
 	if got := strategy.Name(); got != "MALIDStrategy" {
 		t.Errorf("Name() = %v, want %v", got, "MALIDStrategy")
@@ -654,6 +662,7 @@ func TestMALIDStrategy_Name(t *testing.T) {
 }
 
 func TestAPISearchStrategy_Name(t *testing.T) {
+	t.Parallel()
 	strategy := APISearchStrategy{}
 	if got := strategy.Name(); got != "APISearchStrategy" {
 		t.Errorf("Name() = %v, want %v", got, "APISearchStrategy")
@@ -661,6 +670,7 @@ func TestAPISearchStrategy_Name(t *testing.T) {
 }
 
 func TestStrategyChain_Name(t *testing.T) {
+	t.Parallel()
 	chain := NewStrategyChain(IDStrategy{}, TitleStrategy{})
 	// StrategyChain doesn't have a Name() method, but we can test it contains strategies
 	if len(chain.strategies) != 2 {
@@ -670,6 +680,7 @@ func TestStrategyChain_Name(t *testing.T) {
 
 // TestAPISearchStrategy_FindTarget tests the APISearchStrategy
 func TestAPISearchStrategy_FindTarget(t *testing.T) {
+	t.Parallel()
 	defer setReverseDirectionForTest(false)()
 
 	tests := []struct {
@@ -814,6 +825,7 @@ func TestAPISearchStrategy_FindTarget(t *testing.T) {
 }
 
 func TestAPISearchStrategy_FindTarget_SameTypeMatch(t *testing.T) {
+	t.Parallel()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -856,6 +868,7 @@ func TestAPISearchStrategy_FindTarget_SameTypeMatch(t *testing.T) {
 }
 
 func TestAPISearchStrategy_FindTarget_IgnoresTypeMismatch(t *testing.T) {
+	t.Parallel()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -897,6 +910,7 @@ func TestAPISearchStrategy_FindTarget_IgnoresTypeMismatch(t *testing.T) {
 }
 
 func TestManualMappingStrategy_Name(t *testing.T) {
+	t.Parallel()
 	strategy := ManualMappingStrategy{}
 	if got := strategy.Name(); got != "ManualMappingStrategy" {
 		t.Errorf("Name() = %v, want ManualMappingStrategy", got)
@@ -904,6 +918,7 @@ func TestManualMappingStrategy_Name(t *testing.T) {
 }
 
 func TestManualMappingStrategy_NilMappings(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	strategy := ManualMappingStrategy{Mappings: nil}
 
@@ -1032,6 +1047,7 @@ func TestManualMappingStrategy_NoMapping(t *testing.T) {
 
 // TestFindTargetWithMeta_ReturnsMetadata tests that FindTargetWithMeta returns strategy name and index
 func TestFindTargetWithMeta_ReturnsMetadata(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	source := Anime{
@@ -1116,6 +1132,7 @@ func TestFindTargetWithMeta_FirstStrategy(t *testing.T) {
 
 // TestFindTargetWithMeta_NoMatch tests that FindTargetWithMeta returns error when no strategy matches
 func TestFindTargetWithMeta_NoMatch(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	source := Anime{

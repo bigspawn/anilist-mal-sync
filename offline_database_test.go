@@ -80,6 +80,7 @@ func TestExtractIDFromURL(t *testing.T) {
 }
 
 func TestBuildFromEntries(t *testing.T) {
+	t.Parallel()
 	entries := []AODEntry{
 		{
 			Sources: []string{
@@ -147,6 +148,7 @@ func TestBuildFromEntries(t *testing.T) {
 }
 
 func TestOfflineDatabaseGetters_NilValues(t *testing.T) {
+	t.Parallel()
 	db := &OfflineDatabase{
 		malToAniList: make(map[int]int),
 		anilistToMAL: make(map[int]int),
@@ -160,6 +162,7 @@ func TestOfflineDatabaseGetters_NilValues(t *testing.T) {
 }
 
 func TestParseAODFile(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test-db.json")
 
@@ -350,6 +353,7 @@ func TestOfflineDatabaseStrategy_ReverseSync_Issue38(t *testing.T) {
 }
 
 func TestGetCachedVersion(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 
 	t.Run("valid version file", func(t *testing.T) {
@@ -371,6 +375,7 @@ func TestGetCachedVersion(t *testing.T) {
 }
 
 func TestFileExists(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 
 	t.Run("existing file", func(t *testing.T) {
@@ -388,6 +393,7 @@ func TestFileExists(t *testing.T) {
 }
 
 func TestGetDefaultCacheDir(t *testing.T) {
+	t.Parallel()
 	dir := getDefaultCacheDir()
 	assert.NotEmpty(t, dir)
 	assert.True(t, filepath.IsAbs(dir))
