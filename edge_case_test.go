@@ -19,6 +19,7 @@ import (
 // ============================================
 
 func TestOAuth_ConcurrentStateAccess(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping race condition test in short mode")
 	}
@@ -53,6 +54,7 @@ func TestOAuth_ConcurrentStateAccess(t *testing.T) {
 }
 
 func TestSyncReport_ConcurrentWarningAdd(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping race condition test in short mode")
 	}
@@ -82,6 +84,7 @@ func TestSyncReport_ConcurrentWarningAdd(t *testing.T) {
 // ============================================
 
 func TestNormalizeTitle_EdgeCases(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name  string
 		title string
@@ -145,6 +148,7 @@ func TestNormalizeTitle_EdgeCases(t *testing.T) {
 }
 
 func TestExactMatch_EdgeCases(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		t1, t2     string
@@ -199,6 +203,7 @@ func TestExactMatch_EdgeCases(t *testing.T) {
 }
 
 func TestBuildDiffString_EdgeCases(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name  string
 		pairs []any
@@ -246,6 +251,7 @@ func TestBuildDiffString_EdgeCases(t *testing.T) {
 // ============================================
 
 func TestAnime_SameTypeWithTarget_NilAndZero(t *testing.T) {
+	t.Parallel()
 	anime := Anime{
 		IDAnilist: 123,
 		IDMal:     456,
@@ -305,6 +311,7 @@ func TestAnime_SameTypeWithTarget_NilAndZero(t *testing.T) {
 // ============================================
 
 func TestRetryableTransport_ContextCancellation(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name              string
 		cancelImmediately bool
@@ -384,6 +391,7 @@ func TestWithTimeout_DeadlineExceeded(t *testing.T) {
 // ============================================
 
 func TestWatchConfig_GetInterval_EdgeCases(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		interval string
@@ -437,6 +445,7 @@ func TestWatchConfig_GetInterval_EdgeCases(t *testing.T) {
 }
 
 func TestStatus_ErrorCases(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		status  Status
@@ -474,6 +483,7 @@ func TestStatus_ErrorCases(t *testing.T) {
 // ============================================
 
 func TestNormalizeTitle_LongTitle(t *testing.T) {
+	t.Parallel()
 	longTitle := strings.Repeat("Very Long Anime Title ", 100)
 
 	// Should not panic
@@ -490,6 +500,7 @@ func TestNormalizeTitle_LongTitle(t *testing.T) {
 }
 
 func TestLogger_Progress_VeryLongTitle(t *testing.T) {
+	t.Parallel()
 	logger := NewLogger(false)
 	var buf bytes.Buffer
 	logger.SetOutput(&buf)
@@ -511,6 +522,7 @@ func TestLogger_Progress_VeryLongTitle(t *testing.T) {
 }
 
 func TestLogger_Progress_VeryLongTitle_Verbose(t *testing.T) {
+	t.Parallel()
 	logger := NewLogger(true)
 	var buf bytes.Buffer
 	logger.SetOutput(&buf)
