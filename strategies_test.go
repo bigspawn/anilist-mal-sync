@@ -601,6 +601,10 @@ func TestAnime_GetSourceID(t *testing.T) {
 	unlock := lockReverseDirection()
 	defer unlock()
 
+	// Save original value to restore at the end
+	origReverse := reverseDirection
+	defer func() { reverseDirection = origReverse }()
+
 	source := Anime{
 		IDMal:     12345,
 		IDAnilist: 67890,
@@ -624,6 +628,10 @@ func TestAnime_GetSourceID(t *testing.T) {
 func TestManga_GetSourceID(t *testing.T) {
 	unlock := lockReverseDirection()
 	defer unlock()
+
+	// Save original value to restore at the end
+	origReverse := reverseDirection
+	defer func() { reverseDirection = origReverse }()
 
 	source := Manga{
 		IDMal:     11111,
