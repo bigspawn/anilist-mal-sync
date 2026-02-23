@@ -9,7 +9,7 @@ Go CLI application that synchronizes anime/manga lists bidirectionally between A
 ## Build & Development Commands
 
 ```bash
-make install    # Install all dev tools (golangci-lint, gofumpt, goimports, gci, govulncheck, lefthook)
+make install    # Install all dev tools (golangci-lint, gofumpt, goimports, gci, govulncheck)
 make build      # Build binary: go build -o anilist-mal-sync ./cmd/main.go
 make test       # Run all tests: go test ./... -v
 make generate   # Generate mocks using mockgen (run before tests if interfaces change)
@@ -97,11 +97,6 @@ The `.golangci.yml` enforces strict limits to prevent overly complex code:
 - **lll**: 140 characters max line length
 
 Test files are exempt from complexity checks.
-
-### Git Hooks (Lefthook)
-
-Pre-commit runs: gofumpt, goimports, golangci-lint (new issues only), go vet
-Pre-push runs: full golangci-lint, complete test suite
 
 ## Logging
 
