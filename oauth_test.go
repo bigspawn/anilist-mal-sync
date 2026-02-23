@@ -34,6 +34,7 @@ func testSiteConfig() SiteConfig {
 // =============================================================================
 
 func TestNewOAuth_Success(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
@@ -65,6 +66,7 @@ func TestNewOAuth_Success(t *testing.T) {
 }
 
 func TestNewOAuth_RelativePathRejected(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		tokenPath   string
@@ -95,6 +97,7 @@ func TestNewOAuth_RelativePathRejected(t *testing.T) {
 }
 
 func TestNeedInit_NoToken(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
@@ -110,6 +113,7 @@ func TestNeedInit_NoToken(t *testing.T) {
 }
 
 func TestNeedInit_HasToken(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
@@ -136,6 +140,7 @@ func TestNeedInit_HasToken(t *testing.T) {
 }
 
 func TestStateParameterGeneration(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 
 	oauth1, err := NewOAuth(testSiteConfig(), "http://localhost/callback", "test1", []oauth2.AuthCodeOption{}, tmpDir+"/token1.json")
@@ -164,6 +169,7 @@ func TestStateParameterGeneration(t *testing.T) {
 }
 
 func TestGetAuthURL_IncludesState(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
@@ -192,6 +198,7 @@ func TestGetAuthURL_IncludesState(t *testing.T) {
 }
 
 func TestCreateDirIfNotExists(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		setupPath   func(t *testing.T) string
@@ -241,6 +248,7 @@ func TestCreateDirIfNotExists(t *testing.T) {
 // =============================================================================
 
 func TestTokenFileReadWrite(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
@@ -269,6 +277,7 @@ func TestTokenFileReadWrite(t *testing.T) {
 }
 
 func TestMissingTokenFile(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "nonexistent.json")
 
@@ -288,6 +297,7 @@ func TestMissingTokenFile(t *testing.T) {
 }
 
 func TestInvalidTokenFileJSON(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "invalid.json")
 
@@ -303,6 +313,7 @@ func TestInvalidTokenFileJSON(t *testing.T) {
 }
 
 func TestAtomicWritePreventsCorruption(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
@@ -355,6 +366,7 @@ func TestAtomicWritePreventsCorruption(t *testing.T) {
 // =============================================================================
 
 func TestMyAnimeListPKCE_PlainMethod(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		wantMethod  string
@@ -409,6 +421,7 @@ func TestMyAnimeListPKCE_PlainMethod(t *testing.T) {
 }
 
 func TestAnilistPKCE_S256Method(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
@@ -460,6 +473,7 @@ func TestAnilistPKCE_S256Method(t *testing.T) {
 }
 
 func TestGetAuthURL_IncludesPKCEOptions(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
@@ -503,6 +517,7 @@ func TestGetAuthURL_IncludesPKCEOptions(t *testing.T) {
 // =============================================================================
 
 func TestStateValidation_MissingState(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
@@ -550,6 +565,7 @@ func TestStateValidation_MissingState(t *testing.T) {
 }
 
 func TestStateValidation_MismatchedState(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
@@ -596,6 +612,7 @@ func TestStateValidation_MismatchedState(t *testing.T) {
 }
 
 func TestStateValidation_ValidState(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
@@ -649,6 +666,7 @@ func TestStateValidation_ValidState(t *testing.T) {
 // =============================================================================
 
 func TestTokenWithContext_RespectsContext(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
@@ -675,6 +693,7 @@ func TestTokenWithContext_RespectsContext(t *testing.T) {
 }
 
 func TestToken_DeprecatedUsesBackgroundContext(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
@@ -694,6 +713,7 @@ func TestToken_DeprecatedUsesBackgroundContext(t *testing.T) {
 }
 
 func TestTokenSource_ContextAware(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
@@ -721,6 +741,7 @@ func TestTokenSource_ContextAware(t *testing.T) {
 // =============================================================================
 
 func TestConcurrentTokenAccess(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
@@ -747,6 +768,7 @@ func TestConcurrentTokenAccess(t *testing.T) {
 }
 
 func TestConcurrentStateAccess(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
@@ -773,6 +795,7 @@ func TestConcurrentStateAccess(t *testing.T) {
 }
 
 func TestConcurrentTokenAndStateAccess(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
@@ -830,6 +853,7 @@ func setupMockOAuthServer(t *testing.T) (*httptest.Server, *oauth2.Config) {
 }
 
 func TestExchangeToken_WithMockServer(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
@@ -862,6 +886,7 @@ func TestExchangeToken_WithMockServer(t *testing.T) {
 // =============================================================================
 
 func TestOAuth_RoundTrip(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
@@ -899,6 +924,7 @@ func TestOAuth_RoundTrip(t *testing.T) {
 // =============================================================================
 
 func TestIsTokenValid_NoToken(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
@@ -914,6 +940,7 @@ func TestIsTokenValid_NoToken(t *testing.T) {
 }
 
 func TestIsTokenValid_ValidToken(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
@@ -940,6 +967,7 @@ func TestIsTokenValid_ValidToken(t *testing.T) {
 }
 
 func TestIsTokenValid_ExpiredToken(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
@@ -966,6 +994,7 @@ func TestIsTokenValid_ExpiredToken(t *testing.T) {
 }
 
 func TestIsTokenValid_ZeroExpiry(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
@@ -992,6 +1021,7 @@ func TestIsTokenValid_ZeroExpiry(t *testing.T) {
 }
 
 func TestTokenExpiry_NoToken(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
@@ -1008,6 +1038,7 @@ func TestTokenExpiry_NoToken(t *testing.T) {
 }
 
 func TestTokenExpiry_HasToken(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
@@ -1044,6 +1075,7 @@ func TestTokenExpiry_HasToken(t *testing.T) {
 }
 
 func TestDeleteToken_Success(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
@@ -1090,6 +1122,7 @@ func TestDeleteToken_Success(t *testing.T) {
 }
 
 func TestDeleteToken_NoToken(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
@@ -1106,6 +1139,7 @@ func TestDeleteToken_NoToken(t *testing.T) {
 }
 
 func TestInitToken_AlreadyHasToken(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
@@ -1134,6 +1168,7 @@ func TestInitToken_AlreadyHasToken(t *testing.T) {
 }
 
 func TestInitToken_ContextCancelled(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tokenPath := filepath.Join(tmpDir, "token.json")
 
@@ -1162,6 +1197,7 @@ func TestInitToken_ContextCancelled(t *testing.T) {
 // =============================================================================
 
 func TestGetAuthURL_EnvConfigIncludesHost(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name         string
 		siteConfig   SiteConfig
@@ -1235,6 +1271,7 @@ func TestGetAuthURL_EnvConfigIncludesHost(t *testing.T) {
 }
 
 func TestNewOAuth_EnvConfigEndpoints(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name             string
 		siteConfig       SiteConfig

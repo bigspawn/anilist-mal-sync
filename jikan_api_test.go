@@ -66,6 +66,7 @@ func jikanSearchEntry(id int, title, titleEN, titleJP string) map[string]interfa
 }
 
 func TestJikanClient_GetMangaByMALID(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/manga/13" {
 			writeJSON(t, w, jikanMangaResponse(13, "One Piece", "One Piece", "ONE PIECE"))
@@ -89,6 +90,7 @@ func TestJikanClient_GetMangaByMALID(t *testing.T) {
 }
 
 func TestJikanClient_GetMangaByMALID_CacheHit(t *testing.T) {
+	t.Parallel()
 	requestCount := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		requestCount++
@@ -114,6 +116,7 @@ func TestJikanClient_GetMangaByMALID_CacheHit(t *testing.T) {
 }
 
 func TestJikanClient_GetMangaByMALID_NotFound(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
@@ -129,6 +132,7 @@ func TestJikanClient_GetMangaByMALID_NotFound(t *testing.T) {
 }
 
 func TestJikanClient_GetMangaByMALID_NegativeCache(t *testing.T) {
+	t.Parallel()
 	requestCount := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		requestCount++
@@ -152,6 +156,7 @@ func TestJikanClient_GetMangaByMALID_NegativeCache(t *testing.T) {
 }
 
 func TestJikanClient_SearchManga(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		query := r.URL.Query().Get("q")
 		if query == "One Piece" {
@@ -176,6 +181,7 @@ func TestJikanClient_SearchManga(t *testing.T) {
 }
 
 func TestJikanClient_SearchManga_Empty(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(t, w, jikanSearchResponseHelper())
 	}))
@@ -190,6 +196,7 @@ func TestJikanClient_SearchManga_Empty(t *testing.T) {
 }
 
 func TestJikanAPIStrategy_FindTarget_MangaFound(t *testing.T) {
+	t.Parallel()
 	// Seed cache directly to avoid HTTP calls
 	tmpDir := t.TempDir()
 	cache := NewJikanCache(tmpDir, 168*time.Hour)
@@ -232,6 +239,7 @@ func TestJikanAPIStrategy_FindTarget_MangaFound(t *testing.T) {
 }
 
 func TestJikanAPIStrategy_FindTarget_SkipsAnime(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	cache := NewJikanCache(tmpDir, 168*time.Hour)
 	client := &JikanClient{cache: cache}
@@ -253,6 +261,7 @@ func TestJikanAPIStrategy_FindTarget_SkipsAnime(t *testing.T) {
 }
 
 func TestJikanAPIStrategy_NilClient(t *testing.T) {
+	t.Parallel()
 	strategy := JikanAPIStrategy{Client: nil}
 	ctx := NewLogger(false).WithContext(t.Context())
 
@@ -266,6 +275,7 @@ func TestJikanAPIStrategy_NilClient(t *testing.T) {
 }
 
 func TestJikanAPIStrategy_FindTarget_ReverseDirection(t *testing.T) {
+	t.Parallel()
 	// Seed cache with manga data for MAL ID lookup
 	tmpDir := t.TempDir()
 	cache := NewJikanCache(tmpDir, 168*time.Hour)
@@ -311,6 +321,7 @@ func TestJikanAPIStrategy_FindTarget_ReverseDirection(t *testing.T) {
 }
 
 func TestMatchJikanMangaToSource(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		jikan    JikanMangaData
@@ -382,6 +393,7 @@ func TestMatchJikanMangaToSource(t *testing.T) {
 }
 
 func TestFindBestJikanMatch(t *testing.T) {
+	t.Parallel()
 	results := []JikanMangaData{
 		{MalID: 100, Title: "One Piece Film Z", TitleEnglish: "One Piece Film Z", TitleJapanese: ""},
 		{MalID: 13, Title: "One Piece", TitleEnglish: "One Piece", TitleJapanese: "ONE PIECE"},
@@ -392,6 +404,7 @@ func TestFindBestJikanMatch(t *testing.T) {
 }
 
 func TestFindBestJikanMatch_NoMatch(t *testing.T) {
+	t.Parallel()
 	results := []JikanMangaData{
 		{MalID: 100, Title: "Naruto", TitleEnglish: "Naruto", TitleJapanese: "ナルト"},
 	}
@@ -401,6 +414,7 @@ func TestFindBestJikanMatch_NoMatch(t *testing.T) {
 }
 
 func TestSearchTitlesForJikan(t *testing.T) {
+	t.Parallel()
 	titles := searchTitlesForJikan("One Piece", "", "One Piece")
 	// Should deduplicate "One Piece" (romaji == EN after normalization)
 	assert.Len(t, titles, 1)
@@ -412,11 +426,13 @@ func TestSearchTitlesForJikan(t *testing.T) {
 }
 
 func TestSearchTitlesForJikan_Empty(t *testing.T) {
+	t.Parallel()
 	titles := searchTitlesForJikan("", "", "")
 	assert.Empty(t, titles)
 }
 
 func TestJikanClient_GetMangaByMALID_InvalidID(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	cache := NewJikanCache(tmpDir, 168*time.Hour)
 	client := &JikanClient{cache: cache}
@@ -432,6 +448,7 @@ func TestJikanClient_GetMangaByMALID_InvalidID(t *testing.T) {
 }
 
 func TestJikanClient_SearchManga_EmptyQuery(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	cache := NewJikanCache(tmpDir, 168*time.Hour)
 	client := &JikanClient{cache: cache}
@@ -442,6 +459,7 @@ func TestJikanClient_SearchManga_EmptyQuery(t *testing.T) {
 }
 
 func TestJikanClient_ServerError(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))

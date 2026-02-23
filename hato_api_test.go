@@ -10,6 +10,7 @@ import (
 )
 
 func TestHatoClient_GetAniListID_Anime(t *testing.T) {
+	t.Parallel()
 	ctx := t.Context()
 	anilistID := 1
 	malID := 1
@@ -38,6 +39,7 @@ func TestHatoClient_GetAniListID_Anime(t *testing.T) {
 }
 
 func TestHatoClient_CacheHit(t *testing.T) {
+	t.Parallel()
 	ctx := t.Context()
 	tmpDir := t.TempDir()
 	requestCount := 0
@@ -73,6 +75,7 @@ func TestHatoClient_CacheHit(t *testing.T) {
 }
 
 func TestHatoClient_GetAniListID_Manga(t *testing.T) {
+	t.Parallel()
 	ctx := t.Context()
 	anilistID := 87471
 	malID := 92182
@@ -100,6 +103,7 @@ func TestHatoClient_GetAniListID_Manga(t *testing.T) {
 }
 
 func TestHatoClient_GetMALID_Anime(t *testing.T) {
+	t.Parallel()
 	ctx := t.Context()
 	malID := 1
 	anilistID := 1
@@ -126,6 +130,7 @@ func TestHatoClient_GetMALID_Anime(t *testing.T) {
 }
 
 func TestHatoClient_GetMALID_Manga(t *testing.T) {
+	t.Parallel()
 	ctx := t.Context()
 	malID := 92182
 	anilistID := 87471
@@ -152,6 +157,7 @@ func TestHatoClient_GetMALID_Manga(t *testing.T) {
 }
 
 func TestHatoClient_NotFound(t *testing.T) {
+	t.Parallel()
 	ctx := t.Context()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		// Return empty data (null IDs)
@@ -169,6 +175,7 @@ func TestHatoClient_NotFound(t *testing.T) {
 }
 
 func TestHatoClient_404(t *testing.T) {
+	t.Parallel()
 	ctx := t.Context()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
@@ -185,6 +192,7 @@ func TestHatoClient_404(t *testing.T) {
 }
 
 func TestHatoClient_ServerError(t *testing.T) {
+	t.Parallel()
 	ctx := t.Context()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -198,6 +206,7 @@ func TestHatoClient_ServerError(t *testing.T) {
 }
 
 func TestHatoClient_Unreachable(t *testing.T) {
+	t.Parallel()
 	ctx := t.Context()
 	client := NewHatoClient(ctx, "http://127.0.0.1:1", 1*time.Second, "")
 
@@ -206,6 +215,7 @@ func TestHatoClient_Unreachable(t *testing.T) {
 }
 
 func TestHatoClient_NegativeCache(t *testing.T) {
+	t.Parallel()
 	ctx := t.Context()
 	tmpDir := t.TempDir()
 	requestCount := 0
@@ -233,6 +243,7 @@ func TestHatoClient_NegativeCache(t *testing.T) {
 }
 
 func TestHatoAPIStrategy_FindTarget_Anime(t *testing.T) {
+	t.Parallel()
 	ctx := t.Context()
 	anilistID := 1
 	malID := 1
@@ -279,6 +290,7 @@ func TestHatoAPIStrategy_FindTarget_Anime(t *testing.T) {
 }
 
 func TestHatoAPIStrategy_FindTarget_Manga(t *testing.T) {
+	t.Parallel()
 	ctx := t.Context()
 	anilistID := 87471
 	malID := 92182
@@ -325,6 +337,7 @@ func TestHatoAPIStrategy_FindTarget_Manga(t *testing.T) {
 }
 
 func TestHatoAPIStrategy_NilClient(t *testing.T) {
+	t.Parallel()
 	ctx := t.Context()
 	nilStrategy := HatoAPIStrategy{Client: nil}
 	logCtx := NewLogger(false).WithContext(ctx)
@@ -339,6 +352,7 @@ func TestHatoAPIStrategy_NilClient(t *testing.T) {
 }
 
 func TestHatoAPIStrategy_NotInUserList(t *testing.T) {
+	t.Parallel()
 	ctx := t.Context()
 	anilistID := 1
 	malID := 1
@@ -364,18 +378,21 @@ func TestHatoAPIStrategy_NotInUserList(t *testing.T) {
 }
 
 func TestNewHatoClient_DefaultURL(t *testing.T) {
+	t.Parallel()
 	ctx := t.Context()
 	client := NewHatoClient(ctx, "", 5*time.Second, "")
 	assert.Equal(t, defaultHatoBaseURL, client.baseURL)
 }
 
 func TestNewHatoClient_CustomURL(t *testing.T) {
+	t.Parallel()
 	ctx := t.Context()
 	client := NewHatoClient(ctx, "http://localhost:3000", 5*time.Second, "")
 	assert.Equal(t, "http://localhost:3000", client.baseURL)
 }
 
 func TestNewHatoClient_WithCache(t *testing.T) {
+	t.Parallel()
 	ctx := t.Context()
 	tmpDir := t.TempDir()
 	client := NewHatoClient(ctx, "", 5*time.Second, tmpDir)
