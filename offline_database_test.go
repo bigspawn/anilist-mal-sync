@@ -229,12 +229,7 @@ func TestOfflineDatabaseStrategy_FindTarget(t *testing.T) {
 
 	t.Run("found in existing targets", func(t *testing.T) {
 		// Set up reverse direction (MAL -> AniList)
-		rev := true
-		reverseDirection = &rev
-		defer func() {
-			rev = false
-			reverseDirection = &rev
-		}()
+		defer setReverseDirectionForTest(true)()
 
 		src := Anime{
 			IDMal:     10378,
@@ -259,12 +254,7 @@ func TestOfflineDatabaseStrategy_FindTarget(t *testing.T) {
 	})
 
 	t.Run("mapped but not in user's list", func(t *testing.T) {
-		rev := true
-		reverseDirection = &rev
-		defer func() {
-			rev = false
-			reverseDirection = &rev
-		}()
+		defer setReverseDirectionForTest(true)()
 
 		src := Anime{
 			IDMal:     10378,
@@ -328,12 +318,7 @@ func TestOfflineDatabaseStrategy_ReverseSync_Issue38(t *testing.T) {
 	strategy := OfflineDatabaseStrategy{Database: db}
 	ctx := NewLogger(false).WithContext(context.Background())
 
-	rev := true
-	reverseDirection = &rev
-	defer func() {
-		rev = false
-		reverseDirection = &rev
-	}()
+	defer setReverseDirectionForTest(true)()
 
 	// Source from MAL: Shinryaku Ika Musume 2 (MAL ID: 10378)
 	src := Anime{

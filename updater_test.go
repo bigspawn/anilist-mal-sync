@@ -436,6 +436,8 @@ func TestUpdater_DryRunRecordsInDryRunItems(t *testing.T) {
 }
 
 func TestDeduplicateMappings_NoDuplicates(t *testing.T) {
+	defer setReverseDirectionForTest(false)()
+
 	ctx := context.Background()
 
 	updater := &Updater{

@@ -205,7 +205,6 @@ func TestManga_GetTargetID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			defer withReverseDirection(t, tt.reverse)()
 			got := tt.manga.GetTargetID()
 			if got != tt.wantTargetID {

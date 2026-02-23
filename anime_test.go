@@ -344,7 +344,6 @@ func TestAnime_GetUpdateOptions(t *testing.T) {
 }
 
 func TestAnime_GetTargetID(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name         string
 		anime        Anime
@@ -391,7 +390,6 @@ func TestAnime_GetTargetID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			defer withReverseDirection(t, tt.reverse)()
 			got := tt.anime.GetTargetID()
 			if got != tt.wantTargetID {
