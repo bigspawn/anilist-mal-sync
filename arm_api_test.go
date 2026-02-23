@@ -113,6 +113,8 @@ func TestARMClient_Unreachable(t *testing.T) {
 }
 
 func TestARMAPIStrategy_FindTarget(t *testing.T) {
+	t.Parallel()
+
 	anilistID := 10378
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		source := r.URL.Query().Get("source")
@@ -132,8 +134,6 @@ func TestARMAPIStrategy_FindTarget(t *testing.T) {
 	ctx := NewLogger(false).WithContext(context.Background())
 
 	t.Run("found in existing targets", func(t *testing.T) {
-		t.Parallel()
-
 		src := Anime{
 			IDMal:     10378,
 			IDAnilist: 0,

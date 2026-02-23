@@ -71,7 +71,7 @@ dry-run:
 
 # Run tests
 test:
-	go test ./... -v
+	go test ./... -v -race
 
 # Generate mocks using mockgen
 generate:
