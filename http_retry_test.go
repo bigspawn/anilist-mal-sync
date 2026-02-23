@@ -108,7 +108,8 @@ func TestCloneRequest(t *testing.T) {
 // ============================================
 
 func TestRetryableRoundTripper_RetryOn500(t *testing.T) {
-	t.Parallel()
+	// Timing-sensitive test: depends on HTTP request execution speed
+	// Remove t.Parallel() to avoid flaky failures when CPU is overloaded
 	attempts := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		attempts++
@@ -240,7 +241,8 @@ func TestRetryableRoundTripper_NoRetryOn4xx(t *testing.T) {
 }
 
 func TestRetryableRoundTripper_WithBody(t *testing.T) {
-	t.Parallel()
+	// Timing-sensitive test: depends on HTTP request execution speed
+	// Remove t.Parallel() to avoid flaky failures when CPU is overloaded
 	attempts := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		attempts++
@@ -269,7 +271,8 @@ func TestRetryableRoundTripper_WithBody(t *testing.T) {
 }
 
 func TestRetryableRoundTripper_MaxRetriesExhausted(t *testing.T) {
-	t.Parallel()
+	// Timing-sensitive test: depends on HTTP request execution speed
+	// Remove t.Parallel() to avoid flaky failures when CPU is overloaded
 	attempts := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		attempts++

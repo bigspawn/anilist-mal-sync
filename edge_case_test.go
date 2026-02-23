@@ -311,7 +311,8 @@ func TestAnime_SameTypeWithTarget_NilAndZero(t *testing.T) {
 // ============================================
 
 func TestRetryableTransport_ContextCancellation(t *testing.T) {
-	t.Parallel()
+	// Timing-sensitive test: depends on HTTP request execution speed
+	// Remove t.Parallel() to avoid flaky failures when CPU is overloaded
 	tests := []struct {
 		name              string
 		cancelImmediately bool

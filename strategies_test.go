@@ -17,7 +17,7 @@ func withReverseDirection(t *testing.T, reverse bool) func() {
 
 // TestIDStrategy_FindsExistingTarget tests that IDStrategy finds targets by ID when they exist
 func TestIDStrategy_FindsExistingTarget(t *testing.T) {
-	t.Parallel()
+	// Cannot use t.Parallel() due to global reverseDirection variable access
 	defer setReverseDirectionForTest(false)()
 
 	ctx := context.Background()
@@ -53,7 +53,7 @@ func TestIDStrategy_FindsExistingTarget(t *testing.T) {
 
 // TestIDStrategy_NotFoundInUserList tests that IDStrategy returns false when ID not in user's list
 func TestIDStrategy_NotFoundInUserList(t *testing.T) {
-	t.Parallel()
+	// Cannot use t.Parallel() due to global reverseDirection variable access
 	defer setReverseDirectionForTest(false)()
 
 	ctx := context.Background()
@@ -90,7 +90,7 @@ func TestIDStrategy_NotFoundInUserList(t *testing.T) {
 // TestTitleStrategy_ShouldRejectMismatchedMALIDs tests the bug where TitleStrategy
 // matches entries with different MAL IDs, causing repeated updates
 func TestTitleStrategy_ShouldRejectMismatchedMALIDs(t *testing.T) {
-	t.Parallel()
+	// Cannot use t.Parallel() due to global reverseDirection variable access
 	defer setReverseDirectionForTest(false)()
 
 	ctx := context.Background()
@@ -199,7 +199,7 @@ func TestTitleStrategy_ShouldRejectMismatchedMALIDs(t *testing.T) {
 // TestTitleStrategy_ShouldRejectLargeEpisodeCountDifference tests that TitleStrategy
 // should reject matches when episode counts differ significantly
 func TestTitleStrategy_ShouldRejectLargeEpisodeCountDifference(t *testing.T) {
-	t.Parallel()
+	// Cannot use t.Parallel() due to global reverseDirection variable access
 	defer setReverseDirectionForTest(false)()
 
 	ctx := context.Background()
@@ -696,7 +696,7 @@ func TestStrategyChain_Name(t *testing.T) {
 
 // TestAPISearchStrategy_FindTarget tests the APISearchStrategy
 func TestAPISearchStrategy_FindTarget(t *testing.T) {
-	t.Parallel()
+	// Cannot use t.Parallel() due to global reverseDirection variable access
 	defer setReverseDirectionForTest(false)()
 
 	tests := []struct {
