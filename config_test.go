@@ -8,6 +8,7 @@ import (
 )
 
 func TestLoadConfigFromFile_Success(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
 
@@ -60,6 +61,7 @@ myanimelist:
 }
 
 func TestLoadConfigFromFile_NotFound(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "nonexistent.yaml")
 
@@ -75,6 +77,7 @@ func TestLoadConfigFromFile_NotFound(t *testing.T) {
 }
 
 func TestLoadConfigFromFile_InvalidYAML(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "invalid.yaml")
 
@@ -95,6 +98,7 @@ func TestLoadConfigFromFile_InvalidYAML(t *testing.T) {
 }
 
 func TestLoadConfigFromFile_EnvOverride(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
 
@@ -141,6 +145,7 @@ myanimelist:
 }
 
 func TestLoadConfigFromFile_EnvOverride_MAL_USERNAME(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
 
@@ -174,6 +179,7 @@ myanimelist:
 }
 
 func TestLoadConfigFromFile_MissingMALUsername(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
 
@@ -204,6 +210,7 @@ myanimelist:
 }
 
 func TestGetConfigHelp_ReturnsValidString(t *testing.T) {
+	t.Parallel()
 	help := getConfigHelp("config.yaml")
 
 	if help == "" {
@@ -227,6 +234,7 @@ func TestGetConfigHelp_ReturnsValidString(t *testing.T) {
 }
 
 func TestIsConfigNotFoundError_ConfigNotFoundError(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		err  error
@@ -258,6 +266,7 @@ func TestIsConfigNotFoundError_ConfigNotFoundError(t *testing.T) {
 }
 
 func TestLoadConfigFromFile_DefaultTokenPath(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
 
@@ -303,6 +312,7 @@ myanimelist:
 }
 
 func TestLoadConfigFromFile_CustomTokenPath(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
 	customTokenPath := filepath.Join(tmpDir, "custom_tokens.json")
@@ -344,6 +354,7 @@ token_file_path: "` + customTokenPath + `"
 // =============================================================================
 
 func TestWatchConfig_GetInterval(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		interval string
@@ -378,6 +389,7 @@ func TestWatchConfig_GetInterval(t *testing.T) {
 }
 
 func TestWatchConfig_GetInterval_Empty(t *testing.T) {
+	t.Parallel()
 	w := WatchConfig{Interval: ""}
 	got, err := w.GetInterval()
 	if err != nil {
@@ -389,6 +401,7 @@ func TestWatchConfig_GetInterval_Empty(t *testing.T) {
 }
 
 func TestWatchConfig_GetInterval_Invalid(t *testing.T) {
+	t.Parallel()
 	w := WatchConfig{Interval: "not-a-duration"}
 	_, err := w.GetInterval()
 	if err == nil {
@@ -397,6 +410,7 @@ func TestWatchConfig_GetInterval_Invalid(t *testing.T) {
 }
 
 func TestLoadConfigFromEnv_MissingRequiredFields(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name           string
 		setAnilistID   bool
@@ -449,6 +463,7 @@ func TestLoadConfigFromEnv_MissingRequiredFields(t *testing.T) {
 }
 
 func TestGetDefaultTokenPath(t *testing.T) {
+	t.Parallel()
 	path, err := getDefaultTokenPath()
 	if err != nil {
 		t.Fatalf("getDefaultTokenPath() failed: %v", err)
@@ -483,6 +498,7 @@ func TestGetDefaultTokenPath(t *testing.T) {
 }
 
 func TestLoadConfigFromEnv_DefaultTokenPath(t *testing.T) {
+	t.Parallel()
 	// Clear TOKEN_FILE_PATH to test default path
 	t.Setenv("TOKEN_FILE_PATH", "")
 
@@ -515,6 +531,7 @@ func TestLoadConfigFromEnv_DefaultTokenPath(t *testing.T) {
 }
 
 func TestLoadConfigFromEnv_CustomTokenPath(t *testing.T) {
+	t.Parallel()
 	customPath := "/custom/path/tokens.json"
 	t.Setenv("TOKEN_FILE_PATH", customPath)
 
@@ -540,6 +557,7 @@ func TestLoadConfigFromEnv_CustomTokenPath(t *testing.T) {
 // =============================================================================
 
 func TestLoadConfigFromEnv_OAuthURLsHaveDefaults(t *testing.T) {
+	t.Parallel()
 	// Set required env vars
 	t.Setenv("ANILIST_CLIENT_ID", "test_anilist_id")
 	t.Setenv("ANILIST_USERNAME", "test_user")
@@ -579,6 +597,7 @@ func TestLoadConfigFromEnv_OAuthURLsHaveDefaults(t *testing.T) {
 // =============================================================================
 
 func TestLoadConfigFromEnv_MissingAnilistClientID(t *testing.T) {
+	t.Parallel()
 	t.Setenv("ANILIST_CLIENT_ID", "")
 	t.Setenv("ANILIST_USERNAME", "test_user")
 	t.Setenv("MAL_CLIENT_ID", "mal_id")
@@ -596,6 +615,7 @@ func TestLoadConfigFromEnv_MissingAnilistClientID(t *testing.T) {
 }
 
 func TestLoadConfigFromEnv_MissingAnilistUsername(t *testing.T) {
+	t.Parallel()
 	t.Setenv("ANILIST_CLIENT_ID", "test_id")
 	t.Setenv("ANILIST_USERNAME", "")
 	t.Setenv("MAL_CLIENT_ID", "mal_id")
@@ -613,6 +633,7 @@ func TestLoadConfigFromEnv_MissingAnilistUsername(t *testing.T) {
 }
 
 func TestLoadConfigFromEnv_MissingMALClientID(t *testing.T) {
+	t.Parallel()
 	t.Setenv("ANILIST_CLIENT_ID", "test_id")
 	t.Setenv("ANILIST_USERNAME", "test_user")
 	t.Setenv("MAL_CLIENT_ID", "")
@@ -630,6 +651,7 @@ func TestLoadConfigFromEnv_MissingMALClientID(t *testing.T) {
 }
 
 func TestLoadConfigFromEnv_MissingMALUsername(t *testing.T) {
+	t.Parallel()
 	t.Setenv("ANILIST_CLIENT_ID", "test_id")
 	t.Setenv("ANILIST_USERNAME", "test_user")
 	t.Setenv("MAL_CLIENT_ID", "mal_id")
@@ -651,6 +673,7 @@ func TestLoadConfigFromEnv_MissingMALUsername(t *testing.T) {
 // =============================================================================
 
 func TestLoadConfigFromEnv_AllRequiredFieldsMissing(t *testing.T) {
+	t.Parallel()
 	t.Setenv("ANILIST_CLIENT_ID", "")
 	t.Setenv("ANILIST_USERNAME", "")
 	t.Setenv("MAL_CLIENT_ID", "")
@@ -668,6 +691,7 @@ func TestLoadConfigFromEnv_AllRequiredFieldsMissing(t *testing.T) {
 }
 
 func TestLoadConfigFromEnv_ThreeRequiredFieldsMissing(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name           string
 		setAnilistID   bool
@@ -715,6 +739,7 @@ func TestLoadConfigFromEnv_ThreeRequiredFieldsMissing(t *testing.T) {
 }
 
 func TestLoadConfigFromEnv_TwoRequiredFieldsMissing(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name           string
 		setAnilistID   bool
@@ -764,6 +789,7 @@ func TestLoadConfigFromEnv_TwoRequiredFieldsMissing(t *testing.T) {
 }
 
 func TestLoadConfigFromEnv_OneSiteConfigMissing(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name           string
 		setAnilistID   bool
@@ -814,6 +840,7 @@ func TestLoadConfigFromEnv_OneSiteConfigMissing(t *testing.T) {
 // =============================================================================
 
 func TestLoadConfigFromEnv_NoOptionalFields(t *testing.T) {
+	t.Parallel()
 	// Set only required fields
 	t.Setenv("ANILIST_CLIENT_ID", "test_id")
 	t.Setenv("ANILIST_USERNAME", "test_user")
@@ -855,6 +882,7 @@ func TestLoadConfigFromEnv_NoOptionalFields(t *testing.T) {
 }
 
 func TestLoadConfigFromEnv_AllOptionalFieldsSet(t *testing.T) {
+	t.Parallel()
 	// Set required fields
 	t.Setenv("ANILIST_CLIENT_ID", "test_id")
 	t.Setenv("ANILIST_USERNAME", "test_user")
@@ -896,6 +924,7 @@ func TestLoadConfigFromEnv_AllOptionalFieldsSet(t *testing.T) {
 }
 
 func TestLoadConfigFromEnv_AnilistClientSecretOptional(t *testing.T) {
+	t.Parallel()
 	t.Setenv("ANILIST_CLIENT_ID", "test_id")
 	t.Setenv("ANILIST_USERNAME", "test_user")
 	t.Setenv("MAL_CLIENT_ID", "mal_id")
@@ -918,6 +947,7 @@ func TestLoadConfigFromEnv_AnilistClientSecretOptional(t *testing.T) {
 }
 
 func TestLoadConfigFromEnv_MALClientSecretOptional(t *testing.T) {
+	t.Parallel()
 	t.Setenv("ANILIST_CLIENT_ID", "test_id")
 	t.Setenv("ANILIST_USERNAME", "test_user")
 	t.Setenv("MAL_CLIENT_ID", "mal_id")
@@ -944,6 +974,7 @@ func TestLoadConfigFromEnv_MALClientSecretOptional(t *testing.T) {
 // =============================================================================
 
 func TestLoadConfigFromEnv_PORTPrecedence(t *testing.T) {
+	t.Parallel()
 	t.Setenv("ANILIST_CLIENT_ID", "test_id")
 	t.Setenv("ANILIST_USERNAME", "test_user")
 	t.Setenv("MAL_CLIENT_ID", "mal_id")
@@ -965,6 +996,7 @@ func TestLoadConfigFromEnv_PORTPrecedence(t *testing.T) {
 }
 
 func TestLoadConfigFromEnv_OnlyPORTSet(t *testing.T) {
+	t.Parallel()
 	t.Setenv("ANILIST_CLIENT_ID", "test_id")
 	t.Setenv("ANILIST_USERNAME", "test_user")
 	t.Setenv("MAL_CLIENT_ID", "mal_id")
@@ -985,6 +1017,7 @@ func TestLoadConfigFromEnv_OnlyPORTSet(t *testing.T) {
 }
 
 func TestLoadConfigFromEnv_LegacyAnilistSecretFallback(t *testing.T) {
+	t.Parallel()
 	t.Setenv("ANILIST_CLIENT_ID", "test_id")
 	t.Setenv("ANILIST_USERNAME", "test_user")
 	t.Setenv("MAL_CLIENT_ID", "mal_id")
@@ -1007,6 +1040,7 @@ func TestLoadConfigFromEnv_LegacyAnilistSecretFallback(t *testing.T) {
 }
 
 func TestLoadConfigFromEnv_LegacyMALSecretFallback(t *testing.T) {
+	t.Parallel()
 	t.Setenv("ANILIST_CLIENT_ID", "test_id")
 	t.Setenv("ANILIST_USERNAME", "test_user")
 	t.Setenv("MAL_CLIENT_ID", "mal_id")
@@ -1029,6 +1063,7 @@ func TestLoadConfigFromEnv_LegacyMALSecretFallback(t *testing.T) {
 }
 
 func TestLoadConfigFromEnv_NewSecretPrecedence(t *testing.T) {
+	t.Parallel()
 	t.Setenv("ANILIST_CLIENT_ID", "test_id")
 	t.Setenv("ANILIST_USERNAME", "test_user")
 	t.Setenv("MAL_CLIENT_ID", "mal_id")

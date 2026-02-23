@@ -10,6 +10,7 @@ import (
 )
 
 func TestLoadUnmappedState_FileNotFound(t *testing.T) {
+	t.Parallel()
 	state, err := LoadUnmappedState("/tmp/nonexistent-unmapped-test.json")
 	assert.NoError(t, err)
 	assert.NotNil(t, state)
@@ -17,6 +18,7 @@ func TestLoadUnmappedState_FileNotFound(t *testing.T) {
 }
 
 func TestUnmappedState_SaveAndLoad(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "state", "unmapped.json")
 
@@ -48,6 +50,7 @@ func TestUnmappedState_SaveAndLoad(t *testing.T) {
 }
 
 func TestUnmappedEntry_DirectionField(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "unmapped.json")
 
@@ -82,6 +85,7 @@ func TestUnmappedEntry_DirectionField(t *testing.T) {
 }
 
 func TestUnmappedState_MixedDirections(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "unmapped.json")
 
@@ -119,6 +123,7 @@ func TestUnmappedState_MixedDirections(t *testing.T) {
 }
 
 func TestLoadUnmappedState_InvalidJSON(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "unmapped.json")
 	if err := os.WriteFile(path, []byte("not json"), 0o600); err != nil {

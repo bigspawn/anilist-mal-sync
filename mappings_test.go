@@ -10,6 +10,7 @@ import (
 )
 
 func TestLoadMappings_FileNotFound(t *testing.T) {
+	t.Parallel()
 	cfg, err := LoadMappings("/tmp/nonexistent-mappings-test.yaml")
 	assert.NoError(t, err)
 	assert.NotNil(t, cfg)
@@ -18,6 +19,7 @@ func TestLoadMappings_FileNotFound(t *testing.T) {
 }
 
 func TestLoadMappings_ValidFile(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "mappings.yaml")
 
@@ -49,6 +51,7 @@ ignore:
 }
 
 func TestMappingsConfig_SaveAndLoad(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "mappings.yaml")
 
@@ -76,6 +79,7 @@ func TestMappingsConfig_SaveAndLoad(t *testing.T) {
 }
 
 func TestMappingsConfig_GetManualMALID(t *testing.T) {
+	t.Parallel()
 	cfg := &MappingsConfig{
 		ManualMappings: []ManualMapping{
 			{AniListID: 100, MALID: 200},
@@ -96,6 +100,7 @@ func TestMappingsConfig_GetManualMALID(t *testing.T) {
 }
 
 func TestMappingsConfig_GetManualAniListID(t *testing.T) {
+	t.Parallel()
 	cfg := &MappingsConfig{
 		ManualMappings: []ManualMapping{
 			{AniListID: 100, MALID: 200},
@@ -111,6 +116,7 @@ func TestMappingsConfig_GetManualAniListID(t *testing.T) {
 }
 
 func TestMappingsConfig_IsIgnored(t *testing.T) {
+	t.Parallel()
 	cfg := &MappingsConfig{
 		Ignore: IgnoreConfig{
 			AniListIDs: []int{100, 200},
@@ -126,6 +132,7 @@ func TestMappingsConfig_IsIgnored(t *testing.T) {
 }
 
 func TestMappingsConfig_AddIgnoreByID(t *testing.T) {
+	t.Parallel()
 	cfg := &MappingsConfig{}
 
 	cfg.AddIgnoreByID(100, "Test Title", "Test Reason")
@@ -140,6 +147,7 @@ func TestMappingsConfig_AddIgnoreByID(t *testing.T) {
 }
 
 func TestMappingsConfig_IsIgnoredByMALID(t *testing.T) {
+	t.Parallel()
 	cfg := &MappingsConfig{
 		Ignore: IgnoreConfig{
 			MALIDs: []int{500, 600},
@@ -152,6 +160,7 @@ func TestMappingsConfig_IsIgnoredByMALID(t *testing.T) {
 }
 
 func TestMappingsConfig_AddIgnoreByMALID(t *testing.T) {
+	t.Parallel()
 	cfg := &MappingsConfig{}
 
 	cfg.AddIgnoreByMALID(500, "Test Title", "Test Reason")
@@ -171,6 +180,7 @@ func TestMappingsConfig_AddIgnoreByMALID(t *testing.T) {
 }
 
 func TestMappingsConfig_AddManualMapping(t *testing.T) {
+	t.Parallel()
 	cfg := &MappingsConfig{}
 
 	cfg.AddManualMapping(100, 200, "test")
@@ -190,6 +200,7 @@ func TestMappingsConfig_AddManualMapping(t *testing.T) {
 }
 
 func TestLoadMappings_InvalidYAML(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "mappings.yaml")
 	if err := os.WriteFile(path, []byte("{{invalid yaml"), 0o600); err != nil {
@@ -201,6 +212,7 @@ func TestLoadMappings_InvalidYAML(t *testing.T) {
 }
 
 func TestMappingsConfig_MarshalWithComments(t *testing.T) {
+	t.Parallel()
 	cfg := &MappingsConfig{
 		Ignore: IgnoreConfig{
 			AniListIDs: []int{100, 200},
@@ -223,6 +235,7 @@ func TestMappingsConfig_MarshalWithComments(t *testing.T) {
 }
 
 func TestMappingsConfig_MarshalWithMALIDComments(t *testing.T) {
+	t.Parallel()
 	cfg := &MappingsConfig{
 		Ignore: IgnoreConfig{
 			MALIDs: []int{500, 600},
@@ -244,6 +257,7 @@ func TestMappingsConfig_MarshalWithMALIDComments(t *testing.T) {
 }
 
 func TestMappingsConfig_BackwardCompatibility(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "mappings.yaml")
 
@@ -270,6 +284,7 @@ func TestMappingsConfig_BackwardCompatibility(t *testing.T) {
 }
 
 func TestMappingsConfig_SaveAndLoad_WithMALIDs(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "mappings.yaml")
 
@@ -299,6 +314,7 @@ func TestMappingsConfig_SaveAndLoad_WithMALIDs(t *testing.T) {
 }
 
 func TestMappingsConfig_MarshalYAML_CombinedIgnore(t *testing.T) {
+	t.Parallel()
 	cfg := &MappingsConfig{
 		Ignore: IgnoreConfig{
 			AniListIDs: []int{100},
@@ -323,6 +339,7 @@ func TestMappingsConfig_MarshalYAML_CombinedIgnore(t *testing.T) {
 }
 
 func TestIgnoreConfig_Metadata(t *testing.T) {
+	t.Parallel()
 	cfg := &MappingsConfig{}
 
 	// Add IDs with metadata
