@@ -590,6 +590,86 @@ func (a *App) fetchReverseSyncData(ctx context.Context, mediaType string, prefix
 	return a.fetchData(ctx, mediaType, false, prefix)
 }
 
+// buildFavoritesListFromMappings creates a list of anime/manga for favorites sync
+// by combining MAL lists with AniList IDs from resolved mappings.
+// For reverse sync (MAL → AniList), we need:
+// - MAL ID (from MAL list)
+// - AniList ID (from resolved mapping)
+// - IsFavourite (from AniList target in mapping)
+func (a *App) buildFavoritesListFromMappings(
+	malList []Anime,
+	mappings []resolvedMapping,
+) []Anime {
+	// Create MAL ID → mapping lookup
+	malIDToMapping := make(map[int]resolvedMapping)
+	for _, m := range mappings {
+		if src, ok := m.src.(Anime); ok {
+			malIDToMapping[src.IDMal] = m
+		}
+	}
+
+	// Build favorites list: iterate MAL list, fill AniList IDs from mappings
+	result := make([]Anime, 0, len(malList))
+	for _, malAnime := range malList {
+		mapping, hasMapping := malIDToMapping[malAnime.IDMal]
+		if !hasMapping {
+			// No AniList ID found - skip (can't toggle favorite)
+			continue
+		}
+
+		targetAnime, ok := mapping.target.(Anime)
+		if !ok {
+			continue
+		}
+
+		// Use MAL anime data with AniList ID and IsFavourite from target
+		favAnime := malAnime
+		favAnime.IDAnilist = targetAnime.IDAnilist
+		favAnime.IsFavourite = targetAnime.IsFavourite
+		result = append(result, favAnime)
+	}
+
+	return result
+}
+
+// buildMangaFavoritesListFromMappings creates a list of manga for favorites sync
+// by combining MAL lists with AniList IDs from resolved mappings.
+func (a *App) buildMangaFavoritesListFromMappings(
+	malList []Manga,
+	mappings []resolvedMapping,
+) []Manga {
+	// Create MAL ID → mapping lookup
+	malIDToMapping := make(map[int]resolvedMapping)
+	for _, m := range mappings {
+		if src, ok := m.src.(Manga); ok {
+			malIDToMapping[src.IDMal] = m
+		}
+	}
+
+	// Build favorites list: iterate MAL list, fill AniList IDs from mappings
+	result := make([]Manga, 0, len(malList))
+	for _, malManga := range malList {
+		mapping, hasMapping := malIDToMapping[malManga.IDMal]
+		if !hasMapping {
+			// No AniList ID found - skip (can't toggle favorite)
+			continue
+		}
+
+		targetManga, ok := mapping.target.(Manga)
+		if !ok {
+			continue
+		}
+
+		// Use MAL manga data with AniList ID and IsFavourite from target
+		favManga := malManga
+		favManga.IDAnilist = targetManga.IDAnilist
+		favManga.IsFavourite = targetManga.IsFavourite
+		result = append(result, favManga)
+	}
+
+	return result
+}
+
 // syncFavorites performs favorites synchronization between AniList and MAL.
 // This is a separate phase that runs after the main status/progress sync.
 func (a *App) syncFavorites(ctx context.Context) {
@@ -606,10 +686,20 @@ func (a *App) syncFavorites(ctx context.Context) {
 
 	if *reverseDirection {
 		// MAL -> AniList: actually sync (add missing favorites on AniList)
+		// Build favorites list from MAL entries + resolved AniList IDs from updater mappings
+		animeForFavorites := a.buildFavoritesListFromMappings(
+			a.fetchedAnimeFromMAL,
+			a.reverseAnimeUpdater.GetResolvedMappings(),
+		)
+		mangaForFavorites := a.buildMangaFavoritesListFromMappings(
+			a.fetchedMangaFromMAL,
+			a.reverseMangaUpdater.GetResolvedMappings(),
+		)
+
 		result = a.favSync.SyncToAniList(
 			ctx,
-			a.fetchedAnimeFromMAL,
-			a.fetchedMangaFromMAL,
+			animeForFavorites,
+			mangaForFavorites,
 			malAnimeFavs,
 			malMangaFavs,
 		)
