@@ -56,9 +56,9 @@ anilist-mal-sync sync --favorites --reverse-direction
 
 Output:
 ```
-[Favorites] Added "Cowboy Bebop" to AniList favorites
-[Favorites] Added "Monster" to AniList favorites
-Favorites sync complete: +2 added on AniList (15 skipped)
+★ [Favorites] Added "Cowboy Bebop" to AniList favorites
+★ [Favorites] Added "Monster" to AniList favorites
+★ Favorites sync complete: +2 added on AniList (15 skipped)
 ```
 
 ### AniList → MAL (default direction)
@@ -74,9 +74,9 @@ anilist-mal-sync sync --favorites
 
 Output:
 ```
-[Favorites] anime "Cowboy Bebop" is only on AniList
-[Favorites] manga "Berserk" is only on MAL
-Favorites: 2 mismatches (AniList→MAL, report only)
+★ [Favorites] anime "Cowboy Bebop" is only on AniList
+★ [Favorites] manga "Berserk" is only on MAL
+★ Favorites: 2 mismatches (AniList→MAL, report only)
 ```
 
 ## Important Notes
@@ -100,7 +100,7 @@ AniList ToggleFavourite mutations are rate-limited (~90 requests/minute). The to
 Anime/manga entries on your AniList list that don't have a corresponding MAL ID are skipped with a debug log:
 
 ```
-[Favorites] Skipping "Some Anime" (no MAL ID)
+★ [Favorites] Skipping "Some Anime" (no MAL ID)
 ```
 
 ### AniList Favorites Not In Your List
@@ -119,7 +119,7 @@ anilist-mal-sync sync --favorites --dry-run
 
 Output:
 ```
-[Favorites] Would add "Cowboy Bebop" (MAL ID 1, AniList ID 1) to AniList favorites
+★ [Favorites] Would add "Cowboy Bebop" (MAL ID 1, AniList ID 1) to AniList favorites
 ```
 
 ### Sync Anime Only

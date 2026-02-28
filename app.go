@@ -199,7 +199,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 	var favSync *FavoritesSync
 	if config.Favorites.Enabled {
 		favSync = NewFavoritesSync(anilistClient, jikanClient, *dryRun)
-		LogInfoSuccess(ctx, "Favorites sync enabled")
+		LogInfoSuccess(ctx, "★ Favorites sync enabled")
 	}
 
 	return &App{
@@ -598,7 +598,7 @@ func (a *App) syncFavorites(ctx context.Context) {
 	// Fetch MAL favorites via Jikan API
 	malAnimeFavs, malMangaFavs, err := a.jikanClient.GetUserFavorites(ctx, a.config.MyAnimeList.Username)
 	if err != nil {
-		LogWarn(ctx, "Failed to fetch MAL favorites: %v (skipping favorites sync)", err)
+		LogWarn(ctx, "★ [Favorites] Failed to fetch MAL favorites: %v (skipping favorites sync)", err)
 		return
 	}
 
@@ -618,14 +618,14 @@ func (a *App) syncFavorites(ctx context.Context) {
 		a.syncReport.AddFavoritesResult(result)
 
 		if result.Added > 0 {
-			LogInfoSuccess(ctx, "Favorites sync complete: +%d added on AniList (%d skipped)",
+			LogInfoSuccess(ctx, "★ Favorites sync complete: +%d added on AniList (%d skipped)",
 				result.Added, result.Skipped)
 		} else {
-			LogInfo(ctx, "Favorites sync complete: all in sync (%d entries checked)", result.Skipped)
+			LogInfo(ctx, "★ Favorites sync complete: all in sync (%d entries checked)", result.Skipped)
 		}
 
 		if result.Errors > 0 {
-			LogWarn(ctx, "Favorites sync had %d errors", result.Errors)
+			LogWarn(ctx, "★ Favorites sync had %d errors", result.Errors)
 		}
 	} else {
 		// AniList -> MAL: only report (cannot write to MAL)
@@ -641,9 +641,9 @@ func (a *App) syncFavorites(ctx context.Context) {
 		a.syncReport.AddFavoritesResult(result)
 
 		if len(result.Mismatches) > 0 {
-			LogInfo(ctx, "Favorites mismatches found: %d (AniList->MAL, report only)", len(result.Mismatches))
+			LogInfo(ctx, "★ Favorites: %d mismatches (AniList→MAL, report only)", len(result.Mismatches))
 		} else {
-			LogInfoSuccess(ctx, "Favorites complete: all in sync")
+			LogInfoSuccess(ctx, "★ Favorites complete: all in sync")
 		}
 	}
 }
