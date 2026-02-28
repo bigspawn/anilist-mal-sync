@@ -78,10 +78,11 @@ type Anime struct {
 	StartedAt   *time.Time
 	FinishedAt  *time.Time
 	IsFavourite bool
+	isReverse   bool // true when used in reverse sync (MAL → AniList)
 }
 
 func (a Anime) GetTargetID() TargetID {
-	if *reverseDirection {
+	if a.isReverse {
 		return TargetID(a.IDAnilist)
 	}
 	return TargetID(a.IDMal)
@@ -98,7 +99,7 @@ func (a Anime) GetMALID() TargetID {
 }
 
 func (a Anime) GetSourceID() int {
-	if *reverseDirection {
+	if a.isReverse {
 		return a.IDMal
 	}
 	return a.IDAnilist
@@ -305,7 +306,7 @@ func (a Anime) GetTitle() string {
 }
 
 func (a Anime) String() string {
-	sb := strings.Builder{}
+	var sb strings.Builder
 	sb.WriteString("Anime{")
 	fmt.Fprintf(&sb, "IDAnilist: %d, ", a.IDAnilist)
 	fmt.Fprintf(&sb, "IDMal: %d, ", a.IDMal)
@@ -322,11 +323,13 @@ func (a Anime) String() string {
 	return sb.String()
 }
 
-func newAnimesFromMediaListGroups(groups []verniy.MediaListGroup, scoreFormat verniy.ScoreFormat) []Anime {
+// newAnimesFromMediaListGroups converts AniList media list groups to domain Anime list.
+// reverse=false: entries are forward-sync sources; reverse=true: reverse-sync targets.
+func newAnimesFromMediaListGroups(groups []verniy.MediaListGroup, scoreFormat verniy.ScoreFormat, reverse bool) []Anime {
 	res := make([]Anime, 0, len(groups))
 	for _, group := range groups {
 		for _, mediaList := range group.Entries {
-			a, err := newAnimeFromMediaListEntry(mediaList, scoreFormat)
+			a, err := newAnimeFromMediaListEntry(mediaList, scoreFormat, reverse)
 			if err != nil {
 				log.Printf("Error creating anime from media list entry: %v", err)
 				continue
@@ -338,7 +341,7 @@ func newAnimesFromMediaListGroups(groups []verniy.MediaListGroup, scoreFormat ve
 	return res
 }
 
-func newAnimeFromMediaListEntry(mediaList verniy.MediaList, scoreFormat verniy.ScoreFormat) (Anime, error) {
+func newAnimeFromMediaListEntry(mediaList verniy.MediaList, scoreFormat verniy.ScoreFormat, reverse bool) (Anime, error) {
 	if mediaList.Media == nil {
 		return Anime{}, errors.New("media is nil")
 	}
@@ -414,13 +417,17 @@ func newAnimeFromMediaListEntry(mediaList verniy.MediaList, scoreFormat verniy.S
 		StartedAt:   startedAt,
 		FinishedAt:  finishedAt,
 		IsFavourite: isFavourite,
+		isReverse:   reverse,
 	}, nil
 }
 
-func newAnimesFromMalAnimes(malAnimes []mal.Anime) []Anime {
+// newAnimesFromMalAnimes converts MAL anime list to domain Anime list.
+// reverse=false: entries are forward-sync targets (MAL IDs as target IDs).
+// reverse=true: entries are reverse-sync sources (AniList IDs as target IDs).
+func newAnimesFromMalAnimes(malAnimes []mal.Anime, reverse bool) []Anime {
 	res := make([]Anime, 0, len(malAnimes))
 	for _, malAnime := range malAnimes {
-		a, err := newAnimeFromMalAnime(malAnime)
+		a, err := newAnimeFromMalAnime(malAnime, reverse)
 		if err != nil {
 			log.Printf("failed to convert mal anime to anime: %v", err)
 			continue
@@ -430,10 +437,13 @@ func newAnimesFromMalAnimes(malAnimes []mal.Anime) []Anime {
 	return res
 }
 
-func newAnimesFromMalUserAnimes(malAnimes []mal.UserAnime) []Anime {
+// newAnimesFromMalUserAnimes converts MAL user anime list to domain Anime list.
+// reverse=false: entries are forward-sync targets (MAL IDs as target IDs).
+// reverse=true: entries are reverse-sync sources (AniList IDs as target IDs).
+func newAnimesFromMalUserAnimes(malAnimes []mal.UserAnime, reverse bool) []Anime {
 	res := make([]Anime, 0, len(malAnimes))
 	for _, malAnime := range malAnimes {
-		a, err := newAnimeFromMalAnime(malAnime.Anime)
+		a, err := newAnimeFromMalAnime(malAnime.Anime, reverse)
 		if err != nil {
 			log.Printf("failed to convert mal anime to anime: %v", err)
 			continue
@@ -447,7 +457,7 @@ func newAnimesFromMalUserAnimes(malAnimes []mal.UserAnime) []Anime {
 	return res
 }
 
-func newAnimeFromMalAnime(malAnime mal.Anime) (Anime, error) {
+func newAnimeFromMalAnime(malAnime mal.Anime, reverse bool) (Anime, error) {
 	if malAnime.ID == 0 {
 		return Anime{}, errors.New("ID is nil")
 	}
@@ -465,10 +475,11 @@ func newAnimeFromMalAnime(malAnime mal.Anime) (Anime, error) {
 		titleJP = malAnime.AlternativeTitles.Ja
 	}
 
-	// In reverse sync mode, we need to leave AniList ID as 0 so the updater can find it by name
+	// In reverse sync, IDAnilist=0 triggers name-based search in the strategy chain.
+	// In forward sync, IDAnilist=-1 indicates "unknown" (MAL entries as targets don't need it).
 	anilistID := -1
-	if *reverseDirection {
-		anilistID = 0 // This will trigger name-based search in reverse sync
+	if reverse {
+		anilistID = 0
 	}
 
 	return Anime{
@@ -484,6 +495,7 @@ func newAnimeFromMalAnime(malAnime mal.Anime) (Anime, error) {
 		StartedAt:   startedAt,
 		FinishedAt:  finishedAt,
 		IsFavourite: false, // MAL API v2 does not provide favorites
+		isReverse:   reverse,
 	}, nil
 }
 
@@ -565,10 +577,12 @@ func newSourcesFromAnimes(animes []Anime) []Source {
 	return res
 }
 
-func newAnimesFromVerniyMedias(medias []verniy.Media) []Anime {
+// newAnimesFromVerniyMedias converts AniList API search results to domain Anime list.
+// reverse=true: entries will be used as reverse-sync targets (AniList IDs as target IDs).
+func newAnimesFromVerniyMedias(medias []verniy.Media, reverse bool) []Anime {
 	res := make([]Anime, 0, len(medias))
 	for _, media := range medias {
-		a, err := newAnimeFromVerniyMedia(media)
+		a, err := newAnimeFromVerniyMedia(media, reverse)
 		if err != nil {
 			log.Printf("failed to convert verniy media to anime: %v", err)
 			continue
@@ -578,7 +592,7 @@ func newAnimesFromVerniyMedias(medias []verniy.Media) []Anime {
 	return res
 }
 
-func newAnimeFromVerniyMedia(media verniy.Media) (Anime, error) {
+func newAnimeFromVerniyMedia(media verniy.Media, reverse bool) (Anime, error) {
 	if media.ID == 0 {
 		return Anime{}, errors.New("ID is 0")
 	}
@@ -627,6 +641,7 @@ func newAnimeFromVerniyMedia(media verniy.Media) (Anime, error) {
 		StartedAt:   nil,   // Will be set from MAL source
 		FinishedAt:  nil,   // Will be set from MAL source
 		IsFavourite: false, // Verniy media from search doesn't contain user favorite status
+		isReverse:   reverse,
 	}, nil
 }
 

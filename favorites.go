@@ -15,15 +15,13 @@ type favouriteToggler interface {
 // AniList -> MAL direction can only report differences.
 type FavoritesSync struct {
 	toggler favouriteToggler
-	jikan   *JikanClient
 	dryRun  bool
 }
 
 // NewFavoritesSync creates a new FavoritesSync instance.
-func NewFavoritesSync(anilist *AnilistClient, jikan *JikanClient, dryRun bool) *FavoritesSync {
+func NewFavoritesSync(anilist *AnilistClient, dryRun bool) *FavoritesSync {
 	return &FavoritesSync{
 		toggler: anilist,
-		jikan:   jikan,
 		dryRun:  dryRun,
 	}
 }

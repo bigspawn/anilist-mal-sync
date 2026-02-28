@@ -212,7 +212,7 @@ func groupSkipReasons(items []UpdateResult) map[string]int {
 }
 
 // PrintGlobalSummary prints combined statistics for multiple sync operations
-func PrintGlobalSummary(ctx context.Context, stats []*Statistics, report *SyncReport, totalDuration time.Duration) {
+func PrintGlobalSummary(ctx context.Context, stats []*Statistics, report *SyncReport, totalDuration time.Duration, reverse bool) {
 	logger := LoggerFromContext(ctx)
 	if logger == nil {
 		return
@@ -234,7 +234,7 @@ func PrintGlobalSummary(ctx context.Context, stats []*Statistics, report *SyncRe
 	printGlobalUnmapped(logger, report)
 	printGlobalWarnings(logger, report)
 	printGlobalDuplicateConflicts(logger, report)
-	printGlobalFavorites(logger, report)
+	printGlobalFavorites(logger, report, reverse)
 	printGlobalErrors(logger, totals.errorItems)
 }
 
@@ -407,7 +407,7 @@ func capitalizeFirst(s string) string {
 	return strings.ToUpper(s[:1]) + s[1:]
 }
 
-func printGlobalFavorites(logger *Logger, report *SyncReport) {
+func printGlobalFavorites(logger *Logger, report *SyncReport, reverse bool) {
 	if report == nil {
 		return
 	}
@@ -424,7 +424,7 @@ func printGlobalFavorites(logger *Logger, report *SyncReport) {
 
 	if report.HasFavoritesMismatches() {
 		direction := "AniList→MAL"
-		if *reverseDirection {
+		if reverse {
 			direction = "MAL→AniList"
 		}
 		logger.Info("Favorites: %d mismatches (%s, report only)", len(report.FavoritesMismatches), direction)

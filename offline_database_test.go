@@ -320,7 +320,7 @@ func TestOfflineDatabaseStrategy_ReverseSync_Issue38(t *testing.T) {
 	})
 
 	strategy := OfflineDatabaseStrategy{Database: db}
-	ctx := setTestDirectionFromCtx(NewLogger(false).WithContext(t.Context()), SyncDirectionReverse)
+	ctx := WithDirection(NewLogger(false).WithContext(t.Context()), SyncDirectionReverse)
 
 	// Source from MAL: Shinryaku Ika Musume 2 (MAL ID: 10378)
 	src := Anime{

@@ -80,6 +80,7 @@ func (sc *StrategyChain) FindTargetWithMeta(
 // This should be the first strategy in the chain.
 type ManualMappingStrategy struct {
 	Mappings *MappingsConfig
+	Reverse  bool // true for MAL→AniList direction
 }
 
 func (s ManualMappingStrategy) Name() string {
@@ -122,9 +123,8 @@ func (s ManualMappingStrategy) lookupManualMapping(ctx context.Context, src Sour
 	return 0, false
 }
 
-func (s ManualMappingStrategy) lookupByIDs(ctx context.Context, anilistID, malID int) (int, bool) {
-	direction := DirectionFromContext(ctx)
-	if direction == SyncDirectionReverse {
+func (s ManualMappingStrategy) lookupByIDs(_ context.Context, anilistID, malID int) (int, bool) {
+	if s.Reverse {
 		return s.lookupReverse(anilistID, malID)
 	}
 	return s.lookupForward(anilistID, malID)

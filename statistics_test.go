@@ -381,7 +381,7 @@ func TestPrintGlobalSummary(t *testing.T) {
 
 	statsArray := []*Statistics{stats1, stats2}
 
-	PrintGlobalSummary(ctx, statsArray, report, 5*time.Second)
+	PrintGlobalSummary(ctx, statsArray, report, 5*time.Second, false)
 
 	output := buf.String()
 
@@ -402,7 +402,7 @@ func TestPrintGlobalSummary_EmptyStats(t *testing.T) {
 	report := NewSyncReport()
 	statsArray := []*Statistics{}
 
-	PrintGlobalSummary(ctx, statsArray, report, 1*time.Second)
+	PrintGlobalSummary(ctx, statsArray, report, 1*time.Second, false)
 
 	output := buf.String()
 
@@ -428,7 +428,7 @@ func TestPrintGlobalSummary_WithWarnings(t *testing.T) {
 
 	statsArray := []*Statistics{stats}
 
-	PrintGlobalSummary(ctx, statsArray, report, 1*time.Second)
+	PrintGlobalSummary(ctx, statsArray, report, 1*time.Second, false)
 
 	output := buf.String()
 
@@ -456,7 +456,7 @@ func TestPrintGlobalSummary_WithErrors(t *testing.T) {
 	report := NewSyncReport()
 	statsArray := []*Statistics{stats}
 
-	PrintGlobalSummary(ctx, statsArray, report, 1*time.Second)
+	PrintGlobalSummary(ctx, statsArray, report, 1*time.Second, false)
 
 	output := buf.String()
 
@@ -491,7 +491,7 @@ func TestPrintGlobalSummary_SkipReasonsAggregation(t *testing.T) {
 	report := NewSyncReport()
 	statsArray := []*Statistics{stats1, stats2}
 
-	PrintGlobalSummary(ctx, statsArray, report, 1*time.Second)
+	PrintGlobalSummary(ctx, statsArray, report, 1*time.Second, false)
 
 	output := buf.String()
 
@@ -542,7 +542,7 @@ func TestPrintGlobalSummary_WithDryRunItems(t *testing.T) {
 	report := NewSyncReport()
 	statsArray := []*Statistics{stats}
 
-	PrintGlobalSummary(ctx, statsArray, report, 1*time.Second)
+	PrintGlobalSummary(ctx, statsArray, report, 1*time.Second, false)
 
 	output := buf.String()
 	assert.Contains(t, output, "Would update (2)")

@@ -96,16 +96,15 @@ func TestIsFavorite_NilSet(t *testing.T) {
 // =============================================================================
 
 func TestNewFavoritesSync(t *testing.T) {
-	favSync := NewFavoritesSync(nil, nil, false)
+	favSync := NewFavoritesSync(nil, false)
 
 	assert.NotNil(t, favSync)
 	assert.Nil(t, favSync.toggler)
-	assert.Nil(t, favSync.jikan)
 	assert.False(t, favSync.dryRun)
 }
 
 func TestNewFavoritesSync_WithDryRun(t *testing.T) {
-	favSync := NewFavoritesSync(nil, nil, true)
+	favSync := NewFavoritesSync(nil, true)
 
 	assert.NotNil(t, favSync)
 	assert.True(t, favSync.dryRun)

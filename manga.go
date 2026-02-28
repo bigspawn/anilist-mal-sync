@@ -78,10 +78,11 @@ type Manga struct {
 	StartedAt       *time.Time
 	FinishedAt      *time.Time
 	IsFavourite     bool
+	isReverse       bool // true when used in reverse sync (MAL → AniList)
 }
 
 func (m Manga) GetTargetID() TargetID {
-	if *reverseDirection {
+	if m.isReverse {
 		return TargetID(m.IDAnilist)
 	}
 	return TargetID(m.IDMal)
@@ -98,7 +99,7 @@ func (m Manga) GetMALID() TargetID {
 }
 
 func (m Manga) GetSourceID() int {
-	if *reverseDirection {
+	if m.isReverse {
 		return m.IDMal
 	}
 	return m.IDAnilist
@@ -211,7 +212,7 @@ func (m Manga) GetTitle() string {
 }
 
 func (m Manga) String() string {
-	sb := strings.Builder{}
+	var sb strings.Builder
 	sb.WriteString("Manga{")
 	fmt.Fprintf(&sb, "IDAnilist: %d, ", m.IDAnilist)
 	fmt.Fprintf(&sb, "IDMal: %d, ", m.IDMal)
@@ -258,7 +259,7 @@ func (m Manga) GetUpdateOptions() []mal.UpdateMyMangaListStatusOption {
 	return opts
 }
 
-func newMangaFromMediaListEntry(mediaList verniy.MediaList, scoreFormat verniy.ScoreFormat) (Manga, error) {
+func newMangaFromMediaListEntry(mediaList verniy.MediaList, scoreFormat verniy.ScoreFormat, reverse bool) (Manga, error) {
 	if mediaList.Media == nil {
 		return Manga{}, errors.New("media is nil")
 	}
@@ -340,10 +341,14 @@ func newMangaFromMediaListEntry(mediaList verniy.MediaList, scoreFormat verniy.S
 		StartedAt:       startedAt,
 		FinishedAt:      finishedAt,
 		IsFavourite:     isFavourite,
+		isReverse:       reverse,
 	}, nil
 }
 
-func newMangaFromMalManga(manga mal.Manga) (Manga, error) {
+// newMangaFromMalManga converts a MAL manga entry to the domain Manga type.
+// reverse=false: entry is a forward-sync target (MAL ID as target ID).
+// reverse=true: entry is a reverse-sync source (AniList ID as target ID).
+func newMangaFromMalManga(manga mal.Manga, reverse bool) (Manga, error) {
 	if manga.ID == 0 {
 		return Manga{}, errors.New("ID is nil")
 	}
@@ -361,10 +366,11 @@ func newMangaFromMalManga(manga mal.Manga) (Manga, error) {
 		titleJP = manga.AlternativeTitles.Ja
 	}
 
-	// In reverse sync mode, we need to leave AniList ID as 0 so the updater can find it by name
+	// In reverse sync, IDAnilist=0 triggers name-based search in the strategy chain.
+	// In forward sync, IDAnilist=-1 indicates "unknown" (MAL entries as targets don't need it).
 	anilistID := -1
-	if *reverseDirection {
-		anilistID = 0 // This will trigger name-based search in reverse sync
+	if reverse {
+		anilistID = 0
 	}
 
 	return Manga{
@@ -382,6 +388,7 @@ func newMangaFromMalManga(manga mal.Manga) (Manga, error) {
 		StartedAt:       startedAt,
 		FinishedAt:      finishedAt,
 		IsFavourite:     false, // MAL API v2 does not provide favorites
+		isReverse:       reverse,
 	}, nil
 }
 
@@ -421,11 +428,13 @@ func mapAnilistMangaStatustToStatus(s verniy.MediaListStatus) MangaStatus {
 	}
 }
 
-func newMangasFromMediaListGroups(groups []verniy.MediaListGroup, scoreFormat verniy.ScoreFormat) []Manga {
+// newMangasFromMediaListGroups converts AniList media list groups to domain Manga list.
+// reverse=false: forward-sync sources; reverse=true: reverse-sync targets.
+func newMangasFromMediaListGroups(groups []verniy.MediaListGroup, scoreFormat verniy.ScoreFormat, reverse bool) []Manga {
 	res := make([]Manga, 0, len(groups))
 	for _, group := range groups {
 		for _, mediaList := range group.Entries {
-			r, err := newMangaFromMediaListEntry(mediaList, scoreFormat)
+			r, err := newMangaFromMediaListEntry(mediaList, scoreFormat, reverse)
 			if err != nil {
 				log.Printf("Error creating manga from media list entry: %v", err)
 				continue
@@ -437,10 +446,12 @@ func newMangasFromMediaListGroups(groups []verniy.MediaListGroup, scoreFormat ve
 	return res
 }
 
-func newMangasFromMalUserMangas(mangas []mal.UserManga) []Manga {
+// newMangasFromMalUserMangas converts MAL user manga list to domain Manga list.
+// reverse=false: entries are forward-sync targets; reverse=true: reverse-sync sources.
+func newMangasFromMalUserMangas(mangas []mal.UserManga, reverse bool) []Manga {
 	res := make([]Manga, 0, len(mangas))
 	for _, manga := range mangas {
-		r, err := newMangaFromMalManga(manga.Manga)
+		r, err := newMangaFromMalManga(manga.Manga, reverse)
 		if err != nil {
 			log.Printf("Error creating manga from mal user manga: %v", err)
 			continue
@@ -454,10 +465,12 @@ func newMangasFromMalUserMangas(mangas []mal.UserManga) []Manga {
 	return res
 }
 
-func newMangasFromMalMangas(mangas []mal.Manga) []Manga {
+// newMangasFromMalMangas converts MAL manga search results to domain Manga list.
+// Always forward (reverse=false) — search results are never used as reverse-sync sources.
+func newMangasFromMalMangas(mangas []mal.Manga, reverse bool) []Manga {
 	res := make([]Manga, 0, len(mangas))
 	for _, manga := range mangas {
-		r, err := newMangaFromMalManga(manga)
+		r, err := newMangaFromMalManga(manga, reverse)
 		if err != nil {
 			log.Printf("Error creating manga from mal manga: %v", err)
 			continue
@@ -484,10 +497,12 @@ func newSourcesFromMangas(mangas []Manga) []Source {
 	return res
 }
 
-func newMangasFromVerniyMedias(medias []verniy.Media) []Manga {
+// newMangasFromVerniyMedias converts AniList API search results to domain Manga list.
+// reverse=true: entries will be used as reverse-sync targets (AniList IDs as target IDs).
+func newMangasFromVerniyMedias(medias []verniy.Media, reverse bool) []Manga {
 	res := make([]Manga, 0, len(medias))
 	for _, media := range medias {
-		m, err := newMangaFromVerniyMedia(media)
+		m, err := newMangaFromVerniyMedia(media, reverse)
 		if err != nil {
 			log.Printf("failed to convert verniy media to manga: %v", err)
 			continue
@@ -497,7 +512,7 @@ func newMangasFromVerniyMedias(medias []verniy.Media) []Manga {
 	return res
 }
 
-func newMangaFromVerniyMedia(media verniy.Media) (Manga, error) {
+func newMangaFromVerniyMedia(media verniy.Media, reverse bool) (Manga, error) {
 	if media.ID == 0 {
 		return Manga{}, errors.New("ID is 0")
 	}
@@ -547,5 +562,6 @@ func newMangaFromVerniyMedia(media verniy.Media) (Manga, error) {
 		StartedAt:       nil,   // Will be set from MAL source
 		FinishedAt:      nil,   // Will be set from MAL source
 		IsFavourite:     false, // Verniy media from search doesn't contain user favorite status
+		isReverse:       reverse,
 	}, nil
 }

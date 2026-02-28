@@ -73,13 +73,20 @@ var syncFlags = []cli.Flag{
 	},
 }
 
-// setSyncFlagsFromCmd sets global sync variables from command flags and returns verbose value
-func setSyncFlagsFromCmd(cmd *cli.Command) bool {
+// setSyncFlagsFromCmd sets global sync variables from command flags and returns (verbose, reverse).
+func setSyncFlagsFromCmd(cmd *cli.Command) (verboseOut bool, reverseOut bool) {
+	return getSyncFlagsFromCmd(cmd)
+}
+
+// getSyncFlagsFromCmd extracts sync flags, updates package-level globals (except reverseDirection),
+// and returns verbose and reverse values explicitly.
+func getSyncFlagsFromCmd(cmd *cli.Command) (verboseOut bool, reverseOut bool) {
 	forceVal := cmd.Bool("force")
 	dryVal := cmd.Bool("dry-run")
 	mangaVal := cmd.Bool("manga")
 	allVal := cmd.Bool("all")
 	verboseVal := cmd.Bool("verbose")
+	reverseVal := cmd.Bool("reverse")
 
 	forceSync = &forceVal
 	dryRun = &dryVal
@@ -87,7 +94,7 @@ func setSyncFlagsFromCmd(cmd *cli.Command) bool {
 	allSync = &allVal
 	verbose = &verboseVal
 
-	return verboseVal
+	return verboseVal, reverseVal
 }
 
 // applySyncFlagsToConfig applies CLI sync flag overrides to config.

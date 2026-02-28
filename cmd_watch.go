@@ -38,7 +38,7 @@ func newWatchCommand() *cli.Command {
 
 func runWatch(ctx context.Context, cmd *cli.Command) error {
 	// Set package-level vars for compatibility with existing code
-	verboseVal := setSyncFlagsFromCmd(cmd)
+	verboseVal, reverseVal := getSyncFlagsFromCmd(cmd)
 
 	// Load config for compatibility with sync
 	configPath := cmd.String("config")
@@ -54,7 +54,7 @@ func runWatch(ctx context.Context, cmd *cli.Command) error {
 	ctx = logger.WithContext(ctx)
 
 	// Create app for compatibility
-	app, err := NewApp(ctx, config)
+	app, err := NewApp(ctx, config, reverseVal)
 	if err != nil {
 		return fmt.Errorf("create app: %w", err)
 	}
