@@ -344,6 +344,7 @@ func TestAnime_GetUpdateOptions(t *testing.T) {
 }
 
 func TestAnime_GetTargetID(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name         string
 		anime        Anime
@@ -389,11 +390,18 @@ func TestAnime_GetTargetID(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt // Capture range variable
 		t.Run(tt.name, func(t *testing.T) {
-			defer withReverseDirection(t, tt.reverse)()
-			got := tt.anime.GetTargetID()
+			t.Parallel()
+
+			var direction SyncDirection
+			if tt.reverse {
+				direction = SyncDirectionReverse
+			}
+			got := GetTargetIDWithDirection(tt.anime, direction)
+
 			if got != tt.wantTargetID {
-				t.Errorf("GetTargetID() = %v, want %v", got, tt.wantTargetID)
+				t.Errorf("GetTargetIDWithDirection() = %v, want %v", got, tt.wantTargetID)
 			}
 		})
 	}
@@ -464,6 +472,70 @@ func TestAnime_GetMALID(t *testing.T) {
 			got := tt.anime.GetMALID()
 			if got != tt.want {
 				t.Errorf("GetMALID() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAnime_GetSourceIDWithDirection(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		anime     Anime
+		reverse   bool
+		wantSrcID int
+	}{
+		{
+			name: "normal sync returns AniList ID",
+			anime: Anime{
+				IDMal:     12345,
+				IDAnilist: 67890,
+			},
+			reverse:   false,
+			wantSrcID: 67890,
+		},
+		{
+			name: "reverse sync returns MAL ID",
+			anime: Anime{
+				IDMal:     12345,
+				IDAnilist: 67890,
+			},
+			reverse:   true,
+			wantSrcID: 12345,
+		},
+		{
+			name: "zero AniList ID in normal mode",
+			anime: Anime{
+				IDMal:     12345,
+				IDAnilist: 0,
+			},
+			reverse:   false,
+			wantSrcID: 0,
+		},
+		{
+			name: "zero MAL ID in reverse mode",
+			anime: Anime{
+				IDMal:     0,
+				IDAnilist: 67890,
+			},
+			reverse:   true,
+			wantSrcID: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var direction SyncDirection
+			if tt.reverse {
+				direction = SyncDirectionReverse
+			}
+			got := GetSourceIDWithDirection(tt.anime, direction)
+
+			if got != tt.wantSrcID {
+				t.Errorf("GetSourceIDWithDirection() = %v, want %v", got, tt.wantSrcID)
 			}
 		})
 	}

@@ -26,6 +26,16 @@ func runSync(ctx context.Context, cmd *cli.Command) error {
 	logger := NewLogger(verboseVal)
 	ctx = logger.WithContext(ctx)
 
+	// Get direction flag and add to context
+	reverseVal := cmd.Bool("reverse-direction")
+	var direction SyncDirection
+	if reverseVal {
+		direction = SyncDirectionReverse
+	} else {
+		direction = SyncDirectionForward
+	}
+	ctx = WithDirection(ctx, direction)
+
 	config, err := loadConfigFromFile(configPath)
 	if err != nil {
 		return fmt.Errorf("error loading config: %w", err)

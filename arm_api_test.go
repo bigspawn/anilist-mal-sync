@@ -112,7 +112,7 @@ func TestARMClient_Unreachable(t *testing.T) {
 }
 
 func TestARMAPIStrategy_FindTarget(t *testing.T) {
-	t.Parallel()
+	// Cannot use t.Parallel() - tests below use HTTP servers that may conflict
 
 	anilistID := 10378
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

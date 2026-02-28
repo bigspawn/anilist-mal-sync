@@ -12,7 +12,6 @@ var (
 	defaultManga   = false
 	defaultAll     = false
 	defaultVerbose = false
-	defaultReverse = false
 )
 
 // Package-level vars for backward compatibility with app.go/updater.go
@@ -23,7 +22,7 @@ var (
 	mangaSync        = &defaultManga
 	allSync          = &defaultAll
 	verbose          = &defaultVerbose
-	reverseDirection = &defaultReverse
+	reverseDirection = new(bool) // Default to false (forward sync), kept for GetTargetID()/GetSourceID() compatibility
 )
 
 func main() {

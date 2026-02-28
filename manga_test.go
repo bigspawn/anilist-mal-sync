@@ -205,11 +205,18 @@ func TestManga_GetTargetID(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt // Capture range variable
 		t.Run(tt.name, func(t *testing.T) {
-			defer withReverseDirection(t, tt.reverse)()
-			got := tt.manga.GetTargetID()
+			t.Parallel()
+
+			var direction SyncDirection
+			if tt.reverse {
+				direction = SyncDirectionReverse
+			}
+			got := GetTargetIDWithDirection(tt.manga, direction)
+
 			if got != tt.wantTargetID {
-				t.Errorf("GetTargetID() = %v, want %v", got, tt.wantTargetID)
+				t.Errorf("GetTargetIDWithDirection() = %v, want %v", got, tt.wantTargetID)
 			}
 		})
 	}

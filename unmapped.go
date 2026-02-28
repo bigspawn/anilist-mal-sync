@@ -8,10 +8,10 @@ import (
 	"time"
 )
 
-// Sync direction constants.
+// Sync direction constants (string values for JSON serialization).
 const (
-	SyncDirectionForward = "forward" // AniList → MAL
-	SyncDirectionReverse = "reverse" // MAL → AniList
+	DirectionForwardStr = "forward" // AniList → MAL
+	DirectionReverseStr = "reverse" // MAL → AniList
 )
 
 // UnmappedEntry represents an entry that could not be mapped during sync.

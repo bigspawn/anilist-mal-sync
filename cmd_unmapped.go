@@ -85,7 +85,7 @@ func printUnmappedEntry(num int, entry UnmappedEntry) {
 }
 
 func isReverseEntry(entry UnmappedEntry) bool {
-	return entry.Direction == SyncDirectionReverse
+	return entry.Direction == DirectionReverseStr
 }
 
 func runUnmappedIgnoreAll(state *UnmappedState, mappingsPath string) error {

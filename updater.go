@@ -60,7 +60,7 @@ type duplicateConflict struct {
 }
 
 func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target, report *SyncReport) {
-	tgtsByID := buildTargetMap(tgts)
+	tgtsByID := buildTargetMap(ctx, tgts)
 	srcs = u.sortSources(srcs)
 	filtered := u.filterSources(ctx, srcs)
 
@@ -78,13 +78,23 @@ func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target, repo
 	// Phase 3: Process
 	u.processResolvedMappings(ctx, kept, report)
 	u.recordConflicts(ctx, conflicts, report)
-	u.recordUnmapped(unmapped)
+	u.recordUnmapped(ctx, unmapped)
 }
 
-func buildTargetMap(tgts []Target) map[TargetID]Target {
+func buildTargetMap(ctx context.Context, tgts []Target) map[TargetID]Target {
 	tgtsByID := make(map[TargetID]Target, len(tgts))
+	direction := DirectionFromContext(ctx)
 	for _, tgt := range tgts {
-		tgtsByID[tgt.GetTargetID()] = tgt
+		var tgtID TargetID
+		switch v := tgt.(type) {
+		case Anime:
+			tgtID = GetTargetIDWithDirection(v, direction)
+		case Manga:
+			tgtID = GetTargetIDWithDirection(v, direction)
+		default:
+			tgtID = tgt.GetTargetID()
+		}
+		tgtsByID[tgtID] = tgt
 	}
 	return tgtsByID
 }
@@ -127,9 +137,11 @@ func (u *Updater) isIgnored(ctx context.Context, src Source) bool {
 		return true
 	}
 	if len(u.IgnoreIDs) > 0 {
-		if _, ok := u.IgnoreIDs[src.GetSourceID()]; ok {
+		direction := DirectionFromContext(ctx)
+		srcID := GetSourceIDWithDirection(src, direction)
+		if _, ok := u.IgnoreIDs[srcID]; ok {
 			LogDebug(ctx, "[%s] Ignoring entry by ID: %s (ID: %d)",
-				u.Prefix, src.GetTitle(), src.GetSourceID())
+				u.Prefix, src.GetTitle(), srcID)
 			u.Statistics.RecordSkip(UpdateResult{
 				Title:      src.GetTitle(),
 				Status:     src.GetStatusString(),
@@ -331,7 +343,7 @@ func (u *Updater) recordConflicts(
 			Skipped:    true,
 			SkipReason: reason,
 		})
-		u.trackUnmapped(c.loserSrc, reason)
+		u.trackUnmapped(ctx, c.loserSrc, reason)
 
 		if report != nil {
 			report.AddDuplicateConflict(
@@ -346,14 +358,15 @@ func (u *Updater) recordConflicts(
 	}
 }
 
-func (u *Updater) recordUnmapped(unmapped []Source) {
+func (u *Updater) recordUnmapped(ctx context.Context, unmapped []Source) {
 	for _, src := range unmapped {
-		u.trackUnmapped(src, "no matching entry found on target service")
+		u.trackUnmapped(ctx, src, "no matching entry found on target service")
 	}
 }
 
 func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts map[TargetID]Target, report *SyncReport) {
-	tgtID := src.GetTargetID()
+	direction := DirectionFromContext(ctx)
+	tgtID := GetTargetIDWithDirection(src, direction)
 
 	if !u.ForceSync { // filter sources by different progress with targets
 		// Use strategy chain to find target
@@ -366,7 +379,7 @@ func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts ma
 				Skipped:    true,
 				SkipReason: "unmapped",
 			})
-			u.trackUnmapped(src, "no matching entry found on target service")
+			u.trackUnmapped(ctx, src, "no matching entry found on target service")
 			return
 		}
 
@@ -426,7 +439,8 @@ func (u *Updater) updateTarget(ctx context.Context, id TargetID, src Source) {
 	}
 
 	// Generate concise update message
-	detail := generateUpdateDetail(src, id)
+	direction := DirectionFromContext(ctx)
+	detail := generateUpdateDetail(src, id, direction)
 
 	u.Statistics.RecordUpdate(UpdateResult{
 		Title:  src.GetTitle(),
@@ -436,7 +450,7 @@ func (u *Updater) updateTarget(ctx context.Context, id TargetID, src Source) {
 }
 
 // generateUpdateDetail generates a concise update detail string
-func generateUpdateDetail(src Source, tgtID TargetID) string {
+func generateUpdateDetail(src Source, tgtID TargetID, direction SyncDirection) string {
 	// Try to get both MAL and AniList IDs from source
 	var malID, anilistID TargetID
 
@@ -451,7 +465,7 @@ func generateUpdateDetail(src Source, tgtID TargetID) string {
 
 	// In reverse sync (MAL -> AniList), tgtID is the AniList ID
 	// In forward sync (AniList -> MAL), tgtID is the MAL ID
-	if *reverseDirection {
+	if direction == SyncDirectionReverse {
 		anilistID = tgtID // Use the found AniList ID
 	} else {
 		malID = tgtID // Use the found MAL ID
@@ -469,15 +483,12 @@ func generateUpdateDetail(src Source, tgtID TargetID) string {
 	return fmt.Sprintf("(ID: %d)", tgtID)
 }
 
-func (u *Updater) trackUnmapped(src Source, reason string) {
-	direction := SyncDirectionForward
-	if *reverseDirection {
-		direction = SyncDirectionReverse
-	}
+func (u *Updater) trackUnmapped(ctx context.Context, src Source, reason string) {
+	direction := DirectionFromContext(ctx)
 	entry := UnmappedEntry{
 		Title:     src.GetTitle(),
 		MediaType: u.MediaType,
-		Direction: direction,
+		Direction: direction.String(),
 		Reason:    reason,
 	}
 	switch v := src.(type) {
