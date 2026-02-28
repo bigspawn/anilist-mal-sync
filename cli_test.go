@@ -344,9 +344,6 @@ func TestGlobalFlagsAreSet(t *testing.T) {
 	if verbose == nil {
 		t.Error("verbose should not be nil")
 	}
-	if reverseDirection == nil {
-		t.Error("reverseDirection should not be nil")
-	}
 }
 
 func TestGlobalFlagsHaveDefaultValues(t *testing.T) {
@@ -366,9 +363,6 @@ func TestGlobalFlagsHaveDefaultValues(t *testing.T) {
 	}
 	if *verbose != false {
 		t.Errorf("expected verbose default false, got %v", *verbose)
-	}
-	if *reverseDirection != false {
-		t.Errorf("expected reverseDirection default false, got %v", *reverseDirection)
 	}
 }
 
@@ -422,7 +416,7 @@ func TestRunCLI_ContextCancellation(t *testing.T) {
 	}
 
 	// Verify context handling is set up
-	ctx := context.Background()
+	ctx := t.Context()
 	// The Run method should accept context
 	// This is a compile-time check essentially
 	_ = ctx

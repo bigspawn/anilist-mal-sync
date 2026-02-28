@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -68,7 +67,7 @@ func TestHatoCache_SaveLoad(t *testing.T) {
 
 	cache.Set("mal", "anime", 456, data)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	err := cache.Save(ctx)
 	assert.NoError(t, err)
 
@@ -87,7 +86,7 @@ func TestHatoCache_DirtyFlag(t *testing.T) {
 	tmpDir := t.TempDir()
 	cache, _ := NewHatoCache(tmpDir)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// First save should create file
 	anilistID := 123

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"testing"
 
 	"github.com/rl404/verniy"
@@ -174,7 +173,7 @@ func TestAniListMangaService_ScoreFormat(t *testing.T) {
 func TestMALAnimeService_Update_InvalidSource(t *testing.T) {
 	t.Parallel()
 	service := NewMALAnimeService(nil)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Pass Manga as source to Anime service - should fail type assertion
 	mangaSource := Manga{IDMal: 12345, TitleEN: "Test Manga"}
@@ -192,7 +191,7 @@ func TestMALAnimeService_Update_InvalidSource(t *testing.T) {
 func TestMALMangaService_Update_InvalidSource(t *testing.T) {
 	t.Parallel()
 	service := NewMALMangaService(nil)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Pass Anime as source to Manga service - should fail type assertion
 	animeSource := Anime{IDMal: 12345, TitleEN: "Test Anime"}
@@ -210,7 +209,7 @@ func TestMALMangaService_Update_InvalidSource(t *testing.T) {
 func TestAniListAnimeService_Update_InvalidSource(t *testing.T) {
 	t.Parallel()
 	service := NewAniListAnimeService(nil, verniy.ScoreFormatPoint10)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Pass Manga as source to Anime service
 	mangaSource := Manga{IDMal: 12345, TitleEN: "Test Manga"}
@@ -227,7 +226,7 @@ func TestAniListAnimeService_Update_InvalidSource(t *testing.T) {
 func TestAniListMangaService_Update_InvalidSource(t *testing.T) {
 	t.Parallel()
 	service := NewAniListMangaService(nil, verniy.ScoreFormatPoint10)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Pass Anime as source to Manga service
 	animeSource := Anime{IDMal: 12345, TitleEN: "Test Anime"}

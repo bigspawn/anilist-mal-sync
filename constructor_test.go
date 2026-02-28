@@ -68,7 +68,7 @@ func TestLogger_SetOutput(t *testing.T) {
 func TestLogger_WithContext(t *testing.T) {
 	t.Parallel()
 	logger := NewLogger(false)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	ctxWithLogger := logger.WithContext(ctx)
 
@@ -83,7 +83,7 @@ func TestLogger_WithContext(t *testing.T) {
 
 func TestLoggerFromContext_EmptyContext(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	logger := LoggerFromContext(ctx)
 
 	if logger != nil {
@@ -94,7 +94,7 @@ func TestLoggerFromContext_EmptyContext(t *testing.T) {
 func TestLoggerContext_Propagation(t *testing.T) {
 	t.Parallel()
 	logger1 := NewLogger(true)
-	ctx1 := context.Background()
+	ctx1 := t.Context()
 	ctx1 = logger1.WithContext(ctx1)
 
 	logger2 := NewLogger(false)
@@ -337,7 +337,7 @@ func TestStatistics_EndTime(t *testing.T) {
 	var buf bytes.Buffer
 	logger := NewLogger(false)
 	logger.SetOutput(&buf)
-	ctx := logger.WithContext(context.Background())
+	ctx := logger.WithContext(t.Context())
 
 	stats.Print(ctx, "Test")
 

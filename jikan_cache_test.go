@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -51,7 +50,7 @@ func TestJikanCache_SaveLoad(t *testing.T) {
 	data, _ := json.Marshal(map[string]interface{}{"mal_id": 123, "title": "One Piece"})
 	cache.Set(123, data)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	err := cache.Save(ctx)
 	assert.NoError(t, err)
 
@@ -127,7 +126,7 @@ func TestJikanCache_DirtyFlag(t *testing.T) {
 	tmpDir := t.TempDir()
 	cache := NewJikanCache(tmpDir, 168*time.Hour)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// First save should create file
 	data, _ := json.Marshal(map[string]interface{}{"mal_id": 123})

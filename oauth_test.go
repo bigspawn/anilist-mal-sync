@@ -533,7 +533,7 @@ func TestStateValidation_MissingState(t *testing.T) {
 
 	// Call the callback handler (extracted from startServer)
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		_, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 		defer cancel()
 
 		state := r.URL.Query().Get("state")
@@ -580,7 +580,7 @@ func TestStateValidation_MismatchedState(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		_, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 		defer cancel()
 
 		state := r.URL.Query().Get("state")
@@ -627,7 +627,7 @@ func TestStateValidation_ValidState(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		_, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 		defer cancel()
 
 		state := r.URL.Query().Get("state")
@@ -676,7 +676,7 @@ func TestTokenWithContext_RespectsContext(t *testing.T) {
 		t.Fatalf("NewOAuth() error = %v", err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel() // Cancel immediately
 
 	// TokenWithContext should fail due to cancelled context
@@ -723,7 +723,7 @@ func TestTokenSource_ContextAware(t *testing.T) {
 		t.Fatalf("NewOAuth() error = %v", err)
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	ts := oauth.TokenSource(ctx)
 
 	if ts == nil {
@@ -866,7 +866,7 @@ func TestExchangeToken_WithMockServer(t *testing.T) {
 	}
 
 	// Exchange token (will use mock server)
-	ctx := context.Background()
+	ctx := t.Context()
 	err := oauth.ExchangeToken(ctx, "test_code")
 	if err != nil {
 		t.Logf("ExchangeToken() error = %v (this is expected if mock server doesn't handle full OAuth flow)", err)
@@ -1158,7 +1158,7 @@ func TestInitToken_AlreadyHasToken(t *testing.T) {
 	}
 
 	// InitToken should return nil immediately if token exists
-	ctx := context.Background()
+	ctx := t.Context()
 	if err := oauth.InitToken(ctx, "18080"); err != nil {
 		t.Errorf("InitToken() should return nil when token exists: %v", err)
 	}
@@ -1176,7 +1176,7 @@ func TestInitToken_ContextCancelled(t *testing.T) {
 	}
 
 	// Cancel context immediately
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	// InitToken should return context cancellation error

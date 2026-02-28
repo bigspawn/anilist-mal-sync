@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -33,7 +32,7 @@ func TestARMClient_GetAniListID(t *testing.T) {
 
 	client := NewARMClient(server.URL, 5*time.Second)
 
-	id, found, err := client.GetAniListID(context.Background(), 10378)
+	id, found, err := client.GetAniListID(t.Context(), 10378)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +54,7 @@ func TestARMClient_GetMALID(t *testing.T) {
 
 	client := NewARMClient(server.URL, 5*time.Second)
 
-	id, found, err := client.GetMALID(context.Background(), 10378)
+	id, found, err := client.GetMALID(t.Context(), 10378)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +70,7 @@ func TestARMClient_NotFound(t *testing.T) {
 
 	client := NewARMClient(server.URL, 5*time.Second)
 
-	_, found, err := client.GetAniListID(context.Background(), 999999)
+	_, found, err := client.GetAniListID(t.Context(), 999999)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +85,7 @@ func TestARMClient_404(t *testing.T) {
 
 	client := NewARMClient(server.URL, 5*time.Second)
 
-	_, found, err := client.GetAniListID(context.Background(), 999999)
+	_, found, err := client.GetAniListID(t.Context(), 999999)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,14 +100,14 @@ func TestARMClient_ServerError(t *testing.T) {
 
 	client := NewARMClient(server.URL, 5*time.Second)
 
-	_, _, err := client.GetAniListID(context.Background(), 10378)
+	_, _, err := client.GetAniListID(t.Context(), 10378)
 	assert.Error(t, err)
 }
 
 func TestARMClient_Unreachable(t *testing.T) {
 	client := NewARMClient("http://127.0.0.1:1", 1*time.Second)
 
-	_, _, err := client.GetAniListID(context.Background(), 10378)
+	_, _, err := client.GetAniListID(t.Context(), 10378)
 	assert.Error(t, err)
 }
 
@@ -131,7 +130,7 @@ func TestARMAPIStrategy_FindTarget(t *testing.T) {
 
 	client := NewARMClient(server.URL, 5*time.Second)
 	strategy := ARMAPIStrategy{Client: client}
-	ctx := NewLogger(false).WithContext(context.Background())
+	ctx := NewLogger(false).WithContext(t.Context())
 
 	t.Run("found in existing targets", func(t *testing.T) {
 		src := Anime{
@@ -187,7 +186,7 @@ func TestARMAPIStrategy_FindTarget(t *testing.T) {
 func TestARMAPIStrategy_SkipsManga(t *testing.T) {
 	client := NewARMClient("http://unused", 5*time.Second)
 	strategy := ARMAPIStrategy{Client: client}
-	ctx := NewLogger(false).WithContext(context.Background())
+	ctx := NewLogger(false).WithContext(t.Context())
 
 	src := Manga{IDMal: 123}
 	existingTargets := map[TargetID]Target{}

@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -62,7 +61,7 @@ func TestStatistics_PrintLogsCorrectly(t *testing.T) {
 	var buf bytes.Buffer
 	logger := NewLogger(false)
 	logger.SetOutput(&buf)
-	ctx := logger.WithContext(context.Background())
+	ctx := logger.WithContext(t.Context())
 
 	stats := NewStatistics()
 	stats.UpdatedCount = 42
@@ -83,7 +82,7 @@ func TestStatistics_PrintWithZeroValues(t *testing.T) {
 	var buf bytes.Buffer
 	logger := NewLogger(false)
 	logger.SetOutput(&buf)
-	ctx := logger.WithContext(context.Background())
+	ctx := logger.WithContext(t.Context())
 
 	stats := NewStatistics()
 
@@ -216,7 +215,7 @@ func TestPerformSync_ResetsAfterPrint(t *testing.T) {
 	var buf bytes.Buffer
 	logger := NewLogger(false)
 	logger.SetOutput(&buf)
-	ctx := logger.WithContext(context.Background())
+	ctx := logger.WithContext(t.Context())
 
 	stats := &Statistics{
 		UpdatedCount: 10,
@@ -355,7 +354,7 @@ func TestPrintGlobalSummary(t *testing.T) {
 	var buf bytes.Buffer
 	logger := NewLogger(false)
 	logger.SetOutput(&buf)
-	ctx := logger.WithContext(context.Background())
+	ctx := logger.WithContext(t.Context())
 
 	// Create multiple statistics
 	stats1 := NewStatistics()
@@ -398,7 +397,7 @@ func TestPrintGlobalSummary_EmptyStats(t *testing.T) {
 	var buf bytes.Buffer
 	logger := NewLogger(false)
 	logger.SetOutput(&buf)
-	ctx := logger.WithContext(context.Background())
+	ctx := logger.WithContext(t.Context())
 
 	report := NewSyncReport()
 	statsArray := []*Statistics{}
@@ -417,7 +416,7 @@ func TestPrintGlobalSummary_WithWarnings(t *testing.T) {
 	var buf bytes.Buffer
 	logger := NewLogger(false)
 	logger.SetOutput(&buf)
-	ctx := logger.WithContext(context.Background())
+	ctx := logger.WithContext(t.Context())
 
 	stats := NewStatistics()
 	stats.UpdatedCount = 1
@@ -443,7 +442,7 @@ func TestPrintGlobalSummary_WithErrors(t *testing.T) {
 	var buf bytes.Buffer
 	logger := NewLogger(false)
 	logger.SetOutput(&buf)
-	ctx := logger.WithContext(context.Background())
+	ctx := logger.WithContext(t.Context())
 
 	stats := NewStatistics()
 	stats.UpdatedCount = 1
@@ -471,7 +470,7 @@ func TestPrintGlobalSummary_SkipReasonsAggregation(t *testing.T) {
 	var buf bytes.Buffer
 	logger := NewLogger(false)
 	logger.SetOutput(&buf)
-	ctx := logger.WithContext(context.Background())
+	ctx := logger.WithContext(t.Context())
 
 	// Create stats with various skip reasons
 	stats1 := NewStatistics()
@@ -531,7 +530,7 @@ func TestPrintGlobalSummary_WithDryRunItems(t *testing.T) {
 	var buf bytes.Buffer
 	logger := NewLogger(false)
 	logger.SetOutput(&buf)
-	ctx := logger.WithContext(context.Background())
+	ctx := logger.WithContext(t.Context())
 
 	stats := NewStatistics()
 	stats.DryRunCount = 2

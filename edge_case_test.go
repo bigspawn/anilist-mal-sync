@@ -332,7 +332,7 @@ func TestRetryableTransport_ContextCancellation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(t.Context())
 			if tt.cancelImmediately {
 				cancel()
 			} else {
@@ -367,7 +367,7 @@ func TestRetryableTransport_ContextCancellation(t *testing.T) {
 }
 
 func TestWithTimeout_DeadlineExceeded(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	timeout := 1 * time.Nanosecond
 
 	newCtx, cancel := withTimeout(ctx, timeout)

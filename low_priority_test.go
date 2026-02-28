@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -70,7 +69,7 @@ func TestLog_WithContext(t *testing.T) {
 	logger := NewLogger(false)
 	logger.SetOutput(&buf)
 
-	ctx := logger.WithContext(context.Background())
+	ctx := logger.WithContext(t.Context())
 
 	LogInfo(ctx, "test info")
 	if !strings.Contains(buf.String(), "test info") {
@@ -223,7 +222,7 @@ func TestRandHTTPParamString(t *testing.T) {
 func TestWithTimeout(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	timeout := 100 * time.Millisecond
 
 	newCtx, cancel := withTimeout(ctx, timeout)

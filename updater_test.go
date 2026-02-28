@@ -168,7 +168,7 @@ func TestUpdater_Update(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			ctx := context.Background()
+			ctx := t.Context()
 			if tt.cancelContext {
 				var cancel context.CancelFunc
 				ctx, cancel = context.WithCancel(ctx)
@@ -259,7 +259,7 @@ func TestUpdater_updateTarget(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			ctx := context.Background()
+			ctx := t.Context()
 			mockService := NewMockMediaService(ctrl)
 
 			updater := &Updater{
@@ -357,7 +357,7 @@ func TestUpdater_updateSourceByTargets(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			ctx := context.Background()
+			ctx := t.Context()
 			mockService := NewMockMediaService(ctrl)
 
 			updater := &Updater{
@@ -402,7 +402,7 @@ func TestUpdater_DryRunRecordsInDryRunItems(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	mockService := NewMockMediaService(ctrl)
 
 	updater := &Updater{
@@ -440,9 +440,8 @@ func TestUpdater_DryRunRecordsInDryRunItems(t *testing.T) {
 }
 
 func TestDeduplicateMappings_NoDuplicates(t *testing.T) {
-	defer setReverseDirectionForTest(false)()
-
-	ctx := context.Background()
+	// Cannot use t.Parallel() due to global reverseDirection variable access
+	ctx := setTestDirection(t, SyncDirectionForward)
 
 	updater := &Updater{
 		Prefix:     "[Test]",
@@ -476,7 +475,7 @@ func TestDeduplicateMappings_NoDuplicates(t *testing.T) {
 
 func TestDeduplicateMappings_KeepsHigherPriority(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	updater := &Updater{
 		Prefix:     "[Test]",
@@ -529,7 +528,7 @@ func TestDeduplicateMappings_KeepsHigherPriority(t *testing.T) {
 
 func TestDeduplicateMappings_SamePriority_TitleTiebreaker(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	updater := &Updater{
 		Prefix:     "[Test]",
@@ -574,7 +573,7 @@ func TestUpdate_DuplicateTargetDetection(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Simulate: 3 sources, 2 map to the same target
 	sources := []Source{
