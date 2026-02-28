@@ -1063,3 +1063,39 @@ func TestLoadConfigFromEnv_NewSecretPrecedence(t *testing.T) {
 		t.Errorf("MyAnimeList.ClientSecret = %v, want new_mal_secret", cfg.MyAnimeList.ClientSecret)
 	}
 }
+
+func TestFavoritesSyncEnabled_FromEnv(t *testing.T) {
+	t.Setenv("ANILIST_CLIENT_ID", "test_id")
+	t.Setenv("ANILIST_USERNAME", "test_user")
+	t.Setenv("MAL_CLIENT_ID", "mal_id")
+	t.Setenv("MAL_USERNAME", "mal_user")
+
+	tests := []struct {
+		name     string
+		envValue string
+		want     bool
+	}{
+		{"Disabled", "false", false},
+		{"Enabled", "true", true},
+		{"Empty", "", false},
+		{"Zero", "0", false},
+		{"One", "1", true},
+		{"Yes", "yes", true},
+		{"No", "no", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("FAVORITES_SYNC_ENABLED", tt.envValue)
+
+			cfg, err := loadConfigFromEnv()
+			if err != nil {
+				t.Fatalf("loadConfigFromEnv() failed: %v", err)
+			}
+
+			if cfg.Favorites.Enabled != tt.want {
+				t.Errorf("Favorites.Enabled = %v, want %v", cfg.Favorites.Enabled, tt.want)
+			}
+		})
+	}
+}

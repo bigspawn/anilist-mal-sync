@@ -39,6 +39,20 @@ type jikanSearchResponse struct {
 	Data []JikanMangaData `json:"data"`
 }
 
+// JikanFavoriteEntry represents a favorite anime or manga from Jikan API.
+type JikanFavoriteEntry struct {
+	MalID int    `json:"mal_id"`
+	Title string `json:"title"`
+}
+
+// jikanFavoritesResponse wraps the Jikan API v4 user favorites response.
+type jikanFavoritesResponse struct {
+	Data struct {
+		Anime []JikanFavoriteEntry `json:"anime"`
+		Manga []JikanFavoriteEntry `json:"manga"`
+	} `json:"data"`
+}
+
 // JikanClient is an API client for Jikan (unofficial MAL REST API).
 // Implements rate limiting and file-based caching.
 type JikanClient struct {
@@ -183,6 +197,51 @@ func (c *JikanClient) SearchManga(ctx context.Context, query string) []JikanMang
 
 	LogDebug(ctx, "[JIKAN API] search %q: found %d results", query, len(jResp.Data))
 	return jResp.Data
+}
+
+// GetUserFavorites fetches a MAL user's favorite anime and manga via Jikan API.
+// Returns sets of MAL IDs for anime and manga favorites.
+// The Jikan API endpoint returns public user data and does not require authentication.
+func (c *JikanClient) GetUserFavorites(ctx context.Context, username string) (
+	animeIDs map[int]struct{}, mangaIDs map[int]struct{}, err error,
+) {
+	if username == "" {
+		return nil, nil, fmt.Errorf("username cannot be empty")
+	}
+
+	apiURL := fmt.Sprintf("%s/users/%s/favorites", c.baseURL, url.PathEscape(username))
+	LogDebug(ctx, "[JIKAN API] GET %s", apiURL)
+
+	c.rateLimit()
+
+	resp, err := c.doRequest(ctx, apiURL)
+	if err != nil {
+		LogDebug(ctx, "[JIKAN API] user %s favorites: error: %v", username, err)
+		return nil, nil, fmt.Errorf("failed to fetch user favorites: %w", err)
+	}
+	if resp == nil {
+		return nil, nil, fmt.Errorf("user %s not found or profile is private", username)
+	}
+	defer resp.Body.Close() //nolint:errcheck // best effort close
+
+	var jResp jikanFavoritesResponse
+	if err := json.NewDecoder(resp.Body).Decode(&jResp); err != nil {
+		LogDebug(ctx, "[JIKAN API] user %s favorites: decode error: %v", username, err)
+		return nil, nil, fmt.Errorf("failed to decode favorites response: %w", err)
+	}
+
+	animeIDs = make(map[int]struct{}, len(jResp.Data.Anime))
+	for _, fav := range jResp.Data.Anime {
+		animeIDs[fav.MalID] = struct{}{}
+	}
+
+	mangaIDs = make(map[int]struct{}, len(jResp.Data.Manga))
+	for _, fav := range jResp.Data.Manga {
+		mangaIDs[fav.MalID] = struct{}{}
+	}
+
+	LogDebug(ctx, "[JIKAN API] user %s favorites: %d anime, %d manga", username, len(animeIDs), len(mangaIDs))
+	return animeIDs, mangaIDs, nil
 }
 
 // SaveCache persists the cache to disk if there are unsaved changes.

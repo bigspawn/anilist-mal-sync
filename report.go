@@ -4,10 +4,12 @@ import "sync"
 
 // SyncReport accumulates warnings and unmapped entries for deferred printing
 type SyncReport struct {
-	Warnings           []Warning
-	UnmappedItems      []UnmappedEntry
-	DuplicateConflicts []DuplicateConflict
-	mu                 sync.Mutex
+	Warnings            []Warning
+	UnmappedItems       []UnmappedEntry
+	DuplicateConflicts  []DuplicateConflict
+	FavoritesAdded      int
+	FavoritesMismatches []FavoriteMismatch
+	mu                  sync.Mutex
 }
 
 // DuplicateConflict records when multiple sources map to the same target.
@@ -93,4 +95,19 @@ func (r *SyncReport) HasDuplicateConflicts() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return len(r.DuplicateConflicts) > 0
+}
+
+// AddFavoritesResult adds favorites sync result to the report (thread-safe)
+func (r *SyncReport) AddFavoritesResult(result FavoritesResult) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.FavoritesAdded += result.Added
+	r.FavoritesMismatches = append(r.FavoritesMismatches, result.Mismatches...)
+}
+
+// HasFavoritesMismatches returns true if there are favorites mismatches (thread-safe)
+func (r *SyncReport) HasFavoritesMismatches() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.FavoritesMismatches) > 0
 }

@@ -234,6 +234,7 @@ func PrintGlobalSummary(ctx context.Context, stats []*Statistics, report *SyncRe
 	printGlobalUnmapped(logger, report)
 	printGlobalWarnings(logger, report)
 	printGlobalDuplicateConflicts(logger, report)
+	printGlobalFavorites(logger, report)
 	printGlobalErrors(logger, totals.errorItems)
 }
 
@@ -404,4 +405,28 @@ func capitalizeFirst(s string) string {
 		return s
 	}
 	return strings.ToUpper(s[:1]) + s[1:]
+}
+
+func printGlobalFavorites(logger *Logger, report *SyncReport) {
+	if report == nil {
+		return
+	}
+
+	// Print favorites summary if any were added or mismatches exist
+	if report.FavoritesAdded == 0 && !report.HasFavoritesMismatches() {
+		return
+	}
+
+	logger.Info("")
+	if report.FavoritesAdded > 0 {
+		logger.InfoSuccess("Favorites: +%d added on AniList", report.FavoritesAdded)
+	}
+
+	if report.HasFavoritesMismatches() {
+		direction := "AniList→MAL"
+		if *reverseDirection {
+			direction = "MAL→AniList"
+		}
+		logger.Info("Favorites: %d mismatches (%s, report only)", len(report.FavoritesMismatches), direction)
+	}
 }

@@ -23,6 +23,7 @@ type App struct {
 	hatoClient         *HatoClient
 	jikanClient        *JikanClient
 	mappings           *MappingsConfig
+	favSync            *FavoritesSync
 
 	offlineStrategy *OfflineDatabaseStrategy
 
@@ -32,6 +33,12 @@ type App struct {
 	reverseMangaUpdater *Updater
 
 	syncReport *SyncReport
+
+	// Cached lists for favorites sync reuse
+	fetchedAnimeFromAniList []Anime
+	fetchedAnimeFromMAL     []Anime
+	fetchedMangaFromAniList []Manga
+	fetchedMangaFromMAL     []Manga
 }
 
 // NewApp creates a new App instance with configured clients and updaters
@@ -188,6 +195,13 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 
 	// hatoClient is already created by loadIDMappingStrategies() and will be used for both strategies and cache saving
 
+	// Create favorites sync if enabled
+	var favSync *FavoritesSync
+	if config.Favorites.Enabled {
+		favSync = NewFavoritesSync(anilistClient, jikanClient, *dryRun)
+		LogInfoSuccess(ctx, "Favorites sync enabled")
+	}
+
 	return &App{
 		config:              config,
 		mal:                 malClient,
@@ -197,6 +211,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		jikanClient:         jikanClient,
 		mappings:            mappings,
 		offlineStrategy:     offlineStrategy,
+		favSync:             favSync,
 		animeUpdater:        animeUpdater,
 		mangaUpdater:        mangaUpdater,
 		reverseAnimeUpdater: reverseAnimeUpdater,
@@ -303,6 +318,11 @@ func (a *App) Run(ctx context.Context) error {
 
 	// Collect unmapped entries from all updaters and save state
 	a.saveUnmappedState(ctx, updaters)
+
+	// Favorites sync phase (runs after main sync, non-fatal)
+	if a.favSync != nil {
+		a.syncFavorites(ctx)
+	}
 
 	// Print global summary
 	PrintGlobalSummary(ctx, stats, a.syncReport, time.Since(startTime))
@@ -473,6 +493,10 @@ func (a *App) fetchFromAnilistToMAL(ctx context.Context, mediaType string, prefi
 		srcs := newSourcesFromAnimes(newAnimesFromMediaListGroups(srcList, a.anilistScoreFormat))
 		tgts := newTargetsFromAnimes(newAnimesFromMalUserAnimes(tgtList))
 
+		// Cache lists for favorites sync
+		a.fetchedAnimeFromAniList = newAnimesFromMediaListGroups(srcList, a.anilistScoreFormat)
+		a.fetchedAnimeFromMAL = newAnimesFromMalUserAnimes(tgtList)
+
 		LogDebug(ctx, "[%s] Got %d from AniList, %d from MAL", prefix, len(srcs), len(tgts))
 
 		return srcs, tgts, nil
@@ -492,6 +516,10 @@ func (a *App) fetchFromAnilistToMAL(ctx context.Context, mediaType string, prefi
 
 	srcs := newSourcesFromMangas(newMangasFromMediaListGroups(srcList, a.anilistScoreFormat))
 	tgts := newTargetsFromMangas(newMangasFromMalUserMangas(tgtList))
+
+	// Cache lists for favorites sync
+	a.fetchedMangaFromAniList = newMangasFromMediaListGroups(srcList, a.anilistScoreFormat)
+	a.fetchedMangaFromMAL = newMangasFromMalUserMangas(tgtList)
 
 	LogDebug(ctx, "[%s] Got %d from AniList, %d from MAL", prefix, len(srcs), len(tgts))
 
@@ -519,6 +547,10 @@ func (a *App) fetchFromMALToAnilist(ctx context.Context, mediaType string, prefi
 		srcs := newSourcesFromAnimes(newAnimesFromMalUserAnimes(srcList))
 		tgts := newTargetsFromAnimes(newAnimesFromMediaListGroups(tgtList, a.anilistScoreFormat))
 
+		// Cache lists for favorites sync
+		a.fetchedAnimeFromMAL = newAnimesFromMalUserAnimes(srcList)
+		a.fetchedAnimeFromAniList = newAnimesFromMediaListGroups(tgtList, a.anilistScoreFormat)
+
 		LogDebug(ctx, "[%s] Got %d from MAL, %d from AniList", prefix, len(srcs), len(tgts))
 
 		return srcs, tgts, nil
@@ -539,6 +571,10 @@ func (a *App) fetchFromMALToAnilist(ctx context.Context, mediaType string, prefi
 	srcs := newSourcesFromMangas(newMangasFromMalUserMangas(srcList))
 	tgts := newTargetsFromMangas(newMangasFromMediaListGroups(tgtList, a.anilistScoreFormat))
 
+	// Cache lists for favorites sync
+	a.fetchedMangaFromMAL = newMangasFromMalUserMangas(srcList)
+	a.fetchedMangaFromAniList = newMangasFromMediaListGroups(tgtList, a.anilistScoreFormat)
+
 	LogDebug(ctx, "[%s] Got %d from MAL, %d from AniList", prefix, len(srcs), len(tgts))
 
 	return srcs, tgts, nil
@@ -552,4 +588,62 @@ func (a *App) fetchNormalSyncData(ctx context.Context, mediaType string, prefix 
 // fetchReverseSyncData fetches data for MAL -> AniList sync
 func (a *App) fetchReverseSyncData(ctx context.Context, mediaType string, prefix string) ([]Source, []Target, error) {
 	return a.fetchData(ctx, mediaType, false, prefix)
+}
+
+// syncFavorites performs favorites synchronization between AniList and MAL.
+// This is a separate phase that runs after the main status/progress sync.
+func (a *App) syncFavorites(ctx context.Context) {
+	LogStage(ctx, "Syncing favorites...")
+
+	// Fetch MAL favorites via Jikan API
+	malAnimeFavs, malMangaFavs, err := a.jikanClient.GetUserFavorites(ctx, a.config.MyAnimeList.Username)
+	if err != nil {
+		LogWarn(ctx, "Failed to fetch MAL favorites: %v (skipping favorites sync)", err)
+		return
+	}
+
+	var result FavoritesResult
+
+	if *reverseDirection {
+		// MAL -> AniList: actually sync (add missing favorites on AniList)
+		result = a.favSync.SyncToAniList(
+			ctx,
+			a.fetchedAnimeFromMAL,
+			a.fetchedMangaFromMAL,
+			malAnimeFavs,
+			malMangaFavs,
+		)
+
+		// Add result to sync report for summary display
+		a.syncReport.AddFavoritesResult(result)
+
+		if result.Added > 0 {
+			LogInfoSuccess(ctx, "Favorites sync complete: +%d added on AniList (%d skipped)",
+				result.Added, result.Skipped)
+		} else {
+			LogInfo(ctx, "Favorites sync complete: all in sync (%d entries checked)", result.Skipped)
+		}
+
+		if result.Errors > 0 {
+			LogWarn(ctx, "Favorites sync had %d errors", result.Errors)
+		}
+	} else {
+		// AniList -> MAL: only report (cannot write to MAL)
+		result = a.favSync.ReportMismatches(
+			ctx,
+			a.fetchedAnimeFromAniList,
+			a.fetchedMangaFromAniList,
+			malAnimeFavs,
+			malMangaFavs,
+		)
+
+		// Add mismatches to sync report
+		a.syncReport.AddFavoritesResult(result)
+
+		if len(result.Mismatches) > 0 {
+			LogInfo(ctx, "Favorites mismatches found: %d (AniList->MAL, report only)", len(result.Mismatches))
+		} else {
+			LogInfoSuccess(ctx, "Favorites complete: all in sync")
+		}
+	}
 }
