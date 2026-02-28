@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -12,6 +11,7 @@ import (
 )
 
 func TestNewJikanCache(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 
 	cache := NewJikanCache(tmpDir, 168*time.Hour)
@@ -20,6 +20,7 @@ func TestNewJikanCache(t *testing.T) {
 }
 
 func TestJikanCache_SetGet(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	cache := NewJikanCache(tmpDir, 168*time.Hour)
 
@@ -33,6 +34,7 @@ func TestJikanCache_SetGet(t *testing.T) {
 }
 
 func TestJikanCache_NotFound(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	cache := NewJikanCache(tmpDir, 168*time.Hour)
 
@@ -41,13 +43,14 @@ func TestJikanCache_NotFound(t *testing.T) {
 }
 
 func TestJikanCache_SaveLoad(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	cache := NewJikanCache(tmpDir, 168*time.Hour)
 
 	data, _ := json.Marshal(map[string]interface{}{"mal_id": 123, "title": "One Piece"})
 	cache.Set(123, data)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	err := cache.Save(ctx)
 	assert.NoError(t, err)
 
@@ -61,6 +64,7 @@ func TestJikanCache_SaveLoad(t *testing.T) {
 }
 
 func TestJikanCache_Expiration(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	cache := NewJikanCache(tmpDir, 1*time.Millisecond)
 
@@ -80,6 +84,7 @@ func TestJikanCache_Expiration(t *testing.T) {
 }
 
 func TestJikanCache_SearchSetGet(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	cache := NewJikanCache(tmpDir, 168*time.Hour)
 
@@ -100,6 +105,7 @@ func TestJikanCache_SearchSetGet(t *testing.T) {
 }
 
 func TestJikanCache_SearchExpiration(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	cache := NewJikanCache(tmpDir, 1*time.Millisecond)
 
@@ -116,10 +122,11 @@ func TestJikanCache_SearchExpiration(t *testing.T) {
 }
 
 func TestJikanCache_DirtyFlag(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	cache := NewJikanCache(tmpDir, 168*time.Hour)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// First save should create file
 	data, _ := json.Marshal(map[string]interface{}{"mal_id": 123})
@@ -158,6 +165,7 @@ func TestJikanCache_DirtyFlag(t *testing.T) {
 }
 
 func TestJikanCache_NegativeCache(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	cache := NewJikanCache(tmpDir, 168*time.Hour)
 
@@ -170,6 +178,7 @@ func TestJikanCache_NegativeCache(t *testing.T) {
 }
 
 func TestJikanCache_SearchNormalization(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	cache := NewJikanCache(tmpDir, 168*time.Hour)
 
@@ -182,6 +191,7 @@ func TestJikanCache_SearchNormalization(t *testing.T) {
 }
 
 func TestGetDefaultJikanCacheDir(t *testing.T) {
+	t.Parallel()
 	dir := getDefaultJikanCacheDir()
 	assert.NotEmpty(t, dir)
 	assert.Contains(t, dir, "anilist-mal-sync")

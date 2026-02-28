@@ -97,7 +97,7 @@ func (s ManualMappingStrategy) FindTarget(
 		return nil, false, nil
 	}
 
-	targetID, found := s.lookupManualMapping(src)
+	targetID, found := s.lookupManualMapping(ctx, src)
 	if !found {
 		return nil, false, nil
 	}
@@ -112,18 +112,19 @@ func (s ManualMappingStrategy) FindTarget(
 	return nil, false, nil
 }
 
-func (s ManualMappingStrategy) lookupManualMapping(src Source) (int, bool) {
+func (s ManualMappingStrategy) lookupManualMapping(ctx context.Context, src Source) (int, bool) {
 	switch v := src.(type) {
 	case Anime:
-		return s.lookupByIDs(v.IDAnilist, v.IDMal)
+		return s.lookupByIDs(ctx, v.IDAnilist, v.IDMal)
 	case Manga:
-		return s.lookupByIDs(v.IDAnilist, v.IDMal)
+		return s.lookupByIDs(ctx, v.IDAnilist, v.IDMal)
 	}
 	return 0, false
 }
 
-func (s ManualMappingStrategy) lookupByIDs(anilistID, malID int) (int, bool) {
-	if *reverseDirection {
+func (s ManualMappingStrategy) lookupByIDs(ctx context.Context, anilistID, malID int) (int, bool) {
+	direction := DirectionFromContext(ctx)
+	if direction == SyncDirectionReverse {
 		return s.lookupReverse(anilistID, malID)
 	}
 	return s.lookupForward(anilistID, malID)
@@ -169,7 +170,8 @@ func (s IDStrategy) Name() string {
 func (s IDStrategy) FindTarget(
 	ctx context.Context, src Source, existingTargets map[TargetID]Target, prefix string, _ *SyncReport,
 ) (Target, bool, error) {
-	srcID := src.GetTargetID()
+	direction := DirectionFromContext(ctx)
+	srcID := GetTargetIDWithDirection(src, direction)
 	target, found := existingTargets[srcID]
 	if found {
 		LogDebugDecision(ctx, "[%s] Found target by ID %d (direct lookup in user's list): %s", prefix, srcID, target.GetTitle())
@@ -306,7 +308,8 @@ func (s MALIDStrategy) FindTarget(
 	default:
 	}
 
-	srcID := src.GetSourceID()
+	direction := DirectionFromContext(ctx)
+	srcID := GetSourceIDWithDirection(src, direction)
 	if srcID <= 0 {
 		return nil, false, nil
 	}

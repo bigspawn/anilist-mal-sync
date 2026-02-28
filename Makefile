@@ -1,4 +1,4 @@
-.PHONY: build test lint fmt check clean install hooks-install hooks-uninstall dry-run generate
+.PHONY: build test lint fmt check clean install dry-run generate
 
 # Load .env file if exists
 -include .env
@@ -38,15 +38,6 @@ install:
 		go install golang.org/x/vuln/cmd/govulncheck@latest
 	@echo "✓ govulncheck installed"
 	@echo ""
-	@echo "Installing lefthook (Git hooks manager)..."
-	@which lefthook > /dev/null 2>&1 || \
-		brew install lefthook
-	@echo "✓ lefthook installed"
-	@echo ""
-	@echo "Installing Git hooks..."
-	@lefthook install
-	@echo "✓ Git hooks installed"
-	@echo ""
 	@echo "✅ All development tools installed successfully!"
 	@echo ""
 	@echo "Available commands:"
@@ -71,7 +62,7 @@ dry-run:
 
 # Run tests
 test:
-	go test ./... -v
+	go test ./... -v -race
 
 # Generate mocks using mockgen
 generate:
@@ -124,18 +115,6 @@ clean:
 	@go clean -testcache
 	@echo "Cleanup complete!"
 
-# Install Git hooks via Lefthook
-hooks-install:
-	@echo "Installing Git hooks..."
-	@lefthook install
-	@echo "Git hooks installed successfully!"
-
-# Uninstall Git hooks via Lefthook
-hooks-uninstall:
-	@echo "Uninstalling Git hooks..."
-	@lefthook uninstall
-	@echo "Git hooks uninstalled!"
-
 # Show help
 help:
 	@echo "Available commands:"
@@ -148,6 +127,4 @@ help:
 	@echo "  lint             - Run linter (golangci-lint $(LINT_VERSION))"
 	@echo "  check            - Run all checks (generate + format + imports + lint + vet + test)"
 	@echo "  clean            - Remove build artifacts, temporary files and clean test cache"
-	@echo "  hooks-install    - Install Git hooks via Lefthook (auto-run lint/format on commit)"
-	@echo "  hooks-uninstall  - Uninstall Git hooks"
 	@echo "  help             - Show this help message"

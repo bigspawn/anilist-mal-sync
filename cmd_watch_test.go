@@ -19,6 +19,7 @@ const (
 // =============================================================================
 
 func TestWatchCommand_Exists(t *testing.T) {
+	t.Parallel()
 	rootCmd := NewCLI()
 
 	var watchCmd *cli.Command
@@ -39,6 +40,7 @@ func TestWatchCommand_Exists(t *testing.T) {
 }
 
 func TestWatchCommand_HasFlags(t *testing.T) {
+	t.Parallel()
 	rootCmd := NewCLI()
 
 	var watchCmd *cli.Command
@@ -76,6 +78,7 @@ func TestWatchCommand_HasFlags(t *testing.T) {
 }
 
 func TestWatchCommand_IntervalFlag_HasCorrectDefaults(t *testing.T) {
+	t.Parallel()
 	rootCmd := NewCLI()
 
 	var watchCmd *cli.Command
@@ -117,6 +120,7 @@ func TestWatchCommand_IntervalFlag_HasCorrectDefaults(t *testing.T) {
 }
 
 func TestWatchCommand_OnceFlag_IsBool(t *testing.T) {
+	t.Parallel()
 	rootCmd := NewCLI()
 
 	var watchCmd *cli.Command
@@ -151,6 +155,7 @@ func TestWatchCommand_OnceFlag_IsBool(t *testing.T) {
 // =============================================================================
 
 func TestValidateInterval_ValidIntervals(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		interval time.Duration
@@ -195,6 +200,7 @@ func validateInterval(interval time.Duration) error {
 // =============================================================================
 
 func TestWatch_CLI_Overrides_Config(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
 
@@ -256,6 +262,7 @@ watch:
 }
 
 func TestWatch_ConfigOnly(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
 
@@ -295,6 +302,7 @@ watch:
 }
 
 func TestWatch_NoInterval_Error(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
 
@@ -331,6 +339,7 @@ myanimelist:
 }
 
 func TestWatch_InvalidConfigInterval_Error(t *testing.T) {
+	t.Parallel()
 	w := WatchConfig{Interval: "invalid-duration"}
 	_, err := w.GetInterval()
 	if err == nil {
@@ -339,6 +348,7 @@ func TestWatch_InvalidConfigInterval_Error(t *testing.T) {
 }
 
 func TestWatch_IntervalValidation_Config_TooSmall(t *testing.T) {
+	t.Parallel()
 	w := WatchConfig{Interval: "30m"}
 	got, err := w.GetInterval()
 	if err != nil {
@@ -350,6 +360,7 @@ func TestWatch_IntervalValidation_Config_TooSmall(t *testing.T) {
 }
 
 func TestWatch_IntervalValidation_Config_TooLarge(t *testing.T) {
+	t.Parallel()
 	w := WatchConfig{Interval: "200h"}
 	got, err := w.GetInterval()
 	if err != nil {

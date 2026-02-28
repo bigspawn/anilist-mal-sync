@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -11,6 +10,7 @@ import (
 )
 
 func TestNewHatoCache(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 
 	cache, err := NewHatoCache(tmpDir)
@@ -20,6 +20,7 @@ func TestNewHatoCache(t *testing.T) {
 }
 
 func TestHatoCache_SetGet(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	cache, _ := NewHatoCache(tmpDir)
 
@@ -42,6 +43,7 @@ func TestHatoCache_SetGet(t *testing.T) {
 }
 
 func TestHatoCache_NotFound(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	cache, _ := NewHatoCache(tmpDir)
 
@@ -50,6 +52,7 @@ func TestHatoCache_NotFound(t *testing.T) {
 }
 
 func TestHatoCache_SaveLoad(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	cache, _ := NewHatoCache(tmpDir)
 
@@ -64,7 +67,7 @@ func TestHatoCache_SaveLoad(t *testing.T) {
 
 	cache.Set("mal", "anime", 456, data)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	err := cache.Save(ctx)
 	assert.NoError(t, err)
 
@@ -79,10 +82,11 @@ func TestHatoCache_SaveLoad(t *testing.T) {
 }
 
 func TestHatoCache_DirtyFlag(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	cache, _ := NewHatoCache(tmpDir)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// First save should create file
 	anilistID := 123
@@ -124,6 +128,7 @@ func TestHatoCache_DirtyFlag(t *testing.T) {
 }
 
 func TestHatoCache_BuildCacheKey(t *testing.T) {
+	t.Parallel()
 	key := buildCacheKey("mal", "anime", 123)
 	assert.Equal(t, "mal_anime_123", key)
 
@@ -132,6 +137,7 @@ func TestHatoCache_BuildCacheKey(t *testing.T) {
 }
 
 func TestHatoCache_MultipleEntries(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	cache, _ := NewHatoCache(tmpDir)
 
@@ -153,6 +159,7 @@ func TestHatoCache_MultipleEntries(t *testing.T) {
 }
 
 func TestHatoCache_NegativeCache(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	cache, _ := NewHatoCache(tmpDir)
 
@@ -167,6 +174,7 @@ func TestHatoCache_NegativeCache(t *testing.T) {
 }
 
 func TestGetDefaultHatoCacheDir(t *testing.T) {
+	t.Parallel()
 	dir := getDefaultHatoCacheDir()
 	assert.NotEmpty(t, dir)
 	assert.Contains(t, dir, "anilist-mal-sync")

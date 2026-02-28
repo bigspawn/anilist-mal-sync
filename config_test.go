@@ -8,6 +8,7 @@ import (
 )
 
 func TestLoadConfigFromFile_Success(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
 
@@ -60,6 +61,7 @@ myanimelist:
 }
 
 func TestLoadConfigFromFile_NotFound(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "nonexistent.yaml")
 
@@ -75,6 +77,7 @@ func TestLoadConfigFromFile_NotFound(t *testing.T) {
 }
 
 func TestLoadConfigFromFile_InvalidYAML(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "invalid.yaml")
 
@@ -174,6 +177,7 @@ myanimelist:
 }
 
 func TestLoadConfigFromFile_MissingMALUsername(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
 
@@ -204,6 +208,7 @@ myanimelist:
 }
 
 func TestGetConfigHelp_ReturnsValidString(t *testing.T) {
+	t.Parallel()
 	help := getConfigHelp("config.yaml")
 
 	if help == "" {
@@ -227,6 +232,7 @@ func TestGetConfigHelp_ReturnsValidString(t *testing.T) {
 }
 
 func TestIsConfigNotFoundError_ConfigNotFoundError(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		err  error
@@ -258,6 +264,7 @@ func TestIsConfigNotFoundError_ConfigNotFoundError(t *testing.T) {
 }
 
 func TestLoadConfigFromFile_DefaultTokenPath(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
 
@@ -303,6 +310,7 @@ myanimelist:
 }
 
 func TestLoadConfigFromFile_CustomTokenPath(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
 	customTokenPath := filepath.Join(tmpDir, "custom_tokens.json")
@@ -344,6 +352,7 @@ token_file_path: "` + customTokenPath + `"
 // =============================================================================
 
 func TestWatchConfig_GetInterval(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		interval string
@@ -378,6 +387,7 @@ func TestWatchConfig_GetInterval(t *testing.T) {
 }
 
 func TestWatchConfig_GetInterval_Empty(t *testing.T) {
+	t.Parallel()
 	w := WatchConfig{Interval: ""}
 	got, err := w.GetInterval()
 	if err != nil {
@@ -389,6 +399,7 @@ func TestWatchConfig_GetInterval_Empty(t *testing.T) {
 }
 
 func TestWatchConfig_GetInterval_Invalid(t *testing.T) {
+	t.Parallel()
 	w := WatchConfig{Interval: "not-a-duration"}
 	_, err := w.GetInterval()
 	if err == nil {
@@ -449,6 +460,7 @@ func TestLoadConfigFromEnv_MissingRequiredFields(t *testing.T) {
 }
 
 func TestGetDefaultTokenPath(t *testing.T) {
+	t.Parallel()
 	path, err := getDefaultTokenPath()
 	if err != nil {
 		t.Fatalf("getDefaultTokenPath() failed: %v", err)

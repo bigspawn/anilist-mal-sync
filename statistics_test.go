@@ -2,10 +2,7 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"errors"
-	"log"
-	"os"
 	"testing"
 	"time"
 
@@ -13,6 +10,7 @@ import (
 )
 
 func TestStatistics_Reset(t *testing.T) {
+	t.Parallel()
 	stats := &Statistics{
 		UpdatedCount: 42,
 		SkippedCount: 100,
@@ -27,6 +25,7 @@ func TestStatistics_Reset(t *testing.T) {
 }
 
 func TestStatistics_ResetOnEmpty(t *testing.T) {
+	t.Parallel()
 	stats := &Statistics{}
 
 	stats.Reset()
@@ -37,6 +36,7 @@ func TestStatistics_ResetOnEmpty(t *testing.T) {
 }
 
 func TestStatistics_ResetMultipleTimes(t *testing.T) {
+	t.Parallel()
 	stats := &Statistics{
 		UpdatedCount: 10,
 		SkippedCount: 5,
@@ -57,13 +57,11 @@ func TestStatistics_ResetMultipleTimes(t *testing.T) {
 }
 
 func TestStatistics_PrintLogsCorrectly(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
-	log.SetOutput(&buf)
-	defer log.SetOutput(os.Stderr)
-
 	logger := NewLogger(false)
 	logger.SetOutput(&buf)
-	ctx := logger.WithContext(context.Background())
+	ctx := logger.WithContext(t.Context())
 
 	stats := NewStatistics()
 	stats.UpdatedCount = 42
@@ -80,13 +78,11 @@ func TestStatistics_PrintLogsCorrectly(t *testing.T) {
 }
 
 func TestStatistics_PrintWithZeroValues(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
-	log.SetOutput(&buf)
-	defer log.SetOutput(os.Stderr)
-
 	logger := NewLogger(false)
 	logger.SetOutput(&buf)
-	ctx := logger.WithContext(context.Background())
+	ctx := logger.WithContext(t.Context())
 
 	stats := NewStatistics()
 
@@ -98,6 +94,7 @@ func TestStatistics_PrintWithZeroValues(t *testing.T) {
 }
 
 func TestStatistics_WatchModeFlow(t *testing.T) {
+	t.Parallel()
 	updater := &Updater{
 		Prefix:     "Test Watch Mode",
 		Statistics: NewStatistics(),
@@ -125,6 +122,7 @@ func TestStatistics_WatchModeFlow(t *testing.T) {
 }
 
 func TestStatistics_NoResetAccumulationBug(t *testing.T) {
+	t.Parallel()
 	updater := &Updater{
 		Prefix:     "Buggy Watch Mode",
 		Statistics: &Statistics{},
@@ -153,6 +151,7 @@ func TestStatistics_NoResetAccumulationBug(t *testing.T) {
 }
 
 func TestStatistics_AllCountersIndependent(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		updated int
@@ -168,6 +167,7 @@ func TestStatistics_AllCountersIndependent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			stats := &Statistics{
 				UpdatedCount: tt.updated,
 				SkippedCount: tt.skipped,
@@ -184,6 +184,7 @@ func TestStatistics_AllCountersIndependent(t *testing.T) {
 }
 
 func TestUpdater_StatisticsIntegration(t *testing.T) {
+	t.Parallel()
 	updater := &Updater{
 		Prefix:     "Integration Test",
 		Statistics: &Statistics{},
@@ -207,12 +208,14 @@ func TestUpdater_StatisticsIntegration(t *testing.T) {
 }
 
 func TestPerformSync_ResetsAfterPrint(t *testing.T) {
+	t.Parallel()
 	// Integration test to verify Reset() is called after Print()
 	// This tests the fixed behavior in performSync()
 
 	var buf bytes.Buffer
-	log.SetOutput(&buf)
-	defer log.SetOutput(os.Stderr)
+	logger := NewLogger(false)
+	logger.SetOutput(&buf)
+	ctx := logger.WithContext(t.Context())
 
 	stats := &Statistics{
 		UpdatedCount: 10,
@@ -224,12 +227,13 @@ func TestPerformSync_ResetsAfterPrint(t *testing.T) {
 	prefix := "Test Sync"
 
 	// Print first (before reset)
-	stats.Print(context.Background(), prefix)
+	stats.Print(ctx, prefix)
 	output := buf.String()
 
 	// Verify output contains the counts
-	assert.Contains(t, output, "[Test Sync] Updated 10 out of 15")
-	assert.Contains(t, output, "[Test Sync] Skipped 5")
+	assert.Contains(t, output, "Total items: 15")
+	assert.Contains(t, output, "Updated: 10")
+	assert.Contains(t, output, "Skipped: 5")
 
 	// Reset after print
 	stats.Reset()
@@ -241,14 +245,17 @@ func TestPerformSync_ResetsAfterPrint(t *testing.T) {
 
 	// If we print again, should show zeros
 	buf.Reset()
-	stats.Print(context.Background(), prefix)
+	stats.Print(ctx, prefix)
 	output = buf.String()
 
-	assert.Contains(t, output, "[Test Sync] Updated 0 out of 0")
-	assert.Contains(t, output, "[Test Sync] Skipped 0")
+	assert.Contains(t, output, "Total items: 0")
+	assert.Contains(t, output, "Updated: 0")
+	// Skipped is not shown when count is 0
+	assert.NotContains(t, output, "Skipped:")
 }
 
 func TestStatistics_ResetIdempotent(t *testing.T) {
+	t.Parallel()
 	stats := &Statistics{
 		UpdatedCount: 999,
 		SkippedCount: 888,
@@ -265,11 +272,7 @@ func TestStatistics_ResetIdempotent(t *testing.T) {
 }
 
 func TestStatistics_WatchModeMultipleIterations(t *testing.T) {
-	updater := &Updater{
-		Prefix:     "Watch Mode Test",
-		Statistics: &Statistics{},
-	}
-
+	t.Parallel()
 	iterations := []struct {
 		updated int
 		skipped int
@@ -282,15 +285,22 @@ func TestStatistics_WatchModeMultipleIterations(t *testing.T) {
 	}
 
 	for i, iter := range iterations {
+		tt := iter
 		t.Run("Iteration "+string(rune('1'+i)), func(t *testing.T) {
+			t.Parallel()
+			// Create separate updater for each iteration to avoid race conditions
+			updater := &Updater{
+				Prefix:     "Watch Mode Test",
+				Statistics: &Statistics{},
+			}
 			// Simulate counting
-			updater.Statistics.UpdatedCount = iter.updated
-			updater.Statistics.SkippedCount = iter.skipped
-			updater.Statistics.TotalCount = iter.total
+			updater.Statistics.UpdatedCount = tt.updated
+			updater.Statistics.SkippedCount = tt.skipped
+			updater.Statistics.TotalCount = tt.total
 
-			assert.Equal(t, iter.updated, updater.Statistics.UpdatedCount)
-			assert.Equal(t, iter.skipped, updater.Statistics.SkippedCount)
-			assert.Equal(t, iter.total, updater.Statistics.TotalCount)
+			assert.Equal(t, tt.updated, updater.Statistics.UpdatedCount)
+			assert.Equal(t, tt.skipped, updater.Statistics.SkippedCount)
+			assert.Equal(t, tt.total, updater.Statistics.TotalCount)
 
 			// Reset for next iteration
 			updater.Statistics.Reset()
@@ -303,6 +313,7 @@ func TestStatistics_WatchModeMultipleIterations(t *testing.T) {
 }
 
 func TestStatistics_RecordSkipAndUpdate(t *testing.T) {
+	t.Parallel()
 	// This tests that RecordSkip() and RecordUpdate() work correctly
 	// with properly initialized Statistics
 	stats := NewStatistics()
@@ -317,6 +328,7 @@ func TestStatistics_RecordSkipAndUpdate(t *testing.T) {
 }
 
 func TestStatistics_RecordSkipPanicWithoutInit(t *testing.T) {
+	t.Parallel()
 	// This demonstrates the bug - using new(Statistics) causes panic
 	// because StatusCounts is nil
 	stats := &Statistics{} // or new(Statistics)
@@ -327,6 +339,7 @@ func TestStatistics_RecordSkipPanicWithoutInit(t *testing.T) {
 }
 
 func TestStatistics_RecordUpdatePanicWithoutInit(t *testing.T) {
+	t.Parallel()
 	// This demonstrates the bug - using new(Statistics) causes panic
 	// because StatusCounts is nil
 	stats := new(Statistics)
@@ -337,13 +350,11 @@ func TestStatistics_RecordUpdatePanicWithoutInit(t *testing.T) {
 }
 
 func TestPrintGlobalSummary(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
-	log.SetOutput(&buf)
-	defer log.SetOutput(os.Stderr)
-
 	logger := NewLogger(false)
 	logger.SetOutput(&buf)
-	ctx := logger.WithContext(context.Background())
+	ctx := logger.WithContext(t.Context())
 
 	// Create multiple statistics
 	stats1 := NewStatistics()
@@ -382,13 +393,11 @@ func TestPrintGlobalSummary(t *testing.T) {
 }
 
 func TestPrintGlobalSummary_EmptyStats(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
-	log.SetOutput(&buf)
-	defer log.SetOutput(os.Stderr)
-
 	logger := NewLogger(false)
 	logger.SetOutput(&buf)
-	ctx := logger.WithContext(context.Background())
+	ctx := logger.WithContext(t.Context())
 
 	report := NewSyncReport()
 	statsArray := []*Statistics{}
@@ -403,13 +412,11 @@ func TestPrintGlobalSummary_EmptyStats(t *testing.T) {
 }
 
 func TestPrintGlobalSummary_WithWarnings(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
-	log.SetOutput(&buf)
-	defer log.SetOutput(os.Stderr)
-
 	logger := NewLogger(false)
 	logger.SetOutput(&buf)
-	ctx := logger.WithContext(context.Background())
+	ctx := logger.WithContext(t.Context())
 
 	stats := NewStatistics()
 	stats.UpdatedCount = 1
@@ -431,13 +438,11 @@ func TestPrintGlobalSummary_WithWarnings(t *testing.T) {
 }
 
 func TestPrintGlobalSummary_WithErrors(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
-	log.SetOutput(&buf)
-	defer log.SetOutput(os.Stderr)
-
 	logger := NewLogger(false)
 	logger.SetOutput(&buf)
-	ctx := logger.WithContext(context.Background())
+	ctx := logger.WithContext(t.Context())
 
 	stats := NewStatistics()
 	stats.UpdatedCount = 1
@@ -461,13 +466,11 @@ func TestPrintGlobalSummary_WithErrors(t *testing.T) {
 }
 
 func TestPrintGlobalSummary_SkipReasonsAggregation(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
-	log.SetOutput(&buf)
-	defer log.SetOutput(os.Stderr)
-
 	logger := NewLogger(false)
 	logger.SetOutput(&buf)
-	ctx := logger.WithContext(context.Background())
+	ctx := logger.WithContext(t.Context())
 
 	// Create stats with various skip reasons
 	stats1 := NewStatistics()
@@ -499,6 +502,7 @@ func TestPrintGlobalSummary_SkipReasonsAggregation(t *testing.T) {
 }
 
 func TestStatistics_RecordDryRun(t *testing.T) {
+	t.Parallel()
 	stats := NewStatistics()
 
 	stats.RecordDryRun(UpdateResult{Title: "Test", Status: "watching", Detail: "dry run"})
@@ -510,6 +514,7 @@ func TestStatistics_RecordDryRun(t *testing.T) {
 }
 
 func TestStatistics_ResetClearsDryRun(t *testing.T) {
+	t.Parallel()
 	stats := NewStatistics()
 	stats.RecordDryRun(UpdateResult{Title: "Test", Status: "watching"})
 	stats.DryRunCount = 5
@@ -521,13 +526,11 @@ func TestStatistics_ResetClearsDryRun(t *testing.T) {
 }
 
 func TestPrintGlobalSummary_WithDryRunItems(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
-	log.SetOutput(&buf)
-	defer log.SetOutput(os.Stderr)
-
 	logger := NewLogger(false)
 	logger.SetOutput(&buf)
-	ctx := logger.WithContext(context.Background())
+	ctx := logger.WithContext(t.Context())
 
 	stats := NewStatistics()
 	stats.DryRunCount = 2

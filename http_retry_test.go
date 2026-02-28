@@ -71,7 +71,7 @@ func TestShouldRetryStatus(t *testing.T) {
 
 func TestCloneRequest(t *testing.T) {
 	original, _ := http.NewRequestWithContext(
-		context.Background(),
+		t.Context(),
 		http.MethodPost,
 		"http://example.com",
 		io.NopCloser(strings.NewReader("test-body")),
@@ -108,7 +108,8 @@ func TestCloneRequest(t *testing.T) {
 // ============================================
 
 func TestRetryableRoundTripper_RetryOn500(t *testing.T) {
-	t.Parallel()
+	// Timing-sensitive test: depends on HTTP request execution speed
+	// Remove t.Parallel() to avoid flaky failures when CPU is overloaded
 	attempts := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		attempts++
@@ -123,7 +124,7 @@ func TestRetryableRoundTripper_RetryOn500(t *testing.T) {
 	transport := NewRetryableTransport(&http.Client{}, 3)
 	client := &http.Client{Transport: transport}
 
-	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, server.URL, nil)
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL, nil)
 	resp, err := client.Do(req)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -144,7 +145,7 @@ func TestRetryableRoundTripper_NoRetryOnSuccess(t *testing.T) {
 	transport := NewRetryableTransport(&http.Client{}, 3)
 	client := &http.Client{Transport: transport}
 
-	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, server.URL, nil)
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL, nil)
 	resp, err := client.Do(req)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -170,7 +171,7 @@ func TestRetryableRoundTripper_RetryOn429(t *testing.T) {
 	transport := NewRetryableTransport(&http.Client{}, 3)
 	client := &http.Client{Transport: transport}
 
-	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, server.URL, nil)
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL, nil)
 	resp, err := client.Do(req)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -189,7 +190,7 @@ func TestRetryableRoundTripper_ContextCancellation(t *testing.T) {
 	}))
 	defer server.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	transport := NewRetryableTransport(&http.Client{}, 10)
 	client := &http.Client{Transport: transport}
 
@@ -228,7 +229,7 @@ func TestRetryableRoundTripper_NoRetryOn4xx(t *testing.T) {
 	transport := NewRetryableTransport(&http.Client{}, 3)
 	client := &http.Client{Transport: transport}
 
-	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, server.URL, nil)
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL, nil)
 	resp, err := client.Do(req)
 	if err != nil {
 		t.Fatalf("expected no error for 404, got %v", err)
@@ -240,7 +241,8 @@ func TestRetryableRoundTripper_NoRetryOn4xx(t *testing.T) {
 }
 
 func TestRetryableRoundTripper_WithBody(t *testing.T) {
-	t.Parallel()
+	// Timing-sensitive test: depends on HTTP request execution speed
+	// Remove t.Parallel() to avoid flaky failures when CPU is overloaded
 	attempts := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		attempts++
@@ -257,7 +259,7 @@ func TestRetryableRoundTripper_WithBody(t *testing.T) {
 	transport := NewRetryableTransport(&http.Client{}, 3)
 	client := &http.Client{Transport: transport}
 
-	req, _ := http.NewRequestWithContext(context.Background(), http.MethodPost, server.URL, io.NopCloser(strings.NewReader("test-body")))
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodPost, server.URL, io.NopCloser(strings.NewReader("test-body")))
 	resp, err := client.Do(req)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -269,7 +271,8 @@ func TestRetryableRoundTripper_WithBody(t *testing.T) {
 }
 
 func TestRetryableRoundTripper_MaxRetriesExhausted(t *testing.T) {
-	t.Parallel()
+	// Timing-sensitive test: depends on HTTP request execution speed
+	// Remove t.Parallel() to avoid flaky failures when CPU is overloaded
 	attempts := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		attempts++
@@ -280,7 +283,7 @@ func TestRetryableRoundTripper_MaxRetriesExhausted(t *testing.T) {
 	transport := NewRetryableTransport(&http.Client{}, 2)
 	client := &http.Client{Transport: transport}
 
-	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, server.URL, nil)
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL, nil)
 	resp, err := client.Do(req)
 	if resp != nil {
 		_ = resp.Body.Close()

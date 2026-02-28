@@ -8,6 +8,8 @@ import (
 )
 
 func TestLogger_InfoDryRun(t *testing.T) {
+	t.Parallel()
+
 	var buf bytes.Buffer
 	logger := NewLogger(false)
 	logger.SetOutput(&buf)
@@ -20,6 +22,8 @@ func TestLogger_InfoDryRun(t *testing.T) {
 }
 
 func TestLogger_InfoDryRunWithColor(t *testing.T) {
+	t.Parallel()
+
 	var buf bytes.Buffer
 	logger := NewLogger(true)
 	logger.SetOutput(&buf)
@@ -32,6 +36,8 @@ func TestLogger_InfoDryRunWithColor(t *testing.T) {
 }
 
 func TestLogger_InfoDryRunBelowLevel(t *testing.T) {
+	t.Parallel()
+
 	var buf bytes.Buffer
 	logger := NewLogger(false) // LogLevelInfo
 	logger.SetOutput(&buf)

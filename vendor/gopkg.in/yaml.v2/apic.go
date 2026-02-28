@@ -5,7 +5,7 @@ import (
 )
 
 func yaml_insert_token(parser *yaml_parser_t, pos int, token *yaml_token_t) {
-	// fmt.Println("yaml_insert_token", "pos:", pos, "typ:", token.typ, "head:", parser.tokens_head, "len:", len(parser.tokens))
+	//fmt.Println("yaml_insert_token", "pos:", pos, "typ:", token.typ, "head:", parser.tokens_head, "len:", len(parser.tokens))
 
 	// Check if we can move the queue at the beginning of the buffer.
 	if parser.tokens_head > 0 && len(parser.tokens) == cap(parser.tokens) {
@@ -143,7 +143,7 @@ func yaml_emitter_set_canonical(emitter *yaml_emitter_t, canonical bool) {
 	emitter.canonical = canonical
 }
 
-// // Set the indentation increment.
+//// Set the indentation increment.
 func yaml_emitter_set_indent(emitter *yaml_emitter_t, indent int) {
 	if indent < 2 || indent > 9 {
 		indent = 2

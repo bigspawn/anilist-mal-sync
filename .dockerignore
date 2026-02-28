@@ -14,7 +14,6 @@ doc/
 examples/
 LICENSE
 Makefile
-lefthook.yml
 .golangci.yml
 docker-compose*.yaml
 docker-compose*.yml

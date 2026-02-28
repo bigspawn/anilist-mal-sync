@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -18,6 +17,8 @@ import (
 // ============================================
 
 func TestLogger_Colorize(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		useColor bool
@@ -40,6 +41,7 @@ func TestLogger_Colorize(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			logger := &Logger{useColors: tt.useColor}
 			result := logger.colorize(tt.color, tt.text)
 
@@ -61,11 +63,13 @@ func TestLogger_Colorize(t *testing.T) {
 }
 
 func TestLog_WithContext(t *testing.T) {
+	t.Parallel()
+
 	var buf bytes.Buffer
 	logger := NewLogger(false)
 	logger.SetOutput(&buf)
 
-	ctx := logger.WithContext(context.Background())
+	ctx := logger.WithContext(t.Context())
 
 	LogInfo(ctx, "test info")
 	if !strings.Contains(buf.String(), "test info") {
@@ -90,6 +94,8 @@ func TestLog_WithContext(t *testing.T) {
 // ============================================
 
 func TestCreateDirIfNotExists_NewDir(t *testing.T) {
+	t.Parallel()
+
 	tmpDir := t.TempDir()
 	// Only create a single subdirectory, not nested ones
 	newDirPath := filepath.Join(tmpDir, "newdir", "file.json")
@@ -111,6 +117,8 @@ func TestCreateDirIfNotExists_NewDir(t *testing.T) {
 }
 
 func TestCreateDirIfNotExists_ExistingDir(t *testing.T) {
+	t.Parallel()
+
 	tmpDir := t.TempDir()
 
 	err := createDirIfNotExists(tmpDir)
@@ -141,6 +149,8 @@ func TestGetEnvOrDefault(t *testing.T) {
 }
 
 func TestGetDefaultTokenPathOrEmpty(t *testing.T) {
+	t.Parallel()
+
 	path := getDefaultTokenPathOrEmpty()
 
 	// Should return a non-empty path on most systems
@@ -160,6 +170,8 @@ func TestGetDefaultTokenPathOrEmpty(t *testing.T) {
 // ============================================
 
 func TestRandHTTPParamString(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		length  int
@@ -184,6 +196,7 @@ func TestRandHTTPParamString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := randHTTPParamString(tt.length)
 			if len(got) != tt.wantLen {
 				t.Errorf("got length %d, want %d", len(got), tt.wantLen)
@@ -207,7 +220,9 @@ func TestRandHTTPParamString(t *testing.T) {
 }
 
 func TestWithTimeout(t *testing.T) {
-	ctx := context.Background()
+	t.Parallel()
+
+	ctx := t.Context()
 	timeout := 100 * time.Millisecond
 
 	newCtx, cancel := withTimeout(ctx, timeout)
@@ -236,6 +251,8 @@ func TestWithTimeout(t *testing.T) {
 // ============================================
 
 func TestMin3(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		a, b, c int
@@ -270,6 +287,7 @@ func TestMin3(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := min3(tt.a, tt.b, tt.c)
 			if got != tt.want {
 				t.Errorf("got %d, want %d", got, tt.want)
@@ -279,6 +297,8 @@ func TestMin3(t *testing.T) {
 }
 
 func TestNormalizeTitle(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name  string
 		title string
@@ -343,6 +363,7 @@ func TestNormalizeTitle(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := normalizeTitle(tt.title)
 			if got != tt.want {
 				t.Errorf("got %q, want %q", got, tt.want)
@@ -352,6 +373,8 @@ func TestNormalizeTitle(t *testing.T) {
 }
 
 func TestExactMatch(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name       string
 		t1, t2     string
@@ -404,6 +427,7 @@ func TestExactMatch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := exactMatch(tt.t1, tt.t2, tt.titleType)
 			if got != tt.wantResult {
 				t.Errorf("got %v, want %v", got, tt.wantResult)
@@ -413,6 +437,8 @@ func TestExactMatch(t *testing.T) {
 }
 
 func TestNormalizedMatch(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name       string
 		t1, t2     string
@@ -465,6 +491,7 @@ func TestNormalizedMatch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := normalizedMatch(tt.t1, tt.t2, tt.titleType)
 			if got != tt.wantResult {
 				t.Errorf("got %v, want %v", got, tt.wantResult)
@@ -478,6 +505,8 @@ func TestNormalizedMatch(t *testing.T) {
 // ============================================
 
 func TestNewLoggingRoundTripper_NilBase(t *testing.T) {
+	t.Parallel()
+
 	rt := newLoggingRoundTripper(nil, false)
 
 	if rt == nil {
@@ -493,6 +522,8 @@ func TestNewLoggingRoundTripper_NilBase(t *testing.T) {
 }
 
 func TestNewLoggingRoundTripper_WithBase(t *testing.T) {
+	t.Parallel()
+
 	base := &http.Transport{}
 	rt := newLoggingRoundTripper(base, true)
 
@@ -516,6 +547,8 @@ func TestNewLoggingRoundTripper_WithBase(t *testing.T) {
 // ============================================
 
 func TestBuildDiffString(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name  string
 		pairs []any
@@ -555,6 +588,7 @@ func TestBuildDiffString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := buildDiffString(tt.pairs...)
 			if got != tt.want {
 				t.Errorf("got %q, want %q", got, tt.want)
@@ -564,6 +598,8 @@ func TestBuildDiffString(t *testing.T) {
 }
 
 func TestConvertFuzzyDateToTimeOrNow(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		fd   *verniy.FuzzyDate
@@ -598,6 +634,7 @@ func TestConvertFuzzyDateToTimeOrNow(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := convertFuzzyDateToTimeOrNow(tt.fd)
 			if tt.want == nil {
 				if got != nil {
@@ -616,6 +653,8 @@ func TestConvertFuzzyDateToTimeOrNow(t *testing.T) {
 }
 
 func TestParseDateOrNow(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		dateStr string
@@ -640,6 +679,7 @@ func TestParseDateOrNow(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := parseDateOrNow(tt.dateStr)
 			if tt.wantNil {
 				if got != nil {
@@ -675,6 +715,8 @@ func timePtr(t time.Time) *time.Time {
 // ============================================
 
 func TestErrStatusUnknown(t *testing.T) {
+	t.Parallel()
+
 	err := errStatusUnknown
 	if err == nil {
 		t.Fatal("expected non-nil error")
@@ -685,6 +727,8 @@ func TestErrStatusUnknown(t *testing.T) {
 }
 
 func TestErrMangaStatusUnknown(t *testing.T) {
+	t.Parallel()
+
 	err := errMangaStatusUnknown
 	if err == nil {
 		t.Fatal("expected non-nil error")

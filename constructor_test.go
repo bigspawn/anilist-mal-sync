@@ -11,6 +11,7 @@ import (
 
 // Test NewLogger
 func TestNewLogger(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		verbose bool
@@ -37,6 +38,7 @@ func TestNewLogger(t *testing.T) {
 }
 
 func TestNewLogger_VerboseFlag(t *testing.T) {
+	t.Parallel()
 	loggerVerbose := NewLogger(true)
 	loggerQuiet := NewLogger(false)
 
@@ -49,6 +51,7 @@ func TestNewLogger_VerboseFlag(t *testing.T) {
 }
 
 func TestLogger_SetOutput(t *testing.T) {
+	t.Parallel()
 	logger := NewLogger(false)
 
 	var buf bytes.Buffer
@@ -63,8 +66,9 @@ func TestLogger_SetOutput(t *testing.T) {
 }
 
 func TestLogger_WithContext(t *testing.T) {
+	t.Parallel()
 	logger := NewLogger(false)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	ctxWithLogger := logger.WithContext(ctx)
 
@@ -78,7 +82,8 @@ func TestLogger_WithContext(t *testing.T) {
 }
 
 func TestLoggerFromContext_EmptyContext(t *testing.T) {
-	ctx := context.Background()
+	t.Parallel()
+	ctx := t.Context()
 	logger := LoggerFromContext(ctx)
 
 	if logger != nil {
@@ -87,8 +92,9 @@ func TestLoggerFromContext_EmptyContext(t *testing.T) {
 }
 
 func TestLoggerContext_Propagation(t *testing.T) {
+	t.Parallel()
 	logger1 := NewLogger(true)
-	ctx1 := context.Background()
+	ctx1 := t.Context()
 	ctx1 = logger1.WithContext(ctx1)
 
 	logger2 := NewLogger(false)
@@ -107,6 +113,7 @@ func TestLoggerContext_Propagation(t *testing.T) {
 
 // Test NewTokenFile
 func TestNewTokenFile(t *testing.T) {
+	t.Parallel()
 	tokenFile := NewTokenFile()
 
 	if tokenFile == nil {
@@ -116,6 +123,7 @@ func TestNewTokenFile(t *testing.T) {
 
 // Test NewStrategyChain
 func TestNewStrategyChain_Empty(t *testing.T) {
+	t.Parallel()
 	chain := NewStrategyChain()
 
 	if len(chain.strategies) != 0 {
@@ -124,6 +132,7 @@ func TestNewStrategyChain_Empty(t *testing.T) {
 }
 
 func TestNewStrategyChain_WithStrategies(t *testing.T) {
+	t.Parallel()
 	strategy1 := IDStrategy{}
 	strategy2 := TitleStrategy{}
 	strategy3 := MALIDStrategy{}
@@ -137,6 +146,7 @@ func TestNewStrategyChain_WithStrategies(t *testing.T) {
 
 // Test NewSyncReport
 func TestNewSyncReport_Structure(t *testing.T) {
+	t.Parallel()
 	report := NewSyncReport()
 
 	if report.Warnings == nil {
@@ -152,6 +162,7 @@ func TestNewSyncReport_Structure(t *testing.T) {
 
 // Test Statistics methods
 func TestStatistics_IncrementTotal(t *testing.T) {
+	t.Parallel()
 	stats := NewStatistics()
 
 	stats.IncrementTotal()
@@ -167,6 +178,7 @@ func TestStatistics_IncrementTotal(t *testing.T) {
 }
 
 func TestStatistics_StatusCounts(t *testing.T) {
+	t.Parallel()
 	stats := NewStatistics()
 
 	stats.RecordUpdate(UpdateResult{Title: "Test1", Status: "watching"})
@@ -188,6 +200,7 @@ func TestStatistics_StatusCounts(t *testing.T) {
 }
 
 func TestStatistics_RecordError(t *testing.T) {
+	t.Parallel()
 	stats := NewStatistics()
 
 	testErr := errors.New("test error")
@@ -211,6 +224,7 @@ func TestStatistics_RecordError(t *testing.T) {
 }
 
 func TestStatistics_StartTime(t *testing.T) {
+	t.Parallel()
 	stats := NewStatistics()
 
 	if stats.StartTime.IsZero() {
@@ -228,6 +242,7 @@ func TestStatistics_StartTime(t *testing.T) {
 }
 
 func TestStatistics_ResetClearsSlices(t *testing.T) {
+	t.Parallel()
 	stats := NewStatistics()
 
 	stats.RecordUpdate(UpdateResult{Title: "Test", Status: "watching"})
@@ -251,6 +266,7 @@ func TestStatistics_ResetClearsSlices(t *testing.T) {
 }
 
 func TestStatistics_StatusCountsMap(t *testing.T) {
+	t.Parallel()
 	stats := NewStatistics()
 
 	// StatusCounts should be initialized
@@ -275,6 +291,7 @@ func TestStatistics_StatusCountsMap(t *testing.T) {
 }
 
 func TestStatistics_ItemsSlices(t *testing.T) {
+	t.Parallel()
 	stats := NewStatistics()
 
 	// Initially empty
@@ -305,6 +322,7 @@ func TestStatistics_ItemsSlices(t *testing.T) {
 }
 
 func TestStatistics_EndTime(t *testing.T) {
+	t.Parallel()
 	stats := NewStatistics()
 
 	if stats.StartTime.IsZero() {
@@ -319,7 +337,7 @@ func TestStatistics_EndTime(t *testing.T) {
 	var buf bytes.Buffer
 	logger := NewLogger(false)
 	logger.SetOutput(&buf)
-	ctx := logger.WithContext(context.Background())
+	ctx := logger.WithContext(t.Context())
 
 	stats.Print(ctx, "Test")
 
@@ -334,6 +352,7 @@ func TestStatistics_EndTime(t *testing.T) {
 
 // Test multiple statistics instances
 func TestMultipleStatisticsInstances(t *testing.T) {
+	t.Parallel()
 	stats1 := NewStatistics()
 	stats2 := NewStatistics()
 
@@ -351,6 +370,7 @@ func TestMultipleStatisticsInstances(t *testing.T) {
 
 // Test Config methods
 func TestConfig_GetHTTPTimeout_Default(t *testing.T) {
+	t.Parallel()
 	config := Config{
 		HTTPTimeout: "", // empty means default
 	}
@@ -364,6 +384,7 @@ func TestConfig_GetHTTPTimeout_Default(t *testing.T) {
 }
 
 func TestConfig_GetHTTPTimeout_Custom(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		httpTimeout string
@@ -402,6 +423,7 @@ func TestConfig_GetHTTPTimeout_Custom(t *testing.T) {
 
 // Test error detection functions
 func TestIsConfigNotFoundError_Wrapped(t *testing.T) {
+	t.Parallel()
 	// Test with wrapped error
 	baseErr := errors.New("config file not found")
 	err := fmt.Errorf("failed to load config: %w", baseErr)
@@ -420,6 +442,7 @@ func TestIsConfigNotFoundError_Wrapped(t *testing.T) {
 }
 
 func TestIsConfigNotFoundError_Direct(t *testing.T) {
+	t.Parallel()
 	// Test with nil error
 	got := IsConfigNotFoundError(nil)
 	if got {
@@ -435,6 +458,7 @@ func TestIsConfigNotFoundError_Direct(t *testing.T) {
 }
 
 func TestIsCancellationError(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		err      error
@@ -473,6 +497,7 @@ func TestIsCancellationError(t *testing.T) {
 }
 
 func TestIsCLIUsageError_Wrapped(t *testing.T) {
+	t.Parallel()
 	// Test with wrapped error - implementation doesn't unwrap errors,
 	// so this should return false unless the outer message matches
 	baseErr := errors.New("flag parsing failed")
@@ -492,6 +517,7 @@ func TestIsCLIUsageError_Wrapped(t *testing.T) {
 }
 
 func TestIsCLIUsageError_Direct(t *testing.T) {
+	t.Parallel()
 	// Test with nil error
 	got := IsCLIUsageError(nil)
 	if got {
@@ -508,6 +534,7 @@ func TestIsCLIUsageError_Direct(t *testing.T) {
 
 // Test UpdateResult struct
 func TestUpdateResult_IsSkipped(t *testing.T) {
+	t.Parallel()
 	result := UpdateResult{
 		Title:      "Test",
 		Status:     "watching",
@@ -521,6 +548,7 @@ func TestUpdateResult_IsSkipped(t *testing.T) {
 }
 
 func TestUpdateResult_HasError(t *testing.T) {
+	t.Parallel()
 	testErr := errors.New("test error")
 	result := UpdateResult{
 		Title:  "Failed",
@@ -534,6 +562,7 @@ func TestUpdateResult_HasError(t *testing.T) {
 }
 
 func TestUpdateResult_EmptyFields(t *testing.T) {
+	t.Parallel()
 	result := UpdateResult{}
 
 	if result.Title != "" {
@@ -552,6 +581,7 @@ func TestUpdateResult_EmptyFields(t *testing.T) {
 
 // Test TargetID type
 func TestTargetID_Conversion(t *testing.T) {
+	t.Parallel()
 	id := TargetID(12345)
 	// TargetID is just an int alias, but we can test conversions
 	if int(id) != 12345 {
@@ -560,6 +590,7 @@ func TestTargetID_Conversion(t *testing.T) {
 }
 
 func TestTargetID_ZeroValue(t *testing.T) {
+	t.Parallel()
 	var id TargetID
 	if id != 0 {
 		t.Errorf("Zero TargetID should be 0, got %d", id)
@@ -568,6 +599,7 @@ func TestTargetID_ZeroValue(t *testing.T) {
 
 // Test Warning struct
 func TestWarning_Structure(t *testing.T) {
+	t.Parallel()
 	warning := Warning{
 		Title:     "Test Title",
 		Reason:    "Test Reason",
@@ -590,6 +622,7 @@ func TestWarning_Structure(t *testing.T) {
 }
 
 func TestWarning_EmptyFields(t *testing.T) {
+	t.Parallel()
 	warning := Warning{}
 
 	if warning.Title != "" {
@@ -602,6 +635,7 @@ func TestWarning_EmptyFields(t *testing.T) {
 
 // Test SyncReport Warnings
 func TestReport_WarningsField(t *testing.T) {
+	t.Parallel()
 	report := NewSyncReport()
 
 	// After our fix to NewSyncReport, Warnings should be initialized (not nil)
@@ -633,6 +667,7 @@ func TestReport_WarningsField(t *testing.T) {
 
 // Test helper functions
 func TestBufferUsage(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 
 	buf.WriteString("test")

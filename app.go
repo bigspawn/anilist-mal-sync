@@ -256,8 +256,10 @@ func loadIDMappingStrategies(
 func (a *App) Run(ctx context.Context) error {
 	startTime := time.Now()
 
+	direction := DirectionFromContext(ctx)
+
 	var err error
-	if *reverseDirection {
+	if direction == SyncDirectionReverse {
 		err = a.runReverseSync(ctx)
 	} else {
 		err = a.runNormalSync(ctx)
@@ -265,7 +267,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	// Collect statistics for global summary
 	var updaters []*Updater
-	if *reverseDirection {
+	if direction == SyncDirectionReverse {
 		updaters = []*Updater{a.reverseAnimeUpdater, a.reverseMangaUpdater}
 	} else {
 		updaters = []*Updater{a.animeUpdater, a.mangaUpdater}

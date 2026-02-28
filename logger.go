@@ -276,3 +276,33 @@ func LogProgress(ctx context.Context, current, total int, status, title string) 
 		logger.Progress(current, total, status, title)
 	}
 }
+
+// SyncDirection represents the sync direction
+type SyncDirection bool
+
+const (
+	SyncDirectionForward SyncDirection = false // AniList → MAL
+	SyncDirectionReverse SyncDirection = true  // MAL → AniList
+)
+
+// DirectionFromContext extracts sync direction from context
+// Returns SyncDirectionForward (default) if no value is set
+func DirectionFromContext(ctx context.Context) SyncDirection {
+	if dir, ok := ctx.Value(contextKey("direction")).(SyncDirection); ok {
+		return dir
+	}
+	return SyncDirectionForward
+}
+
+// WithDirection returns a new context with sync direction embedded
+func WithDirection(ctx context.Context, dir SyncDirection) context.Context {
+	return context.WithValue(ctx, contextKey("direction"), dir)
+}
+
+// String returns the string representation of SyncDirection for JSON serialization
+func (d SyncDirection) String() string {
+	if d == SyncDirectionReverse {
+		return DirectionReverseStr
+	}
+	return DirectionForwardStr
+}

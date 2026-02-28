@@ -7,6 +7,7 @@ import (
 )
 
 func TestStatus_GetMalStatus(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		status    Status
@@ -78,6 +79,7 @@ func TestStatus_GetMalStatus(t *testing.T) {
 }
 
 func TestStatus_GetAnilistStatus(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		status Status
@@ -131,6 +133,7 @@ func TestStatus_GetAnilistStatus(t *testing.T) {
 }
 
 func TestMangaStatus_GetMalStatus(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		status    MangaStatus
@@ -202,6 +205,7 @@ func TestMangaStatus_GetMalStatus(t *testing.T) {
 }
 
 func TestMangaStatus_GetAnilistStatus(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		status MangaStatus

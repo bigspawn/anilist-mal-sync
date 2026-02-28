@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -11,6 +10,7 @@ import (
 )
 
 func TestExtractIDFromURL(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		url    string
@@ -79,6 +79,7 @@ func TestExtractIDFromURL(t *testing.T) {
 }
 
 func TestBuildFromEntries(t *testing.T) {
+	t.Parallel()
 	entries := []AODEntry{
 		{
 			Sources: []string{
@@ -146,6 +147,7 @@ func TestBuildFromEntries(t *testing.T) {
 }
 
 func TestOfflineDatabaseGetters_NilValues(t *testing.T) {
+	t.Parallel()
 	db := &OfflineDatabase{
 		malToAniList: make(map[int]int),
 		anilistToMAL: make(map[int]int),
@@ -159,6 +161,7 @@ func TestOfflineDatabaseGetters_NilValues(t *testing.T) {
 }
 
 func TestParseAODFile(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test-db.json")
 
@@ -224,16 +227,12 @@ func TestOfflineDatabaseStrategy_FindTarget(t *testing.T) {
 	})
 
 	strategy := OfflineDatabaseStrategy{Database: db}
-	ctx := NewLogger(false).WithContext(context.Background())
+	ctx := NewLogger(false).WithContext(t.Context())
 
 	t.Run("found in existing targets", func(t *testing.T) {
+		// Cannot use t.Parallel() due to global reverseDirection variable access
 		// Set up reverse direction (MAL -> AniList)
-		rev := true
-		reverseDirection = &rev
-		defer func() {
-			rev = false
-			reverseDirection = &rev
-		}()
+		testCtx := setTestDirection(t, SyncDirectionReverse)
 
 		src := Anime{
 			IDMal:     10378,
@@ -251,19 +250,15 @@ func TestOfflineDatabaseStrategy_FindTarget(t *testing.T) {
 			TargetID(10378): targetAnime,
 		}
 
-		target, found, err := strategy.FindTarget(ctx, src, existingTargets, "test", nil)
+		target, found, err := strategy.FindTarget(testCtx, src, existingTargets, "test", nil)
 		assert.NoError(t, err)
 		assert.True(t, found)
 		assert.Equal(t, "Squid Girl Season 2", target.GetTitle())
 	})
 
 	t.Run("mapped but not in user's list", func(t *testing.T) {
-		rev := true
-		reverseDirection = &rev
-		defer func() {
-			rev = false
-			reverseDirection = &rev
-		}()
+		// Cannot use t.Parallel() due to global reverseDirection variable access
+		testCtx := setTestDirection(t, SyncDirectionReverse)
 
 		src := Anime{
 			IDMal:     10378,
@@ -273,7 +268,7 @@ func TestOfflineDatabaseStrategy_FindTarget(t *testing.T) {
 
 		existingTargets := map[TargetID]Target{}
 
-		target, found, err := strategy.FindTarget(ctx, src, existingTargets, "test", nil)
+		target, found, err := strategy.FindTarget(testCtx, src, existingTargets, "test", nil)
 		assert.NoError(t, err)
 		assert.False(t, found)
 		assert.Nil(t, target)
@@ -325,14 +320,7 @@ func TestOfflineDatabaseStrategy_ReverseSync_Issue38(t *testing.T) {
 	})
 
 	strategy := OfflineDatabaseStrategy{Database: db}
-	ctx := NewLogger(false).WithContext(context.Background())
-
-	rev := true
-	reverseDirection = &rev
-	defer func() {
-		rev = false
-		reverseDirection = &rev
-	}()
+	ctx := setTestDirectionFromCtx(NewLogger(false).WithContext(t.Context()), SyncDirectionReverse)
 
 	// Source from MAL: Shinryaku Ika Musume 2 (MAL ID: 10378)
 	src := Anime{
@@ -364,6 +352,7 @@ func TestOfflineDatabaseStrategy_ReverseSync_Issue38(t *testing.T) {
 }
 
 func TestGetCachedVersion(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 
 	t.Run("valid version file", func(t *testing.T) {
@@ -385,6 +374,7 @@ func TestGetCachedVersion(t *testing.T) {
 }
 
 func TestFileExists(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 
 	t.Run("existing file", func(t *testing.T) {
@@ -402,6 +392,7 @@ func TestFileExists(t *testing.T) {
 }
 
 func TestGetDefaultCacheDir(t *testing.T) {
+	t.Parallel()
 	dir := getDefaultCacheDir()
 	assert.NotEmpty(t, dir)
 	assert.True(t, filepath.IsAbs(dir))

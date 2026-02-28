@@ -53,6 +53,7 @@ func (d DeviceAuthResponse) MarshalJSON() ([]byte, error) {
 		ExpiresIn: expiresIn,
 		Alias:     (*Alias)(&d),
 	})
+
 }
 
 func (c *DeviceAuthResponse) UnmarshalJSON(data []byte) error {

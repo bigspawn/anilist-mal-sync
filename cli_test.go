@@ -13,6 +13,7 @@ import (
 // =============================================================================
 
 func TestCLI_HasCommands(t *testing.T) {
+	t.Parallel()
 	cmd := NewCLI()
 
 	if len(cmd.Commands) != 6 {
@@ -33,6 +34,7 @@ func TestCLI_HasCommands(t *testing.T) {
 }
 
 func TestCLI_HasFlags(t *testing.T) {
+	t.Parallel()
 	cmd := NewCLI()
 
 	if len(cmd.Flags) != 12 {
@@ -57,6 +59,7 @@ func TestCLI_HasFlags(t *testing.T) {
 }
 
 func TestCLI_SyncCommand_HasFlags(t *testing.T) {
+	t.Parallel()
 	rootCmd := NewCLI()
 
 	var syncCmd *cli.Command
@@ -93,6 +96,7 @@ func TestCLI_SyncCommand_HasFlags(t *testing.T) {
 }
 
 func TestCLI_RootCommand_FlagAliases(t *testing.T) {
+	t.Parallel()
 	cmd := NewCLI()
 
 	aliases := make(map[string][]string)
@@ -134,6 +138,7 @@ func TestCLI_RootCommand_FlagAliases(t *testing.T) {
 }
 
 func TestCLI_SyncCommand_FlagAliases(t *testing.T) {
+	t.Parallel()
 	rootCmd := NewCLI()
 
 	var syncCmd *cli.Command
@@ -186,6 +191,7 @@ func TestCLI_SyncCommand_FlagAliases(t *testing.T) {
 }
 
 func TestCLI_VerboseFlag_NoShortAlias(t *testing.T) {
+	t.Parallel()
 	rootCmd := NewCLI()
 
 	var verboseFlag cli.Flag
@@ -223,6 +229,7 @@ func equalSlices(a, b []string) bool {
 }
 
 func TestCLI_LoginCommand_HasServiceFlag(t *testing.T) {
+	t.Parallel()
 	rootCmd := NewCLI()
 
 	var loginCmd *cli.Command
@@ -248,6 +255,7 @@ func TestCLI_LoginCommand_HasServiceFlag(t *testing.T) {
 }
 
 func TestCLI_StatusCommand_NoFlags(t *testing.T) {
+	t.Parallel()
 	rootCmd := NewCLI()
 
 	var statusCmd *cli.Command
@@ -268,6 +276,7 @@ func TestCLI_StatusCommand_NoFlags(t *testing.T) {
 }
 
 func TestCLI_WatchCommand_HasSyncFlags(t *testing.T) {
+	t.Parallel()
 	rootCmd := NewCLI()
 
 	var watchCmd *cli.Command
@@ -309,6 +318,7 @@ func TestCLI_WatchCommand_HasSyncFlags(t *testing.T) {
 // =============================================================================
 
 func TestCLI_DefaultActionIsSync(t *testing.T) {
+	t.Parallel()
 	cmd := NewCLI()
 
 	if cmd.Action == nil {
@@ -317,6 +327,7 @@ func TestCLI_DefaultActionIsSync(t *testing.T) {
 }
 
 func TestGlobalFlagsAreSet(t *testing.T) {
+	t.Parallel()
 	// Verify that the global flag pointers are not nil
 	if forceSync == nil {
 		t.Error("forceSync should not be nil")
@@ -333,12 +344,10 @@ func TestGlobalFlagsAreSet(t *testing.T) {
 	if verbose == nil {
 		t.Error("verbose should not be nil")
 	}
-	if reverseDirection == nil {
-		t.Error("reverseDirection should not be nil")
-	}
 }
 
 func TestGlobalFlagsHaveDefaultValues(t *testing.T) {
+	t.Parallel()
 	// Default values should be false for all flags
 	if *forceSync != false {
 		t.Errorf("expected forceSync default false, got %v", *forceSync)
@@ -355,9 +364,6 @@ func TestGlobalFlagsHaveDefaultValues(t *testing.T) {
 	if *verbose != false {
 		t.Errorf("expected verbose default false, got %v", *verbose)
 	}
-	if *reverseDirection != false {
-		t.Errorf("expected reverseDirection default false, got %v", *reverseDirection)
-	}
 }
 
 // =============================================================================
@@ -365,6 +371,7 @@ func TestGlobalFlagsHaveDefaultValues(t *testing.T) {
 // =============================================================================
 
 func TestCLI_RunWithHelp(t *testing.T) {
+	t.Parallel()
 	// Test that we can create CLI and it doesn't panic
 	cmd := NewCLI()
 
@@ -376,6 +383,7 @@ func TestCLI_RunWithHelp(t *testing.T) {
 }
 
 func TestServiceConstants(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		constant string
@@ -396,6 +404,7 @@ func TestServiceConstants(t *testing.T) {
 }
 
 func TestRunCLI_ContextCancellation(t *testing.T) {
+	t.Parallel()
 	// Test that RunCLI returns without error when given empty args
 	// (It will show help/usage, which is not an error)
 	// We can't fully test without a real config file, but we can
@@ -407,7 +416,7 @@ func TestRunCLI_ContextCancellation(t *testing.T) {
 	}
 
 	// Verify context handling is set up
-	ctx := context.Background()
+	ctx := t.Context()
 	// The Run method should accept context
 	// This is a compile-time check essentially
 	_ = ctx
@@ -419,6 +428,7 @@ func TestRunCLI_ContextCancellation(t *testing.T) {
 // =============================================================================
 
 func TestIsCancellationError_ContextCanceled(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		err  error
@@ -471,6 +481,7 @@ func TestIsCancellationError_ContextCanceled(t *testing.T) {
 // =============================================================================
 
 func TestCLI_SyncFlagsMarkedAsLocal(t *testing.T) {
+	t.Parallel()
 	cmd := NewCLI()
 
 	// Flags that should be marked as Local (not inherited by subcommands)
@@ -528,6 +539,7 @@ func TestCLI_SyncFlagsMarkedAsLocal(t *testing.T) {
 }
 
 func TestCLI_NonSyncCommandsDontInheritSyncFlags(t *testing.T) {
+	t.Parallel()
 	rootCmd := NewCLI()
 
 	// Sync-specific flags that should NOT appear in non-sync subcommands
@@ -569,6 +581,7 @@ func TestCLI_NonSyncCommandsDontInheritSyncFlags(t *testing.T) {
 }
 
 func TestCLI_ARMAPIFlagDescriptionContainsDefault(t *testing.T) {
+	t.Parallel()
 	rootCmd := NewCLI()
 
 	var armAPIFlag cli.Flag
@@ -604,6 +617,7 @@ func TestCLI_ARMAPIFlagDescriptionContainsDefault(t *testing.T) {
 }
 
 func TestCLI_OfflineDBFlagDescriptionContainsDefault(t *testing.T) {
+	t.Parallel()
 	rootCmd := NewCLI()
 
 	var offlineDBFlag cli.Flag
@@ -642,6 +656,7 @@ func TestCLI_OfflineDBFlagDescriptionContainsDefault(t *testing.T) {
 // =============================================================================
 
 func TestCLI_LogoutCommand_HasServiceFlag(t *testing.T) {
+	t.Parallel()
 	rootCmd := NewCLI()
 
 	var logoutCmd *cli.Command
@@ -671,6 +686,7 @@ func TestCLI_LogoutCommand_HasServiceFlag(t *testing.T) {
 // =============================================================================
 
 func TestCLI_WatchCommand_HasIntervalAndOnceFlags(t *testing.T) {
+	t.Parallel()
 	rootCmd := NewCLI()
 
 	var watchCmd *cli.Command
@@ -700,6 +716,7 @@ func TestCLI_WatchCommand_HasIntervalAndOnceFlags(t *testing.T) {
 }
 
 func TestCLI_WatchCommand_IntervalHasShortAlias(t *testing.T) {
+	t.Parallel()
 	rootCmd := NewCLI()
 
 	var watchCmd *cli.Command

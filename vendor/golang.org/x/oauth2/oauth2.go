@@ -280,6 +280,7 @@ func (tf *tokenRefresher) Token() (*Token, error) {
 		"grant_type":    {"refresh_token"},
 		"refresh_token": {tf.refreshToken},
 	})
+
 	if err != nil {
 		return nil, err
 	}
