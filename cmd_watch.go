@@ -101,6 +101,7 @@ func runWatch(ctx context.Context, cmd *cli.Command) error {
 		select {
 		case <-ticker.C:
 			log.Printf("Running scheduled sync...")
+			app.Refresh(ctx)
 			if err := app.Run(ctx); err != nil {
 				log.Printf("Sync error: %v", err)
 			} else {
