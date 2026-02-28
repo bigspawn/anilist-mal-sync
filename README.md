@@ -7,6 +7,7 @@ Program to synchronize your AniList and MyAnimeList accounts.
 ## Features
 
 - Bidirectional sync between AniList and MyAnimeList (anime and manga)
+- Favorites synchronization (MAL → AniList with add-only, AniList → MAL report-only)
 - OAuth2 authentication
 - CLI interface
 - Manual ID mappings and ignore rules via `mappings.yaml`
@@ -132,6 +133,7 @@ Done!
 | | `--arm-api` | Enable ARM API for anime ID mapping (default: `false`, ignored for `--manga`) |
 | | `--arm-api-url` | ARM API base URL |
 | | `--jikan-api` | Enable Jikan API for manga ID mapping (default: `false`, ignored for anime) |
+| | `--favorites` | Sync favorites between services (requires Jikan API for MAL favorites) |
 
 **Watch options:**
 | Short | Long | Description |
@@ -192,6 +194,8 @@ jikan_api:
   enabled: false  # Enable Jikan API for manga ID mapping (default: false)
   cache_dir: ""  # Default: ~/.config/anilist-mal-sync/jikan-cache
   cache_max_age: "168h"  # Cache max age (default: 168h / 7 days)
+favorites:
+  enabled: false  # Enable favorites synchronization (default: false)
 ```
 
 ## ID Mapping Strategies
@@ -284,6 +288,78 @@ Configuration can be provided entirely via environment variables (recommended fo
 - `JIKAN_API_ENABLED` - Enable Jikan API for manga ID mapping (default: `false`, not used for anime sync)
 - `JIKAN_API_CACHE_DIR` - Jikan API cache directory (default: `~/.config/anilist-mal-sync/jikan-cache`)
 - `JIKAN_API_CACHE_MAX_AGE` - Jikan API cache max age (default: `168h` / 7 days)
+- `FAVORITES_SYNC_ENABLED` - Enable favorites synchronization (default: `false`)
+
+## Favorites Synchronization
+
+Favorites sync is an optional feature that synchronizes your favorited anime and manga between AniList and MyAnimeList. It runs as a separate phase after the main status/progress synchronization.
+
+### API Limitations
+
+| Direction | Read | Write | Behavior |
+|-----------|------|-------|----------|
+| MAL → AniList | ✅ via Jikan API | ✅ via ToggleFavourite mutation | Full sync (add missing favorites) |
+| AniList → MAL | ✅ via isFavourite field | ❌ MAL API v2 has no favorites endpoint | Report only |
+
+### Enabling Favorites Sync
+
+**Via CLI flag:**
+```bash
+# Sync with favorites enabled
+anilist-mal-sync sync --favorites
+
+# Reverse sync (MAL → AniList) with favorites
+anilist-mal-sync sync --favorites --reverse-direction
+```
+
+**Via environment variable:**
+```bash
+export FAVORITES_SYNC_ENABLED=true
+anilist-mal-sync sync
+```
+
+**Via config file:**
+```yaml
+favorites:
+  enabled: true
+```
+
+**Via Docker:**
+```yaml
+environment:
+  - FAVORITES_SYNC_ENABLED=true
+```
+
+Note: The `--favorites` flag automatically enables Jikan API (required for reading MAL favorites).
+
+### Behavior
+
+#### MAL → AniList (with `--reverse-direction`)
+- Reads your MAL favorites via Jikan API (public user profile)
+- Compares with your AniList list entries
+- **Adds** missing favorites on AniList
+- **Does not remove** favorites that exist only on AniList (you may have intentionally favorited different items)
+
+Example output:
+```
+★ [Favorites] Added "Cowboy Bebop" to AniList favorites
+★ [Favorites] Added "Monster" to AniList favorites
+★ Favorites sync complete: +2 added on AniList (15 skipped)
+```
+
+#### AniList → MAL (default direction)
+- Reads your AniList favorites from list entries (via `isFavourite` field)
+- Reads your MAL favorites via Jikan API
+- Reports differences (cannot write to MAL)
+
+Example output:
+```
+★ [Favorites] anime "Cowboy Bebop" is only on AniList
+★ [Favorites] manga "Berserk" is only on MAL
+★ Favorites: 2 mismatches (AniList→MAL, report only)
+```
+
+For detailed documentation, see [docs/favorites-sync.md](docs/favorites-sync.md).
 
 ## Advanced
 
