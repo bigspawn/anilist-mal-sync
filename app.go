@@ -24,6 +24,8 @@ type App struct {
 	jikanClient        *JikanClient
 	mappings           *MappingsConfig
 
+	offlineStrategy *OfflineDatabaseStrategy
+
 	animeUpdater        *Updater
 	mangaUpdater        *Updater
 	reverseAnimeUpdater *Updater
@@ -194,6 +196,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		hatoClient:          hatoClient,
 		jikanClient:         jikanClient,
 		mappings:            mappings,
+		offlineStrategy:     offlineStrategy,
 		animeUpdater:        animeUpdater,
 		mangaUpdater:        mangaUpdater,
 		reverseAnimeUpdater: reverseAnimeUpdater,
@@ -212,7 +215,7 @@ func loadIDMappingStrategies(
 	ctx context.Context,
 	config Config,
 	needsAnime bool,
-) (OfflineDatabaseStrategy, HatoAPIStrategy, *HatoClient, ARMAPIStrategy, JikanAPIStrategy, *JikanClient) {
+) (*OfflineDatabaseStrategy, HatoAPIStrategy, *HatoClient, ARMAPIStrategy, JikanAPIStrategy, *JikanClient) {
 	var offlineDB *OfflineDatabase
 	// Only load offline database for anime synchronization
 	if needsAnime && config.OfflineDatabase.Enabled {
@@ -245,12 +248,33 @@ func loadIDMappingStrategies(
 		LogInfoSuccess(ctx, "Jikan API enabled (manga ID mapping)")
 	}
 
-	return OfflineDatabaseStrategy{Database: offlineDB},
+	return &OfflineDatabaseStrategy{Database: offlineDB},
 		HatoAPIStrategy{Client: hatoClient},
 		hatoClient,
 		ARMAPIStrategy{Client: armClient},
 		JikanAPIStrategy{Client: jikanClient},
 		jikanClient
+}
+
+// Refresh resets per-run state and optionally reloads the offline database.
+// Call before each Run() in watch mode to prevent state accumulation between cycles.
+func (a *App) Refresh(ctx context.Context) {
+	if a.config.OfflineDatabase.Enabled && a.config.OfflineDatabase.AutoUpdate {
+		if db, err := LoadOfflineDatabase(ctx, a.config.OfflineDatabase); err != nil {
+			LogWarn(ctx, "Failed to refresh offline database: %v", err)
+		} else {
+			a.offlineStrategy.Database = db
+		}
+	}
+
+	a.syncReport = NewSyncReport()
+	for _, u := range []*Updater{
+		a.animeUpdater, a.mangaUpdater,
+		a.reverseAnimeUpdater, a.reverseMangaUpdater,
+	} {
+		u.Statistics = NewStatistics()
+		u.UnmappedList = nil
+	}
 }
 
 func (a *App) Run(ctx context.Context) error {
