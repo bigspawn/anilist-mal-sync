@@ -51,6 +51,7 @@ func (c *AnilistClient) GetUserAnimeList(ctx context.Context) ([]verniy.MediaLis
 				verniy.MediaFieldStatusV2,
 				verniy.MediaFieldEpisodes,
 				verniy.MediaFieldSeasonYear,
+				verniy.MediaFieldIsFavourite,
 			),
 		),
 	)
@@ -86,6 +87,7 @@ func (c *AnilistClient) GetUserMangaList(ctx context.Context) ([]verniy.MediaLis
 				verniy.MediaFieldStatusV2,
 				verniy.MediaFieldChapters,
 				verniy.MediaFieldVolumes,
+				verniy.MediaFieldIsFavourite,
 			),
 		),
 	)
@@ -343,6 +345,99 @@ func (c *AnilistClient) UpdateMangaEntry(
 	}
 
 	var response SaveMediaListEntry
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	return nil
+}
+
+// ToggleFavouriteResponse represents the response from AniList ToggleFavourite mutation.
+// The response contains nested "nodes" arrays matching the GraphQL query structure:
+// anime { nodes { id } }, manga { nodes { id } }.
+type ToggleFavouriteResponse struct {
+	Data struct {
+		ToggleFavourite struct {
+			Anime struct {
+				Nodes []struct {
+					ID int `json:"id"`
+				} `json:"nodes"`
+			} `json:"anime"`
+			Manga struct {
+				Nodes []struct {
+					ID int `json:"id"`
+				} `json:"nodes"`
+			} `json:"manga"`
+		} `json:"ToggleFavourite"`
+	} `json:"data"`
+}
+
+// ToggleFavourite toggles the favorite status of an anime or manga on AniList.
+// Only one of animeID or mangaID should be provided (non-zero) per call.
+// The ToggleFavourite mutation is idempotent: calling it on an already-favorited
+// item removes it from favorites, calling it on a non-favorited item adds it.
+//
+// Parameters:
+//   - animeID: AniList anime ID (use 0 if toggling manga)
+//   - mangaID: AniList manga ID (use 0 if toggling anime)
+func (c *AnilistClient) ToggleFavourite(ctx context.Context, animeID, mangaID int) error {
+	ctx, cancel := withTimeout(ctx, c.httpTimeout)
+	defer cancel()
+
+	if animeID <= 0 && mangaID <= 0 {
+		return fmt.Errorf("at least one of animeID or mangaID must be positive")
+	}
+	if animeID > 0 && mangaID > 0 {
+		return fmt.Errorf("only one of animeID or mangaID can be specified per call")
+	}
+
+	mutation := `
+		mutation ($animeId: Int, $mangaId: Int) {
+			ToggleFavourite(animeId: $animeId, mangaId: $mangaId) {
+				anime { nodes { id } }
+				manga { nodes { id } }
+			}
+		}
+	`
+
+	variables := map[string]any{}
+	if animeID > 0 {
+		variables["animeId"] = animeID
+	}
+	if mangaID > 0 {
+		variables["mangaId"] = mangaID
+	}
+
+	requestBody := map[string]any{
+		"query":     mutation,
+		"variables": variables,
+	}
+
+	jsonBody, err := json.Marshal(requestBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request body: %w", err)
+	}
+
+	responseBody, code, err := c.c.MakeRequest(ctx, jsonBody)
+	if err != nil {
+		return fmt.Errorf("failed to make request: %w", err)
+	}
+
+	if code != 200 {
+		return fmt.Errorf("AniList API returned status code %d: %s", code, string(responseBody))
+	}
+
+	// Check for GraphQL errors
+	var graphqlResp GraphQLResponse
+	if err := json.Unmarshal(responseBody, &graphqlResp); err != nil {
+		return fmt.Errorf("failed to unmarshal GraphQL response: %w", err)
+	}
+
+	if len(graphqlResp.Errors) > 0 {
+		return fmt.Errorf("GraphQL errors: %+v", graphqlResp.Errors)
+	}
+
+	var response ToggleFavouriteResponse
 	if err := json.Unmarshal(responseBody, &response); err != nil {
 		return fmt.Errorf("failed to unmarshal response: %w", err)
 	}

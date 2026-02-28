@@ -39,6 +39,7 @@ The codebase uses a **strategy pattern** for matching entries between services:
   - **Reverse Anime**: Manual → ID → OfflineDB → HatoAPI → ARM → Title → MALID → APISearch
   - **Reverse Manga**: Manual → ID → HatoAPI → Title → Jikan → MALID → APISearch
 - `Updater` - generic orchestrator with 3-phase pipeline (resolve → deduplicate → process) that uses strategies to match and update entries
+- `FavoritesSync` - separate phase for favorites synchronization that runs after the main sync, using already-resolved AniList↔MAL ID mappings
 
 ### Main Components
 
@@ -48,23 +49,24 @@ The codebase uses a **strategy pattern** for matching entries between services:
 | `cli.go` | CLI interface (urfave/cli/v3) with 6 commands: login, logout, status, sync, watch, unmapped |
 | `config.go` | Config loading (env vars take precedence over YAML) |
 | `oauth.go` | Token management & OAuth2 flow |
-| `anilist.go` | AniList GraphQL client (via verniy library) |
+| `anilist.go` | AniList GraphQL client (via verniy library) with ToggleFavourite mutation |
 | `myanimelist.go` | MAL REST API client (via go-myanimelist) |
-| `anime.go` / `manga.go` | Domain models implementing Source/Target interfaces |
+| `anime.go` / `manga.go` | Domain models implementing Source/Target interfaces with IsFavourite field |
 | `strategies.go` | Matching strategy implementations |
 | `arm_api.go` | ARM API client for online ID mapping |
 | `hato_api.go` / `hato_cache.go` | Hato API client for ID mapping with response caching |
-| `jikan_api.go` / `jikan_cache.go` | Jikan API client for manga ID mapping with response caching |
+| `jikan_api.go` / `jikan_cache.go` | Jikan API client for manga ID mapping with response caching and GetUserFavorites |
 | `offline_database.go` | Offline database using anime-offline-database |
 | `updater.go` | Generic 3-phase update orchestration (resolve, deduplicate, process) |
 | `service.go` | MediaService interface and implementations |
+| `favorites.go` | Favorites synchronization logic (MAL→AniList sync, AniList→MAL report only) |
 | `mappings.go` | Manual AniList↔MAL mappings and ignore rules (YAML) |
 | `unmapped.go` | Unmapped entries state persistence (JSON) |
 | `cmd_sync.go` / `cmd_watch.go` | Sync and watch command implementations |
 | `cmd_login.go` / `cmd_logout.go` / `cmd_status.go` | Auth and status commands |
 | `cmd_unmapped.go` | CLI command for managing unmapped entries |
-| `report.go` | Sync report: warnings, unmapped items, duplicate conflicts |
-| `statistics.go` | Sync statistics tracking and summary output |
+| `report.go` | Sync report: warnings, unmapped items, duplicate conflicts, favorites mismatches |
+| `statistics.go` | Sync statistics tracking and summary output with favorites results |
 | `logger.go` | Leveled logger with color support, context-based logging |
 | `logging.go` | HTTP round-tripper debug logging |
 | `http_retry.go` | Exponential backoff retry logic |
@@ -79,8 +81,11 @@ The codebase uses a **strategy pattern** for matching entries between services:
 5. **Resolve**: match entries using strategy chain (see Key Abstractions for per-direction chains)
 6. **Deduplicate**: detect N:1 conflicts (multiple sources → same target), resolve by strategy priority
 7. **Process**: update target service with changes
-8. Save unmapped entries state for `unmapped` command
-9. Print statistics and sync report
+8. **Favorites sync** (if enabled with `--favorites`): synchronize favorites between services
+   - MAL→AniList: add missing favorites on AniList (does not remove)
+   - AniList→MAL: report mismatches only (MAL API does not support favorites write)
+9. Save unmapped entries state for `unmapped` command
+10. Print statistics and sync report
 
 ### Sync Directions
 
@@ -88,6 +93,15 @@ The codebase uses a **strategy pattern** for matching entries between services:
 - **Reverse** (`--reverse-direction`): MyAnimeList → AniList
 
 Start/end dates are preserved in both directions. See [docs/date-sync.md](docs/date-sync.md) for details.
+
+### Favorites Synchronization
+
+Favorites sync is an optional feature enabled via `--favorites` CLI flag or `FAVORITES_SYNC_ENABLED` env var. It runs as a separate phase after the main sync.
+
+- **MAL → AniList**: Adds favorites from MAL to AniList. Does not remove favorites that exist only on AniList (user may have intentionally favorited different items on each service).
+- **AniList → MAL**: Reports mismatches only. MAL API v2 does not support favorites read/write, so MAL favorites are fetched via Jikan API but cannot be modified.
+
+Note: Favorites sync requires Jikan API to be enabled (automatically enabled when `--favorites` is used).
 
 ## Code Quality Rules
 

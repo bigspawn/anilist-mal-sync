@@ -67,6 +67,10 @@ var syncFlags = []cli.Flag{
 		Name:  "jikan-api",
 		Usage: "enable Jikan API for manga ID mapping (default: false)",
 	},
+	&cli.BoolFlag{
+		Name:  "favorites",
+		Usage: "sync favorites between services (requires Jikan API for MAL favorites)",
+	},
 }
 
 // setSyncFlagsFromCmd sets global sync variables from command flags and returns verbose value
@@ -106,6 +110,13 @@ func applySyncFlagsToConfig(cmd *cli.Command, cfg *Config) {
 	}
 	if cmd.IsSet("jikan-api") {
 		cfg.JikanAPI.Enabled = cmd.Bool("jikan-api")
+	}
+	if cmd.IsSet("favorites") {
+		cfg.Favorites.Enabled = cmd.Bool("favorites")
+		// Favorites sync requires Jikan API to read MAL favorites
+		if cfg.Favorites.Enabled {
+			cfg.JikanAPI.Enabled = true
+		}
 	}
 }
 
@@ -175,6 +186,11 @@ func NewCLI() *cli.Command {
 		Usage: "enable Jikan API for manga ID mapping (default: false)",
 		Local: true,
 	}
+	favoritesFlag := &cli.BoolFlag{
+		Name:  "favorites",
+		Usage: "sync favorites between services (requires Jikan API for MAL favorites)",
+		Local: true,
+	}
 
 	return &cli.Command{
 		Name:        "anilist-mal-sync",
@@ -194,6 +210,7 @@ func NewCLI() *cli.Command {
 			armAPIFlag,
 			armAPIURLFlag,
 			jikanAPIFlag,
+			favoritesFlag,
 		},
 		Commands: []*cli.Command{
 			newLoginCommand(),

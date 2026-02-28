@@ -77,6 +77,7 @@ type Manga struct {
 	Volumes         int
 	StartedAt       *time.Time
 	FinishedAt      *time.Time
+	IsFavourite     bool
 }
 
 func (m Manga) GetTargetID() TargetID {
@@ -319,6 +320,11 @@ func newMangaFromMediaListEntry(mediaList verniy.MediaList, scoreFormat verniy.S
 	startedAt := convertFuzzyDateToTimeOrNow(mediaList.StartedAt)
 	finishedAt := convertFuzzyDateToTimeOrNow(mediaList.CompletedAt)
 
+	var isFavourite bool
+	if mediaList.Media.IsFavourite != nil {
+		isFavourite = *mediaList.Media.IsFavourite
+	}
+
 	return Manga{
 		IDAnilist:       mediaList.Media.ID,
 		IDMal:           idMal,
@@ -333,6 +339,7 @@ func newMangaFromMediaListEntry(mediaList verniy.MediaList, scoreFormat verniy.S
 		Volumes:         volumes,
 		StartedAt:       startedAt,
 		FinishedAt:      finishedAt,
+		IsFavourite:     isFavourite,
 	}, nil
 }
 
@@ -374,6 +381,7 @@ func newMangaFromMalManga(manga mal.Manga) (Manga, error) {
 		Volumes:         manga.NumVolumes,
 		StartedAt:       startedAt,
 		FinishedAt:      finishedAt,
+		IsFavourite:     false, // MAL API v2 does not provide favorites
 	}, nil
 }
 
@@ -536,7 +544,8 @@ func newMangaFromVerniyMedia(media verniy.Media) (Manga, error) {
 		TitleRomaji:     romajiTitle,
 		Chapters:        chapters,
 		Volumes:         volumes,
-		StartedAt:       nil, // Will be set from MAL source
-		FinishedAt:      nil, // Will be set from MAL source
+		StartedAt:       nil,   // Will be set from MAL source
+		FinishedAt:      nil,   // Will be set from MAL source
+		IsFavourite:     false, // Verniy media from search doesn't contain user favorite status
 	}, nil
 }

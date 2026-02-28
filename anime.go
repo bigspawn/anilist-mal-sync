@@ -77,6 +77,7 @@ type Anime struct {
 	TitleRomaji string
 	StartedAt   *time.Time
 	FinishedAt  *time.Time
+	IsFavourite bool
 }
 
 func (a Anime) GetTargetID() TargetID {
@@ -394,6 +395,11 @@ func newAnimeFromMediaListEntry(mediaList verniy.MediaList, scoreFormat verniy.S
 	startedAt := convertFuzzyDateToTimeOrNow(mediaList.StartedAt)
 	finishedAt := convertFuzzyDateToTimeOrNow(mediaList.CompletedAt)
 
+	var isFavourite bool
+	if mediaList.Media.IsFavourite != nil {
+		isFavourite = *mediaList.Media.IsFavourite
+	}
+
 	return Anime{
 		NumEpisodes: episodeNumber,
 		IDAnilist:   mediaList.Media.ID,
@@ -407,6 +413,7 @@ func newAnimeFromMediaListEntry(mediaList verniy.MediaList, scoreFormat verniy.S
 		TitleRomaji: romajiTitle,
 		StartedAt:   startedAt,
 		FinishedAt:  finishedAt,
+		IsFavourite: isFavourite,
 	}, nil
 }
 
@@ -476,6 +483,7 @@ func newAnimeFromMalAnime(malAnime mal.Anime) (Anime, error) {
 		TitleJP:     titleJP,
 		StartedAt:   startedAt,
 		FinishedAt:  finishedAt,
+		IsFavourite: false, // MAL API v2 does not provide favorites
 	}, nil
 }
 
@@ -616,8 +624,9 @@ func newAnimeFromVerniyMedia(media verniy.Media) (Anime, error) {
 		TitleEN:     titleEN,
 		TitleJP:     titleJP,
 		TitleRomaji: romajiTitle,
-		StartedAt:   nil, // Will be set from MAL source
-		FinishedAt:  nil, // Will be set from MAL source
+		StartedAt:   nil,   // Will be set from MAL source
+		FinishedAt:  nil,   // Will be set from MAL source
+		IsFavourite: false, // Verniy media from search doesn't contain user favorite status
 	}, nil
 }
 

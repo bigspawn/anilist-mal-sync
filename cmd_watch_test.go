@@ -53,9 +53,9 @@ func TestWatchCommand_HasFlags(t *testing.T) {
 		t.Fatal("watch command not found")
 	}
 
-	// watch has 2 own flags + 11 sync flags = 13 total
-	if len(watchCmd.Flags) != 13 {
-		t.Errorf("expected 13 flags (2 watch + 11 sync), got %d", len(watchCmd.Flags))
+	// watch has 2 own flags + 12 sync flags = 14 total
+	if len(watchCmd.Flags) != 14 {
+		t.Errorf("expected 14 flags (2 watch + 12 sync), got %d", len(watchCmd.Flags))
 	}
 
 	// Check flags by name
