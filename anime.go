@@ -294,17 +294,17 @@ func (a Anime) GetTitle() string {
 func (a Anime) String() string {
 	sb := strings.Builder{}
 	sb.WriteString("Anime{")
-	sb.WriteString(fmt.Sprintf("IDAnilist: %d, ", a.IDAnilist))
-	sb.WriteString(fmt.Sprintf("IDMal: %d, ", a.IDMal))
-	sb.WriteString(fmt.Sprintf("TitleEN: %s, ", a.TitleEN))
-	sb.WriteString(fmt.Sprintf("TitleJP: %s, ", a.TitleJP))
-	sb.WriteString(fmt.Sprintf("MediaListStatus: %s, ", a.Status))
-	sb.WriteString(fmt.Sprintf("Score: %d, ", a.Score))
-	sb.WriteString(fmt.Sprintf("Progress: %d, ", a.Progress))
-	sb.WriteString(fmt.Sprintf("EpisodeNumber: %d, ", a.NumEpisodes))
-	sb.WriteString(fmt.Sprintf("SeasonYear: %d, ", a.SeasonYear))
-	sb.WriteString(fmt.Sprintf("StartedAt: %s, ", a.StartedAt))
-	sb.WriteString(fmt.Sprintf("FinishedAt: %s", a.FinishedAt))
+	fmt.Fprintf(&sb, "IDAnilist: %d, ", a.IDAnilist)
+	fmt.Fprintf(&sb, "IDMal: %d, ", a.IDMal)
+	fmt.Fprintf(&sb, "TitleEN: %s, ", a.TitleEN)
+	fmt.Fprintf(&sb, "TitleJP: %s, ", a.TitleJP)
+	fmt.Fprintf(&sb, "MediaListStatus: %s, ", a.Status)
+	fmt.Fprintf(&sb, "Score: %d, ", a.Score)
+	fmt.Fprintf(&sb, "Progress: %d, ", a.Progress)
+	fmt.Fprintf(&sb, "EpisodeNumber: %d, ", a.NumEpisodes)
+	fmt.Fprintf(&sb, "SeasonYear: %d, ", a.SeasonYear)
+	fmt.Fprintf(&sb, "StartedAt: %s, ", a.StartedAt)
+	fmt.Fprintf(&sb, "FinishedAt: %s", a.FinishedAt)
 	sb.WriteString("}")
 	return sb.String()
 }
@@ -626,7 +626,7 @@ func buildDiffString(pairs ...any) string {
 		b := pairs[i+2]
 
 		if !reflect.DeepEqual(a, b) {
-			sb.WriteString(fmt.Sprintf("%s: %v -> %v, ", field, a, b))
+			fmt.Fprintf(&sb, "%s: %v -> %v, ", field, a, b)
 		}
 	}
 
