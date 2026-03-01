@@ -106,15 +106,17 @@ func TestManualMappingStrategy_Reverse_Field(t *testing.T) {
 	fwd := ManualMappingStrategy{Mappings: mappings, Reverse: false}
 	rev := ManualMappingStrategy{Mappings: mappings, Reverse: true}
 
+	ctx := context.Background()
+
 	// Forward: AniList source → MAL target
 	srcFwd := Anime{IDAnilist: 1, IDMal: 0}
-	id, ok := fwd.lookupManualMapping(srcFwd)
+	id, ok := fwd.lookupManualMapping(ctx, srcFwd)
 	assert.True(t, ok)
 	assert.Equal(t, 2, id, "forward: should return MAL ID 2")
 
 	// Reverse: MAL source → AniList target
 	srcRev := Anime{IDAnilist: 0, IDMal: 2}
-	id, ok = rev.lookupManualMapping(srcRev)
+	id, ok = rev.lookupManualMapping(ctx, srcRev)
 	assert.True(t, ok)
 	assert.Equal(t, 1, id, "reverse: should return AniList ID 1")
 }
@@ -123,11 +125,11 @@ func TestUpdater_Reverse_Field_TrackUnmapped(t *testing.T) {
 	t.Parallel()
 	u := &Updater{Reverse: false, MediaType: mediaTypeAnime}
 	u.trackUnmapped(Anime{IDAnilist: 5}, "no match")
-	assert.Equal(t, SyncDirectionForward, u.UnmappedList[0].Direction)
+	assert.Equal(t, DirectionForwardStr, u.UnmappedList[0].Direction)
 
 	u2 := &Updater{Reverse: true, MediaType: mediaTypeManga}
 	u2.trackUnmapped(Manga{IDMal: 7}, "no match")
-	assert.Equal(t, SyncDirectionReverse, u2.UnmappedList[0].Direction)
+	assert.Equal(t, DirectionReverseStr, u2.UnmappedList[0].Direction)
 }
 
 func TestGenerateUpdateDetail_Forward(t *testing.T) {

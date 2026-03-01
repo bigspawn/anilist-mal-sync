@@ -88,18 +88,8 @@ func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target, repo
 
 func buildTargetMap(ctx context.Context, tgts []Target) map[TargetID]Target {
 	tgtsByID := make(map[TargetID]Target, len(tgts))
-	direction := DirectionFromContext(ctx)
 	for _, tgt := range tgts {
-		var tgtID TargetID
-		switch v := tgt.(type) {
-		case Anime:
-			tgtID = GetTargetIDWithDirection(v, direction)
-		case Manga:
-			tgtID = GetTargetIDWithDirection(v, direction)
-		default:
-			tgtID = tgt.GetTargetID()
-		}
-		tgtsByID[tgtID] = tgt
+		tgtsByID[tgt.GetTargetID()] = tgt
 	}
 	return tgtsByID
 }
@@ -142,8 +132,7 @@ func (u *Updater) isIgnored(ctx context.Context, src Source) bool {
 		return true
 	}
 	if len(u.IgnoreIDs) > 0 {
-		direction := DirectionFromContext(ctx)
-		srcID := GetSourceIDWithDirection(src, direction)
+		srcID := src.GetSourceID()
 		if _, ok := u.IgnoreIDs[srcID]; ok {
 			LogDebug(ctx, "[%s] Ignoring entry by ID: %s (ID: %d)",
 				u.Prefix, src.GetTitle(), srcID)
@@ -376,8 +365,7 @@ func (u *Updater) GetResolvedMappings() []resolvedMapping {
 }
 
 func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts map[TargetID]Target, report *SyncReport) {
-	direction := DirectionFromContext(ctx)
-	tgtID := GetTargetIDWithDirection(src, direction)
+	tgtID := src.GetTargetID()
 
 	if !u.ForceSync { // filter sources by different progress with targets
 		// Use strategy chain to find target

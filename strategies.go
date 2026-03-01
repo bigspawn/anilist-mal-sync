@@ -166,8 +166,7 @@ func (s IDStrategy) Name() string {
 func (s IDStrategy) FindTarget(
 	ctx context.Context, src Source, existingTargets map[TargetID]Target, prefix string, _ *SyncReport,
 ) (Target, bool, error) {
-	direction := DirectionFromContext(ctx)
-	srcID := GetTargetIDWithDirection(src, direction)
+	srcID := src.GetTargetID()
 	target, found := existingTargets[srcID]
 	if found {
 		LogDebugDecision(ctx, "[%s] Found target by ID %d (direct lookup in user's list): %s", prefix, srcID, target.GetTitle())
@@ -304,8 +303,7 @@ func (s MALIDStrategy) FindTarget(
 	default:
 	}
 
-	direction := DirectionFromContext(ctx)
-	srcID := GetSourceIDWithDirection(src, direction)
+	srcID := src.GetSourceID()
 	if srcID <= 0 {
 		return nil, false, nil
 	}
