@@ -195,7 +195,7 @@ func NewCLI() *cli.Command {
 	return &cli.Command{
 		Name:        "anilist-mal-sync",
 		Usage:       "Synchronize anime and manga lists between AniList and MyAnimeList",
-		Version:     "1.0.0",
+		Version:     version,
 		Description: "Sync your anime/manga lists between AniList and MyAnimeList.",
 		Flags: []cli.Flag{
 			configFlag,

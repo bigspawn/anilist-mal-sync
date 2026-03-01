@@ -16,6 +16,23 @@ Program to synchronize your AniList and MyAnimeList accounts.
 - Offline ID mapping using anime-offline-database (prevents incorrect season matches)
 - Optional ARM API integration for online ID lookups
 
+## What gets synced
+
+For each entry in your list the following fields are synchronized from source to target:
+
+| Field | Synced |
+|-------|--------|
+| Status (watching / completed / on-hold / dropped / plan to watch) | ✅ |
+| Score (automatically normalized between AniList and MAL score formats) | ✅ |
+| Progress (episodes watched / chapters + volumes read) | ✅ |
+| Start date | ✅ (nil source date never overwrites a set target date) |
+| Finish date | ✅ (only when status is Completed) |
+| Favorites | ✅ optional, via `--favorites` flag |
+
+**Conflict rule:** the source service always wins. In the default direction (AniList → MAL) your AniList data overwrites MAL. Use `--reverse-direction` to flip.
+
+See [docs/date-sync.md](docs/date-sync.md) for detailed date synchronization rules.
+
 ## Quick Start (Docker)
 
 ### Step 1: Create OAuth applications
@@ -38,6 +55,7 @@ Download [`docker-compose.example.yaml`](docker-compose.example.yaml) and edit c
 services:
   sync:
     image: ghcr.io/bigspawn/anilist-mal-sync:latest
+    command: ["watch", "--once"]
     ports:
       - "18080:18080"
     environment:
@@ -51,8 +69,8 @@ services:
       - MAL_CLIENT_ID=your_mal_client_id
       - MAL_CLIENT_SECRET=your_mal_secret
       - MAL_USERNAME=your_mal_username
-      # Optional: Watch mode interval (e.g., 12h, 1h, 30m)
-      # - WATCH_INTERVAL=12h
+      # Watch mode interval (min: 1h, max: 168h / 7 days)
+      - WATCH_INTERVAL=12h
       # Optional: Manual mappings file path
       # - MAPPINGS_FILE_PATH=/home/appuser/.config/anilist-mal-sync/mappings.yaml
       # Optional: ID Mapping settings
@@ -66,6 +84,7 @@ services:
       # - JIKAN_API_ENABLED=false  # Enable Jikan API for manga ID mapping
       # - JIKAN_API_CACHE_DIR=/home/appuser/.config/anilist-mal-sync/jikan-cache
       # - JIKAN_API_CACHE_MAX_AGE=168h
+      # - FAVORITES_SYNC_ENABLED=false  # Enable favorites sync (requires Jikan API)
     volumes:
       - tokens:/home/appuser/.config/anilist-mal-sync
     restart: unless-stopped
@@ -84,23 +103,31 @@ Follow the URLs printed in terminal.
 
 ### Step 4: Run
 
-#### Step 4.1: Run dry-run mode
+#### Step 4.1: Preview changes (dry run)
 
-First, run dry-run mode to preview what will be synced without making actual changes.
+**Recommended before the first real sync.** On a large list the tool may update hundreds of
+entries at once — dry run lets you see exactly what will change without touching anything.
 
 ```bash
-docker-compose run --rm --service-ports sync sync --dry-run
+docker-compose run --rm --service-ports sync sync --dry-run --all
 ```
 
-#### Step 4.2: Run real synchronization
+#### Step 4.2: Start the sync daemon
 
-After a successful dry-run, you can start the service with real sync:
+`docker-compose up -d` starts the container in **watch mode** (`--once` flag causes an
+immediate first sync, then it repeats every `WATCH_INTERVAL` hours in the background).
 
 ```bash
 docker-compose up -d
 ```
 
-Done!
+Done! The service will sync your lists every 12 hours (or whatever you set in `WATCH_INTERVAL`).
+
+> **Note:** `WATCH_INTERVAL` accepts values between `1h` and `168h` (7 days).
+> To run a one-off sync instead of the daemon use:
+> ```bash
+> docker-compose run --rm sync sync
+> ```
 
 ## Commands
 
@@ -139,7 +166,7 @@ Done!
 | Short | Long | Description |
 |-------|------|-------------|
 | `-i` | `--interval` | Sync interval: 1h-168h (overrides config) |
-| | `--once` | Sync immediately then start watching |
+| | `--once` | Run one sync immediately, then start the interval loop. **Without this flag the first sync is delayed by the full interval.** |
 
 Interval can be set via `--interval` flag or in `config.yaml` under `watch.interval`.
 
@@ -433,11 +460,9 @@ Use your system's scheduler for periodic sync:
 
 This project is not affiliated with AniList or MyAnimeList. Use at your own risk.
 
-## TODO
+## Roadmap
 
-- [ ] Sync favorites
-- [x] Sync MAL to AniList
-- [ ] Sync rewatching and rereading
+- [ ] Sync rewatching and rereading counts
 
 ## Credits
 

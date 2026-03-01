@@ -1,6 +1,7 @@
 services:
   sync:
     image: ghcr.io/bigspawn/anilist-mal-sync:latest
+    command: ["watch", "--once"]
     ports:
       - "18080:18080"
     environment:
@@ -14,8 +15,8 @@ services:
       - MAL_CLIENT_ID=your_mal_client_id
       - MAL_CLIENT_SECRET=your_mal_secret
       - MAL_USERNAME=your_mal_username
-      # Optional: Watch mode interval (e.g., 12h, 1h, 30m)
-      # - WATCH_INTERVAL=12h
+      # Watch mode interval (min: 1h, max: 168h / 7 days)
+      - WATCH_INTERVAL=12h
       # Optional: Manual mappings file path
       # - MAPPINGS_FILE_PATH=/home/appuser/.config/anilist-mal-sync/mappings.yaml
       # Optional: ID Mapping settings
@@ -29,6 +30,7 @@ services:
       # - JIKAN_API_ENABLED=false  # Enable Jikan API for manga ID mapping
       # - JIKAN_API_CACHE_DIR=/home/appuser/.config/anilist-mal-sync/jikan-cache
       # - JIKAN_API_CACHE_MAX_AGE=168h
+      # - FAVORITES_SYNC_ENABLED=false  # Enable favorites sync (requires Jikan API)
     volumes:
       - tokens:/home/appuser/.config/anilist-mal-sync
     restart: unless-stopped
@@ -39,4 +41,5 @@ volumes:
 # Usage:
 # 1. Replace environment variables above with your credentials
 # 2. Authenticate: docker-compose run --rm --service-ports sync login all
-# 3. Start sync: docker-compose up -d
+# 3. Preview changes (dry run): docker-compose run --rm sync sync --dry-run
+# 4. Start watch daemon: docker-compose up -d
