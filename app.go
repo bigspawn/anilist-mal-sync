@@ -371,34 +371,39 @@ func (a *App) saveUnmappedState(ctx context.Context, updaters []*Updater) {
 		Entries:   allUnmapped,
 		UpdatedAt: time.Now(),
 	}
-	if saveErr := state.Save(""); saveErr != nil {
+	saveErr := state.Save("")
+	if saveErr != nil {
 		LogWarn(ctx, "Failed to save unmapped state: %v", saveErr)
 	}
 }
 
 func (a *App) runNormalSync(ctx context.Context) error {
 	if a.mangaSync || a.allSync {
-		if err := a.syncManga(ctx); err != nil {
+		err := a.syncManga(ctx)
+		if err != nil {
 			return fmt.Errorf("error syncing manga: %w", err)
 		}
 	}
 
 	if !(a.mangaSync) || a.allSync {
-		if err := a.syncAnime(ctx); err != nil {
+		err := a.syncAnime(ctx)
+		if err != nil {
 			return fmt.Errorf("error syncing anime: %w", err)
 		}
 	}
 
 	// Save Hato cache if enabled
 	if a.hatoClient != nil {
-		if err := a.hatoClient.SaveCache(ctx); err != nil {
+		err := a.hatoClient.SaveCache(ctx)
+		if err != nil {
 			LogWarn(ctx, "Failed to save Hato cache: %v", err)
 		}
 	}
 
 	// Save Jikan cache if enabled
 	if a.jikanClient != nil {
-		if err := a.jikanClient.SaveCache(ctx); err != nil {
+		err := a.jikanClient.SaveCache(ctx)
+		if err != nil {
 			LogWarn(ctx, "Failed to save Jikan cache: %v", err)
 		}
 	}
@@ -408,27 +413,31 @@ func (a *App) runNormalSync(ctx context.Context) error {
 
 func (a *App) runReverseSync(ctx context.Context) error {
 	if a.mangaSync || a.allSync {
-		if err := a.reverseSyncManga(ctx); err != nil {
+		err := a.reverseSyncManga(ctx)
+		if err != nil {
 			return fmt.Errorf("error reverse syncing manga: %w", err)
 		}
 	}
 
 	if !(a.mangaSync) || a.allSync {
-		if err := a.reverseSyncAnime(ctx); err != nil {
+		err := a.reverseSyncAnime(ctx)
+		if err != nil {
 			return fmt.Errorf("error reverse syncing anime: %w", err)
 		}
 	}
 
 	// Save Hato cache if enabled
 	if a.hatoClient != nil {
-		if err := a.hatoClient.SaveCache(ctx); err != nil {
+		err := a.hatoClient.SaveCache(ctx)
+		if err != nil {
 			LogWarn(ctx, "Failed to save Hato cache: %v", err)
 		}
 	}
 
 	// Save Jikan cache if enabled
 	if a.jikanClient != nil {
-		if err := a.jikanClient.SaveCache(ctx); err != nil {
+		err := a.jikanClient.SaveCache(ctx)
+		if err != nil {
 			LogWarn(ctx, "Failed to save Jikan cache: %v", err)
 		}
 	}
@@ -436,27 +445,27 @@ func (a *App) runReverseSync(ctx context.Context) error {
 	return nil
 }
 
-// syncAnimeFromAnilistToMAL syncs anime from AniList to MAL
+// syncAnimeFromAnilistToMAL syncs anime from AniList to MAL.
 func (a *App) syncAnime(ctx context.Context) error {
 	return a.performSync(ctx, mediaTypeAnime, false, a.animeUpdater)
 }
 
-// syncMangaFromAnilistToMAL syncs manga from AniList to MAL
+// syncMangaFromAnilistToMAL syncs manga from AniList to MAL.
 func (a *App) syncManga(ctx context.Context) error {
 	return a.performSync(ctx, mediaTypeManga, false, a.mangaUpdater)
 }
 
-// reverseSyncAnimeFromMALToAnilist syncs anime from MAL to AniList
+// reverseSyncAnimeFromMALToAnilist syncs anime from MAL to AniList.
 func (a *App) reverseSyncAnime(ctx context.Context) error {
 	return a.performSync(ctx, "anime", true, a.reverseAnimeUpdater)
 }
 
-// reverseSyncMangaFromMALToAnilist syncs manga from MAL to AniList
+// reverseSyncMangaFromMALToAnilist syncs manga from MAL to AniList.
 func (a *App) reverseSyncManga(ctx context.Context) error {
 	return a.performSync(ctx, "manga", true, a.reverseMangaUpdater)
 }
 
-// performSync is a generic sync function that handles both anime and manga syncing
+// performSync is a generic sync function that handles both anime and manga syncing.
 func (a *App) performSync(ctx context.Context, mediaType string, reverse bool, updater *Updater) error {
 	var srcs []Source
 	var tgts []Target
@@ -605,7 +614,7 @@ func (a *App) fetchFromMALToAnilist(ctx context.Context, mediaType string, prefi
 // For reverse sync (MAL → AniList), we need:
 // - MAL ID (from MAL list)
 // - AniList ID (from resolved mapping)
-// - IsFavourite (from AniList target in mapping)
+// - IsFavourite (from AniList target in mapping).
 func (a *App) buildFavoritesListFromMappings(
 	malList []Anime,
 	mappings []resolvedMapping,

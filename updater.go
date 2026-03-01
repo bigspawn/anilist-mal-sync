@@ -30,17 +30,17 @@ type Target interface {
 }
 
 type Updater struct {
-	Prefix        string
-	Statistics    *Statistics
-	IgnoreTitles  map[string]struct{}
-	IgnoreIDs     map[int]struct{}
-	StrategyChain *StrategyChain
-	Service       MediaService // Replaces callback
-	ForceSync     bool         // Skip matching logic, force sync all
-	DryRun        bool         // Skip actual updates
-	Reverse       bool         // true for MAL→AniList direction
-	MediaType     string       // "anime" or "manga" — used for unmapped tracking
-	UnmappedList  []UnmappedEntry
+	Prefix           string
+	Statistics       *Statistics
+	IgnoreTitles     map[string]struct{}
+	IgnoreIDs        map[int]struct{}
+	StrategyChain    *StrategyChain
+	Service          MediaService // Replaces callback
+	ForceSync        bool         // Skip matching logic, force sync all
+	DryRun           bool         // Skip actual updates
+	Reverse          bool         // true for MAL→AniList direction
+	MediaType        string       // "anime" or "manga" — used for unmapped tracking
+	UnmappedList     []UnmappedEntry
 	ResolvedMappings []resolvedMapping // Saved for favorites sync
 }
 
@@ -429,7 +429,8 @@ func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts ma
 func (u *Updater) updateTarget(ctx context.Context, id TargetID, src Source) {
 	LogDebug(ctx, "[%s] Updating %s", u.Prefix, src.GetTitle())
 
-	if err := u.Service.Update(ctx, id, src, u.Prefix); err != nil {
+	err := u.Service.Update(ctx, id, src, u.Prefix)
+	if err != nil {
 		u.Statistics.RecordError(UpdateResult{
 			Title:  src.GetTitle(),
 			Status: src.GetStatusString(),
@@ -505,5 +506,3 @@ func (u *Updater) trackUnmapped(src Source, reason string) {
 	}
 	u.UnmappedList = append(u.UnmappedList, entry)
 }
-
-

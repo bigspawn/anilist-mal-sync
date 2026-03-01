@@ -96,7 +96,8 @@ func (f *FavoritesSync) addAnimeToAniList(ctx context.Context, anime Anime, resu
 		return
 	}
 
-	if err := f.toggleWithRateLimit(ctx, anime.IDAnilist, 0); err != nil {
+	err := f.toggleWithRateLimit(ctx, anime.IDAnilist, 0)
+	if err != nil {
 		LogWarn(ctx, "★ [Favorites] Failed to add anime %q to favorites: %v", anime.GetTitle(), err)
 		result.Errors++
 		return
@@ -135,7 +136,8 @@ func (f *FavoritesSync) addMangaToAniList(ctx context.Context, manga Manga, resu
 		return
 	}
 
-	if err := f.toggleWithRateLimit(ctx, 0, manga.IDAnilist); err != nil {
+	err := f.toggleWithRateLimit(ctx, 0, manga.IDAnilist)
+	if err != nil {
 		LogWarn(ctx, "★ [Favorites] Failed to add manga %q to favorites: %v", manga.GetTitle(), err)
 		result.Errors++
 		return

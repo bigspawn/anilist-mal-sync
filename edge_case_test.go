@@ -39,15 +39,13 @@ func TestOAuth_ConcurrentStateAccess(t *testing.T) {
 
 	var wg sync.WaitGroup
 	// Run multiple goroutines accessing state methods
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 10 {
+		wg.Go(func() {
 			_ = oauth.GetAuthURL()
 			_ = oauth.NeedInit()
 			_ = oauth.IsTokenValid()
 			_ = oauth.TokenExpiry()
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -63,7 +61,7 @@ func TestSyncReport_ConcurrentWarningAdd(t *testing.T) {
 	var wg sync.WaitGroup
 
 	// Add warnings concurrently from multiple goroutines
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		wg.Add(1)
 		go func(n int) {
 			defer wg.Done()

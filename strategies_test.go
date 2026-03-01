@@ -9,7 +9,7 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-// TestIDStrategy_FindsExistingTarget tests that IDStrategy finds targets by ID when they exist
+// TestIDStrategy_FindsExistingTarget tests that IDStrategy finds targets by ID when they exist.
 func TestIDStrategy_FindsExistingTarget(t *testing.T) {
 	ctx := context.Background()
 	strategy := IDStrategy{}
@@ -42,7 +42,7 @@ func TestIDStrategy_FindsExistingTarget(t *testing.T) {
 	}
 }
 
-// TestIDStrategy_NotFoundInUserList tests that IDStrategy returns false when ID not in user's list
+// TestIDStrategy_NotFoundInUserList tests that IDStrategy returns false when ID not in user's list.
 func TestIDStrategy_NotFoundInUserList(t *testing.T) {
 	ctx := context.Background()
 	strategy := IDStrategy{}
@@ -76,7 +76,7 @@ func TestIDStrategy_NotFoundInUserList(t *testing.T) {
 }
 
 // TestTitleStrategy_ShouldRejectMismatchedMALIDs tests the bug where TitleStrategy
-// matches entries with different MAL IDs, causing repeated updates
+// matches entries with different MAL IDs, causing repeated updates.
 func TestTitleStrategy_ShouldRejectMismatchedMALIDs(t *testing.T) {
 	ctx := context.Background()
 	strategy := TitleStrategy{}
@@ -182,7 +182,7 @@ func TestTitleStrategy_ShouldRejectMismatchedMALIDs(t *testing.T) {
 }
 
 // TestTitleStrategy_ShouldRejectLargeEpisodeCountDifference tests that TitleStrategy
-// should reject matches when episode counts differ significantly
+// should reject matches when episode counts differ significantly.
 func TestTitleStrategy_ShouldRejectLargeEpisodeCountDifference(t *testing.T) {
 	ctx := context.Background()
 	strategy := TitleStrategy{}
@@ -283,7 +283,7 @@ func TestTitleStrategy_ShouldRejectLargeEpisodeCountDifference(t *testing.T) {
 	}
 }
 
-// TestStrategyChain_Integration tests the full strategy chain behavior
+// TestStrategyChain_Integration tests the full strategy chain behavior.
 func TestStrategyChain_Integration(t *testing.T) {
 	ctx := context.Background()
 
@@ -331,7 +331,7 @@ func TestStrategyChain_Integration(t *testing.T) {
 	}
 }
 
-// TestMALIDStrategy_FindsTargetByMALID tests that MALIDStrategy finds targets by MAL ID
+// TestMALIDStrategy_FindsTargetByMALID tests that MALIDStrategy finds targets by MAL ID.
 func TestMALIDStrategy_FindsTargetByMALID(t *testing.T) {
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
@@ -393,7 +393,7 @@ func TestMALIDStrategy_FindsTargetByMALID(t *testing.T) {
 	}
 }
 
-// TestMALIDStrategy_ReturnsExistingUserTarget tests that MALIDStrategy returns existing target from user's list
+// TestMALIDStrategy_ReturnsExistingUserTarget tests that MALIDStrategy returns existing target from user's list.
 func TestMALIDStrategy_ReturnsExistingUserTarget(t *testing.T) {
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
@@ -462,7 +462,7 @@ func TestMALIDStrategy_ReturnsExistingUserTarget(t *testing.T) {
 	}
 }
 
-// TestMALIDStrategy_SkipsZeroMALID tests that MALIDStrategy skips when source has no MAL ID
+// TestMALIDStrategy_SkipsZeroMALID tests that MALIDStrategy skips when source has no MAL ID.
 func TestMALIDStrategy_SkipsZeroMALID(t *testing.T) {
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
@@ -499,7 +499,7 @@ func TestMALIDStrategy_SkipsZeroMALID(t *testing.T) {
 	}
 }
 
-// TestMALIDStrategy_ContextCancellation tests that MALIDStrategy respects context cancellation
+// TestMALIDStrategy_ContextCancellation tests that MALIDStrategy respects context cancellation.
 func TestMALIDStrategy_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
@@ -537,7 +537,7 @@ func TestMALIDStrategy_ContextCancellation(t *testing.T) {
 	}
 }
 
-// TestMALIDStrategy_ErrorHandling tests that MALIDStrategy properly handles API errors
+// TestMALIDStrategy_ErrorHandling tests that MALIDStrategy properly handles API errors.
 func TestMALIDStrategy_ErrorHandling(t *testing.T) {
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
@@ -572,7 +572,7 @@ func TestMALIDStrategy_ErrorHandling(t *testing.T) {
 	}
 }
 
-// TestAnime_GetSourceID tests that GetSourceID returns correct source ID based on sync direction
+// TestAnime_GetSourceID tests that GetSourceID returns correct source ID based on sync direction.
 func TestAnime_GetSourceID(t *testing.T) {
 	t.Parallel()
 
@@ -597,7 +597,7 @@ func TestAnime_GetSourceID(t *testing.T) {
 	}
 }
 
-// TestManga_GetSourceID tests that GetSourceID returns correct source ID based on sync direction
+// TestManga_GetSourceID tests that GetSourceID returns correct source ID based on sync direction.
 func TestManga_GetSourceID(t *testing.T) {
 	t.Parallel()
 
@@ -622,7 +622,7 @@ func TestManga_GetSourceID(t *testing.T) {
 	}
 }
 
-// TestStrategy_Name tests the Name() method for all strategies
+// TestStrategy_Name tests the Name() method for all strategies.
 func TestIDStrategy_Name(t *testing.T) {
 	strategy := IDStrategy{}
 	if got := strategy.Name(); got != StrategyNameID {
@@ -659,7 +659,7 @@ func TestStrategyChain_Name(t *testing.T) {
 	}
 }
 
-// TestAPISearchStrategy_FindTarget tests the APISearchStrategy
+// TestAPISearchStrategy_FindTarget tests the APISearchStrategy.
 func TestAPISearchStrategy_FindTarget(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -1013,7 +1013,7 @@ func TestManualMappingStrategy_NoMapping(t *testing.T) {
 	}
 }
 
-// TestFindTargetWithMeta_ReturnsMetadata tests that FindTargetWithMeta returns strategy name and index
+// TestFindTargetWithMeta_ReturnsMetadata tests that FindTargetWithMeta returns strategy name and index.
 func TestFindTargetWithMeta_ReturnsMetadata(t *testing.T) {
 	ctx := context.Background()
 
@@ -1058,7 +1058,7 @@ func TestFindTargetWithMeta_ReturnsMetadata(t *testing.T) {
 	}
 }
 
-// TestFindTargetWithMeta_FirstStrategy tests that FindTargetWithMeta returns idx=0 for first strategy
+// TestFindTargetWithMeta_FirstStrategy tests that FindTargetWithMeta returns idx=0 for first strategy.
 func TestFindTargetWithMeta_FirstStrategy(t *testing.T) {
 	ctx := context.Background()
 
@@ -1095,7 +1095,7 @@ func TestFindTargetWithMeta_FirstStrategy(t *testing.T) {
 	}
 }
 
-// TestFindTargetWithMeta_NoMatch tests that FindTargetWithMeta returns error when no strategy matches
+// TestFindTargetWithMeta_NoMatch tests that FindTargetWithMeta returns error when no strategy matches.
 func TestFindTargetWithMeta_NoMatch(t *testing.T) {
 	ctx := context.Background()
 

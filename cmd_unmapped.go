@@ -162,7 +162,8 @@ func runUnmappedFix(state *UnmappedState, mappingsPath string) error {
 	}
 
 	if changed {
-		if err := mappings.Save(mappingsPath); err != nil {
+		err := mappings.Save(mappingsPath)
+		if err != nil {
 			return fmt.Errorf("save mappings: %w", err)
 		}
 		savePath := mappingsPath

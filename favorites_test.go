@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"io"
 	"testing"
 
@@ -202,7 +202,7 @@ func TestSyncToAniList_SkipsEntriesWithoutMALID(t *testing.T) {
 }
 
 func TestSyncToAniList_ErrorDoesNotCountAsAdded(t *testing.T) {
-	mock := &mockToggler{err: fmt.Errorf("API error")}
+	mock := &mockToggler{err: errors.New("API error")}
 	fs := &FavoritesSync{toggler: mock, dryRun: false}
 
 	animes := []Anime{makeAnime(100, 1, "Anime A", false)}
@@ -215,7 +215,7 @@ func TestSyncToAniList_ErrorDoesNotCountAsAdded(t *testing.T) {
 
 func TestSyncToAniList_PartialError(t *testing.T) {
 	// First call succeeds, second fails
-	mock := &mockToggler{errOn: map[int]error{1: fmt.Errorf("fail")}}
+	mock := &mockToggler{errOn: map[int]error{1: errors.New("fail")}}
 	fs := &FavoritesSync{toggler: mock, dryRun: false}
 
 	animes := []Anime{

@@ -9,7 +9,7 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-// ANSI color codes for terminal output
+// ANSI color codes for terminal output.
 const (
 	colorReset  = "\033[0m"
 	colorRed    = "\033[31m"
@@ -22,8 +22,8 @@ const (
 	colorBold   = "\033[1m"
 )
 
-// colorPrint prints colored text to stdout, ignoring write errors
-func colorPrint(format string, args ...interface{}) {
+// colorPrint prints colored text to stdout, ignoring write errors.
+func colorPrint(format string, args ...any) {
 	_, _ = fmt.Fprintf(os.Stdout, format, args...)
 }
 
@@ -58,7 +58,8 @@ func runLogin(ctx context.Context, cmd *cli.Command) error {
 	case ServiceMyAnimeList:
 		return loginMyAnimeList(ctx, config)
 	case ServiceAll:
-		if err := loginMyAnimeList(ctx, config); err != nil {
+		err := loginMyAnimeList(ctx, config)
+		if err != nil {
 			return err
 		}
 		return loginAnilist(ctx, config)

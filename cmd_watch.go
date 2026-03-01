@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -68,7 +69,7 @@ func runWatch(ctx context.Context, cmd *cli.Command) error {
 			return fmt.Errorf("invalid interval in config: %w", err)
 		}
 		if cfgInterval == 0 {
-			return fmt.Errorf("interval required (use --interval or set watch.interval in config)")
+			return errors.New("interval required (use --interval or set watch.interval in config)")
 		}
 		interval = cfgInterval
 	}
@@ -84,7 +85,8 @@ func runWatch(ctx context.Context, cmd *cli.Command) error {
 	// Optional immediate sync
 	if cmd.Bool("once") {
 		log.Printf("Running initial sync (--once flag set)...")
-		if err := app.Run(ctx); err != nil {
+		err := app.Run(ctx)
+		if err != nil {
 			return fmt.Errorf("initial sync failed: %w", err)
 		}
 		nextTime := time.Now().Add(interval)
@@ -102,7 +104,8 @@ func runWatch(ctx context.Context, cmd *cli.Command) error {
 		case <-ticker.C:
 			log.Printf("Running scheduled sync...")
 			app.Refresh(ctx)
-			if err := app.Run(ctx); err != nil {
+			err := app.Run(ctx)
+			if err != nil {
 				log.Printf("Sync error: %v", err)
 			} else {
 				nextTime := time.Now().Add(interval)

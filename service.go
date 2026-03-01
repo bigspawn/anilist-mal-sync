@@ -4,31 +4,32 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/rl404/verniy"
 )
 
-// MediaService abstracts operations with a media service (MAL/AniList)
+// MediaService abstracts operations with a media service (MAL/AniList).
 type MediaService interface {
 	GetByID(ctx context.Context, id TargetID, prefix string) (Target, error)
 	GetByName(ctx context.Context, name string, prefix string) ([]Target, error)
 	Update(ctx context.Context, id TargetID, src Source, prefix string) error
 }
 
-// MediaServiceWithMALID extends MediaService with MAL ID lookup capability
+// MediaServiceWithMALID extends MediaService with MAL ID lookup capability.
 type MediaServiceWithMALID interface {
 	MediaService
 	GetByMALID(ctx context.Context, malID int, prefix string) (Target, error)
 }
 
-// MALAnimeService implements MediaService for MAL anime operations
+// MALAnimeService implements MediaService for MAL anime operations.
 type MALAnimeService struct {
 	client *MyAnimeListClient
 }
 
-// NewMALAnimeService creates a new MAL anime service
+// NewMALAnimeService creates a new MAL anime service.
 func NewMALAnimeService(client *MyAnimeListClient) *MALAnimeService {
 	return &MALAnimeService{client: client}
 }
@@ -58,20 +59,21 @@ func (s *MALAnimeService) GetByName(ctx context.Context, name string, _ string) 
 func (s *MALAnimeService) Update(ctx context.Context, id TargetID, src Source, _ string) error {
 	a, ok := src.(Anime)
 	if !ok {
-		return fmt.Errorf("source is not an anime")
+		return errors.New("source is not an anime")
 	}
-	if err := s.client.UpdateAnimeByIDAndOptions(ctx, int(id), a.GetUpdateOptions()); err != nil {
+	err := s.client.UpdateAnimeByIDAndOptions(ctx, int(id), a.GetUpdateOptions())
+	if err != nil {
 		return fmt.Errorf("error updating anime by id and options: %w", err)
 	}
 	return nil
 }
 
-// MALMangaService implements MediaService for MAL manga operations
+// MALMangaService implements MediaService for MAL manga operations.
 type MALMangaService struct {
 	client *MyAnimeListClient
 }
 
-// NewMALMangaService creates a new MAL manga service
+// NewMALMangaService creates a new MAL manga service.
 func NewMALMangaService(client *MyAnimeListClient) *MALMangaService {
 	return &MALMangaService{client: client}
 }
@@ -101,9 +103,10 @@ func (s *MALMangaService) GetByName(ctx context.Context, name string, _ string) 
 func (s *MALMangaService) Update(ctx context.Context, id TargetID, src Source, _ string) error {
 	m, ok := src.(Manga)
 	if !ok {
-		return fmt.Errorf("source is not a manga")
+		return errors.New("source is not a manga")
 	}
-	if err := s.client.UpdateMangaByIDAndOptions(ctx, int(id), m.GetUpdateOptions()); err != nil {
+	err := s.client.UpdateMangaByIDAndOptions(ctx, int(id), m.GetUpdateOptions())
+	if err != nil {
 		return fmt.Errorf("error updating manga by id and options: %w", err)
 	}
 	return nil
@@ -158,7 +161,7 @@ func (s *AniListAnimeService) GetByMALID(ctx context.Context, malID int, _ strin
 func (s *AniListAnimeService) Update(ctx context.Context, id TargetID, src Source, _ string) error {
 	a, ok := src.(Anime)
 	if !ok {
-		return fmt.Errorf("source is not an anime")
+		return errors.New("source is not an anime")
 	}
 	anilistScore := denormalizeScoreForAniList(ctx, a.Score, s.scoreFormat)
 
@@ -167,7 +170,7 @@ func (s *AniListAnimeService) Update(ctx context.Context, id TargetID, src Sourc
 		completedAt = a.FinishedAt
 	}
 
-	if err := s.client.UpdateAnimeEntry(
+	err := s.client.UpdateAnimeEntry(
 		ctx,
 		int(id),
 		a.Status.GetAnilistStatus(),
@@ -175,7 +178,8 @@ func (s *AniListAnimeService) Update(ctx context.Context, id TargetID, src Sourc
 		anilistScore,
 		a.StartedAt,
 		completedAt,
-	); err != nil {
+	)
+	if err != nil {
 		return fmt.Errorf("error updating anilist anime: %w", err)
 	}
 	return nil
@@ -230,7 +234,7 @@ func (s *AniListMangaService) GetByMALID(ctx context.Context, malID int, _ strin
 func (s *AniListMangaService) Update(ctx context.Context, id TargetID, src Source, _ string) error {
 	m, ok := src.(Manga)
 	if !ok {
-		return fmt.Errorf("source is not a manga")
+		return errors.New("source is not a manga")
 	}
 	anilistScore := denormalizeMangaScoreForAniList(ctx, m.Score, s.scoreFormat)
 
@@ -239,7 +243,7 @@ func (s *AniListMangaService) Update(ctx context.Context, id TargetID, src Sourc
 		completedAt = m.FinishedAt
 	}
 
-	if err := s.client.UpdateMangaEntry(
+	err := s.client.UpdateMangaEntry(
 		ctx,
 		int(id),
 		m.Status.GetAnilistStatus(),
@@ -248,7 +252,8 @@ func (s *AniListMangaService) Update(ctx context.Context, id TargetID, src Sourc
 		anilistScore,
 		m.StartedAt,
 		completedAt,
-	); err != nil {
+	)
+	if err != nil {
 		return fmt.Errorf("error updating anilist manga: %w", err)
 	}
 	return nil

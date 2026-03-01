@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// Test NewLogger
+// Test NewLogger.
 func TestNewLogger(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -111,7 +111,7 @@ func TestLoggerContext_Propagation(t *testing.T) {
 	}
 }
 
-// Test NewTokenFile
+// Test NewTokenFile.
 func TestNewTokenFile(t *testing.T) {
 	t.Parallel()
 	tokenFile := NewTokenFile()
@@ -121,7 +121,7 @@ func TestNewTokenFile(t *testing.T) {
 	}
 }
 
-// Test NewStrategyChain
+// Test NewStrategyChain.
 func TestNewStrategyChain_Empty(t *testing.T) {
 	t.Parallel()
 	chain := NewStrategyChain()
@@ -144,7 +144,7 @@ func TestNewStrategyChain_WithStrategies(t *testing.T) {
 	}
 }
 
-// Test NewSyncReport
+// Test NewSyncReport.
 func TestNewSyncReport_Structure(t *testing.T) {
 	t.Parallel()
 	report := NewSyncReport()
@@ -160,7 +160,7 @@ func TestNewSyncReport_Structure(t *testing.T) {
 	}
 }
 
-// Test Statistics methods
+// Test Statistics methods.
 func TestStatistics_IncrementTotal(t *testing.T) {
 	t.Parallel()
 	stats := NewStatistics()
@@ -350,7 +350,7 @@ func TestStatistics_EndTime(t *testing.T) {
 	}
 }
 
-// Test multiple statistics instances
+// Test multiple statistics instances.
 func TestMultipleStatisticsInstances(t *testing.T) {
 	t.Parallel()
 	stats1 := NewStatistics()
@@ -368,7 +368,7 @@ func TestMultipleStatisticsInstances(t *testing.T) {
 	}
 }
 
-// Test Config methods
+// Test Config methods.
 func TestConfig_GetHTTPTimeout_Default(t *testing.T) {
 	t.Parallel()
 	config := Config{
@@ -421,7 +421,7 @@ func TestConfig_GetHTTPTimeout_Custom(t *testing.T) {
 	}
 }
 
-// Test error detection functions
+// Test error detection functions.
 func TestIsConfigNotFoundError_Wrapped(t *testing.T) {
 	t.Parallel()
 	// Test with wrapped error
@@ -532,7 +532,7 @@ func TestIsCLIUsageError_Direct(t *testing.T) {
 	}
 }
 
-// Test UpdateResult struct
+// Test UpdateResult struct.
 func TestUpdateResult_IsSkipped(t *testing.T) {
 	t.Parallel()
 	result := UpdateResult{
@@ -579,7 +579,7 @@ func TestUpdateResult_EmptyFields(t *testing.T) {
 	}
 }
 
-// Test TargetID type
+// Test TargetID type.
 func TestTargetID_Conversion(t *testing.T) {
 	t.Parallel()
 	id := TargetID(12345)
@@ -597,7 +597,7 @@ func TestTargetID_ZeroValue(t *testing.T) {
 	}
 }
 
-// Test Warning struct
+// Test Warning struct.
 func TestWarning_Structure(t *testing.T) {
 	t.Parallel()
 	warning := Warning{
@@ -633,7 +633,7 @@ func TestWarning_EmptyFields(t *testing.T) {
 	}
 }
 
-// Test SyncReport Warnings
+// Test SyncReport Warnings.
 func TestReport_WarningsField(t *testing.T) {
 	t.Parallel()
 	report := NewSyncReport()
@@ -665,7 +665,7 @@ func TestReport_WarningsField(t *testing.T) {
 	}
 }
 
-// Test helper functions
+// Test helper functions.
 func TestBufferUsage(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer

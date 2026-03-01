@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 
 	yaml "gopkg.in/yaml.v3"
@@ -107,10 +109,8 @@ func (m *MappingsConfig) GetManualAniListID(malID int) (int, bool) {
 
 // IsIgnored checks if an entry should be ignored by AniList ID or title.
 func (m *MappingsConfig) IsIgnored(anilistID int, title string) bool {
-	for _, id := range m.Ignore.AniListIDs {
-		if id == anilistID {
-			return true
-		}
+	if slices.Contains(m.Ignore.AniListIDs, anilistID) {
+		return true
 	}
 	lowerTitle := strings.ToLower(title)
 	for _, t := range m.Ignore.Titles {
@@ -123,10 +123,8 @@ func (m *MappingsConfig) IsIgnored(anilistID int, title string) bool {
 
 // AddIgnoreByID adds an AniList ID to the ignore list with optional metadata.
 func (m *MappingsConfig) AddIgnoreByID(anilistID int, title string, reason string) {
-	for _, id := range m.Ignore.AniListIDs {
-		if id == anilistID {
-			return
-		}
+	if slices.Contains(m.Ignore.AniListIDs, anilistID) {
+		return
 	}
 	m.Ignore.AniListIDs = append(m.Ignore.AniListIDs, anilistID)
 
@@ -138,20 +136,13 @@ func (m *MappingsConfig) AddIgnoreByID(anilistID int, title string, reason strin
 
 // IsIgnoredByMALID checks if an entry should be ignored by MAL ID.
 func (m *MappingsConfig) IsIgnoredByMALID(malID int) bool {
-	for _, id := range m.Ignore.MALIDs {
-		if id == malID {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(m.Ignore.MALIDs, malID)
 }
 
 // AddIgnoreByMALID adds a MAL ID to the ignore list with optional metadata.
 func (m *MappingsConfig) AddIgnoreByMALID(malID int, title string, reason string) {
-	for _, id := range m.Ignore.MALIDs {
-		if id == malID {
-			return
-		}
+	if slices.Contains(m.Ignore.MALIDs, malID) {
+		return
 	}
 	m.Ignore.MALIDs = append(m.Ignore.MALIDs, malID)
 
@@ -189,7 +180,7 @@ func getDefaultMappingsPath() string {
 func buildIgnoreIDsNode(ids []int, meta map[int]IgnoreEntry) *yaml.Node {
 	seqNode := &yaml.Node{Kind: yaml.SequenceNode}
 	for _, id := range ids {
-		idNode := &yaml.Node{Kind: yaml.ScalarNode, Value: fmt.Sprintf("%d", id)}
+		idNode := &yaml.Node{Kind: yaml.ScalarNode, Value: strconv.Itoa(id)}
 		if meta, ok := meta[id]; ok {
 			var parts []string
 			if meta.Title != "" {
@@ -208,7 +199,7 @@ func buildIgnoreIDsNode(ids []int, meta map[int]IgnoreEntry) *yaml.Node {
 }
 
 // MarshalYAML implements custom YAML marshaling with inline comments.
-func (m *MappingsConfig) MarshalYAML() (interface{}, error) { //nolint:unparam // Error return required by yaml.Marshaler interface
+func (m *MappingsConfig) MarshalYAML() (any, error) { //nolint:unparam // Error return required by yaml.Marshaler interface
 	node := &yaml.Node{
 		Kind: yaml.MappingNode,
 	}
@@ -221,9 +212,9 @@ func (m *MappingsConfig) MarshalYAML() (interface{}, error) { //nolint:unparam /
 				Kind: yaml.MappingNode,
 				Content: []*yaml.Node{
 					{Kind: yaml.ScalarNode, Value: "anilist_id"},
-					{Kind: yaml.ScalarNode, Value: fmt.Sprintf("%d", mapping.AniListID)},
+					{Kind: yaml.ScalarNode, Value: strconv.Itoa(mapping.AniListID)},
 					{Kind: yaml.ScalarNode, Value: "mal_id"},
-					{Kind: yaml.ScalarNode, Value: fmt.Sprintf("%d", mapping.MALID)},
+					{Kind: yaml.ScalarNode, Value: strconv.Itoa(mapping.MALID)},
 				},
 			}
 			if mapping.Comment != "" {

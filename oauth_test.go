@@ -753,12 +753,10 @@ func TestConcurrentTokenAccess(t *testing.T) {
 	// Spawn 100 goroutines reading token state
 	var wg sync.WaitGroup
 	iterations := 100
-	for i := 0; i < iterations; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range iterations {
+		wg.Go(func() {
 			_ = oauth.NeedInit() // Concurrent read
-		}()
+		})
 	}
 	wg.Wait()
 
@@ -779,12 +777,10 @@ func TestConcurrentStateAccess(t *testing.T) {
 	// Spawn 100 goroutines getting auth URL (reads state)
 	var wg sync.WaitGroup
 	iterations := 100
-	for i := 0; i < iterations; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range iterations {
+		wg.Go(func() {
 			_ = oauth.GetAuthURL() // Concurrent read of state
-		}()
+		})
 	}
 	wg.Wait()
 
@@ -805,7 +801,7 @@ func TestConcurrentTokenAndStateAccess(t *testing.T) {
 	// Spawn multiple goroutines accessing both token and state
 	var wg sync.WaitGroup
 	iterations := 50
-	for i := 0; i < iterations; i++ {
+	for range iterations {
 		wg.Add(2)
 		go func() {
 			defer wg.Done()

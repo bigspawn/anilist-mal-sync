@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -95,7 +96,7 @@ type Config struct {
 	MappingsFilePath string                `yaml:"mappings_file_path"`
 }
 
-// loadConfigFromEnv loads configuration from environment variables
+// loadConfigFromEnv loads configuration from environment variables.
 func loadConfigFromEnv() (Config, error) {
 	tokenPath, err := getDefaultTokenPath()
 	if err != nil {
@@ -168,7 +169,7 @@ func getEnvBoolOrDefault(key string, defaultValue bool) bool {
 	return parseBoolString(value)
 }
 
-// getEnvOrDefault returns environment variable value or default if empty
+// getEnvOrDefault returns environment variable value or default if empty.
 func getEnvOrDefault(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
@@ -176,7 +177,7 @@ func getEnvOrDefault(key, defaultValue string) string {
 	return defaultValue
 }
 
-// getDefaultTokenPath returns the default token file path for the current platform
+// getDefaultTokenPath returns the default token file path for the current platform.
 func getDefaultTokenPath() (string, error) {
 	configDir, err := os.UserConfigDir()
 	if err != nil {
@@ -185,7 +186,7 @@ func getDefaultTokenPath() (string, error) {
 	return filepath.Join(configDir, "anilist-mal-sync", "token.json"), nil
 }
 
-// overrideConfigFromEnv applies environment variable overrides to a config
+// overrideConfigFromEnv applies environment variable overrides to a config.
 func overrideConfigFromEnv(cfg *Config) {
 	overrideOAuthFromEnv(&cfg.OAuth)
 	overrideAnilistFromEnv(&cfg.Anilist)
@@ -285,7 +286,7 @@ func overrideBoolFromEnv(field *bool, key string) {
 	}
 }
 
-// getDefaultTokenPathOrEmpty returns the default token path or empty string on error
+// getDefaultTokenPathOrEmpty returns the default token path or empty string on error.
 func getDefaultTokenPathOrEmpty() string {
 	path, err := getDefaultTokenPath()
 	if err != nil {
@@ -297,7 +298,7 @@ func getDefaultTokenPathOrEmpty() string {
 func validateConfig(cfg Config) error {
 	if cfg.Anilist.ClientID == "" || cfg.Anilist.Username == "" ||
 		cfg.MyAnimeList.ClientID == "" || cfg.MyAnimeList.Username == "" {
-		return fmt.Errorf("required fields not set")
+		return errors.New("required fields not set")
 	}
 	return nil
 }
@@ -325,7 +326,7 @@ func loadConfigFromFile(filename string) (Config, error) {
 
 	// Validate required fields
 	if err := validateConfig(cfg); err != nil {
-		return Config{}, fmt.Errorf("required fields not set (anilist.client_id, anilist.username, myanimelist.client_id, myanimelist.username)")
+		return Config{}, errors.New("required fields not set (anilist.client_id, anilist.username, myanimelist.client_id, myanimelist.username)")
 	}
 
 	return cfg, nil
@@ -337,7 +338,7 @@ func loadConfigFromEnvWithValidation() (Config, error) {
 		return Config{}, err
 	}
 	if err := validateConfig(cfg); err != nil {
-		return Config{}, fmt.Errorf("required environment variables not set (ANILIST_CLIENT_ID, ANILIST_USERNAME, MAL_CLIENT_ID, MAL_USERNAME)")
+		return Config{}, errors.New("required environment variables not set (ANILIST_CLIENT_ID, ANILIST_USERNAME, MAL_CLIENT_ID, MAL_USERNAME)")
 	}
 	return cfg, nil
 }
@@ -358,7 +359,8 @@ func tryLoadFromEnvWithHelp(filename string) (Config, error) {
 		return Config{}, envErr
 	}
 	// Validate that required fields are set
-	if err := validateConfig(cfg); err != nil {
+	err := validateConfig(cfg)
+	if err != nil {
 		// Print help message to stderr
 		fmt.Fprintln(os.Stderr, getConfigHelp(filename))
 		return Config{}, fmt.Errorf("config file not found and required environment variables not set: %w", err)
@@ -368,7 +370,8 @@ func tryLoadFromEnvWithHelp(filename string) (Config, error) {
 
 func parseConfigFile(data []byte, filename string) (Config, error) {
 	cfg := configWithDefaults()
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
+	err := yaml.Unmarshal(data, &cfg)
+	if err != nil {
 		fmt.Fprintln(os.Stderr, getConfigHelp(filename))
 		return Config{}, fmt.Errorf("failed to parse config file: %w", err)
 	}
@@ -403,7 +406,7 @@ func configWithDefaults() Config {
 	}
 }
 
-// getConfigHelp returns a helpful message for creating config file
+// getConfigHelp returns a helpful message for creating config file.
 func getConfigHelp(configPath string) string {
 	const (
 		colorReset  = "\033[0m"
@@ -439,7 +442,7 @@ func getConfigHelp(configPath string) string {
 		colorCyan, colorReset)
 }
 
-// IsConfigNotFoundError checks if error is related to config file
+// IsConfigNotFoundError checks if error is related to config file.
 func IsConfigNotFoundError(err error) bool {
 	if err == nil {
 		return false

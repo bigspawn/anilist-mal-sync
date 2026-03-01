@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -97,7 +98,7 @@ func (c *AnilistClient) GetUserMangaList(ctx context.Context) ([]verniy.MediaLis
 	return mediaListGroups, nil
 }
 
-// newAnilistOAuth creates AniList OAuth with optional initialization
+// newAnilistOAuth creates AniList OAuth with optional initialization.
 func newAnilistOAuth(ctx context.Context, config Config, initWithToken bool) (*OAuth, error) {
 	verifier := oauth2.GenerateVerifier()
 
@@ -129,7 +130,7 @@ func NewAnilistOAuthWithoutInit(ctx context.Context, config Config) (*OAuth, err
 	return newAnilistOAuth(ctx, config, false)
 }
 
-// GraphQLError represents a GraphQL error
+// GraphQLError represents a GraphQL error.
 type GraphQLError struct {
 	Message   string `json:"message"`
 	Status    int    `json:"status"`
@@ -139,13 +140,13 @@ type GraphQLError struct {
 	} `json:"locations"`
 }
 
-// GraphQLResponse represents a GraphQL response with potential errors
+// GraphQLResponse represents a GraphQL response with potential errors.
 type GraphQLResponse struct {
 	Data   json.RawMessage `json:"data"`
 	Errors []GraphQLError  `json:"errors"`
 }
 
-// SaveMediaListEntry represents the response from AniList SaveMediaListEntry mutation
+// SaveMediaListEntry represents the response from AniList SaveMediaListEntry mutation.
 type SaveMediaListEntry struct {
 	Data struct {
 		SaveMediaListEntry struct {
@@ -201,7 +202,7 @@ func (c *AnilistClient) UpdateAnimeEntry(
 		}
 	`
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"mediaId":  mediaID,
 		"status":   status,
 		"progress": progress,
@@ -215,7 +216,7 @@ func (c *AnilistClient) UpdateAnimeEntry(
 		variables["completedAt"] = fd
 	}
 
-	requestBody := map[string]interface{}{
+	requestBody := map[string]any{
 		"query":     mutation,
 		"variables": variables,
 	}
@@ -300,7 +301,7 @@ func (c *AnilistClient) UpdateMangaEntry(
 		}
 	`
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"mediaId":         mediaID,
 		"status":          status,
 		"progress":        progress,
@@ -315,7 +316,7 @@ func (c *AnilistClient) UpdateMangaEntry(
 		variables["completedAt"] = fd
 	}
 
-	requestBody := map[string]interface{}{
+	requestBody := map[string]any{
 		"query":     mutation,
 		"variables": variables,
 	}
@@ -365,10 +366,10 @@ func (c *AnilistClient) ToggleFavourite(ctx context.Context, animeID, mangaID in
 	defer cancel()
 
 	if animeID <= 0 && mangaID <= 0 {
-		return fmt.Errorf("at least one of animeID or mangaID must be positive")
+		return errors.New("at least one of animeID or mangaID must be positive")
 	}
 	if animeID > 0 && mangaID > 0 {
-		return fmt.Errorf("only one of animeID or mangaID can be specified per call")
+		return errors.New("only one of animeID or mangaID can be specified per call")
 	}
 
 	mutation := `
@@ -420,7 +421,7 @@ func (c *AnilistClient) ToggleFavourite(ctx context.Context, animeID, mangaID in
 	return nil
 }
 
-// GetAnimeByID gets an anime from AniList by ID
+// GetAnimeByID gets an anime from AniList by ID.
 func (c *AnilistClient) GetAnimeByID(ctx context.Context, id int) (*verniy.Media, error) {
 	ctx, cancel := withTimeout(ctx, c.httpTimeout)
 	defer cancel()
@@ -442,7 +443,7 @@ func (c *AnilistClient) GetAnimeByID(ctx context.Context, id int) (*verniy.Media
 	return media, nil
 }
 
-// GetAnimesByName searches for anime on AniList by name
+// GetAnimesByName searches for anime on AniList by name.
 func (c *AnilistClient) GetAnimesByName(ctx context.Context, name string) ([]verniy.Media, error) {
 	ctx, cancel := withTimeout(ctx, c.httpTimeout)
 	defer cancel()
@@ -464,7 +465,7 @@ func (c *AnilistClient) GetAnimesByName(ctx context.Context, name string) ([]ver
 	return page.Media, nil
 }
 
-// GetAnimeByMALID gets an anime from AniList by MAL ID
+// GetAnimeByMALID gets an anime from AniList by MAL ID.
 func (c *AnilistClient) GetAnimeByMALID(ctx context.Context, malID int) (*verniy.Media, error) {
 	ctx, cancel := withTimeout(ctx, c.httpTimeout)
 	defer cancel()
@@ -489,7 +490,7 @@ func (c *AnilistClient) GetAnimeByMALID(ctx context.Context, malID int) (*verniy
 	return &page.Media[0], nil
 }
 
-// GetMangaByID gets a manga from AniList by ID
+// GetMangaByID gets a manga from AniList by ID.
 func (c *AnilistClient) GetMangaByID(ctx context.Context, id int) (*verniy.Media, error) {
 	ctx, cancel := withTimeout(ctx, c.httpTimeout)
 	defer cancel()
@@ -513,7 +514,7 @@ func (c *AnilistClient) GetMangaByID(ctx context.Context, id int) (*verniy.Media
 	return media, nil
 }
 
-// GetMangasByName searches for manga on AniList by name
+// GetMangasByName searches for manga on AniList by name.
 func (c *AnilistClient) GetMangasByName(ctx context.Context, name string) ([]verniy.Media, error) {
 	ctx, cancel := withTimeout(ctx, c.httpTimeout)
 	defer cancel()
@@ -537,7 +538,7 @@ func (c *AnilistClient) GetMangasByName(ctx context.Context, name string) ([]ver
 	return page.Media, nil
 }
 
-// GetMangaByMALID gets a manga from AniList by MAL ID
+// GetMangaByMALID gets a manga from AniList by MAL ID.
 func (c *AnilistClient) GetMangaByMALID(ctx context.Context, malID int) (*verniy.Media, error) {
 	ctx, cancel := withTimeout(ctx, c.httpTimeout)
 	defer cancel()
@@ -583,7 +584,7 @@ func timeToFuzzyDateInput(t *time.Time) map[string]int {
 	}
 }
 
-// GetUserScoreFormat retrieves the user's score format preference from AniList
+// GetUserScoreFormat retrieves the user's score format preference from AniList.
 func (c *AnilistClient) GetUserScoreFormat(ctx context.Context) (verniy.ScoreFormat, error) {
 	ctx, cancel := withTimeout(ctx, c.httpTimeout)
 	defer cancel()
@@ -597,11 +598,11 @@ func (c *AnilistClient) GetUserScoreFormat(ctx context.Context) (verniy.ScoreFor
 	}
 
 	if user.MediaListOptions == nil {
-		return "", fmt.Errorf("user media list options is nil")
+		return "", errors.New("user media list options is nil")
 	}
 
 	if user.MediaListOptions.ScoreFormat == nil {
-		return "", fmt.Errorf("user score format is nil")
+		return "", errors.New("user score format is nil")
 	}
 
 	return *user.MediaListOptions.ScoreFormat, nil

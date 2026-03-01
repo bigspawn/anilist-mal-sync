@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -441,7 +442,7 @@ func TestIsCancellationError_ContextCanceled(t *testing.T) {
 		},
 		{
 			name: "Random error",
-			err:  fmt.Errorf("random error"),
+			err:  errors.New("random error"),
 			want: false,
 		},
 		{
@@ -793,7 +794,8 @@ func TestGetSyncFlagsFromCmd_ReverseDirection(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	if err := root.Run(ctx, []string{"app", "sync", "--reverse-direction"}); err != nil {
+	err := root.Run(ctx, []string{"app", "sync", "--reverse-direction"})
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -818,7 +820,8 @@ func TestGetSyncFlagsFromCmd_NoReverse(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	if err := root.Run(ctx, []string{"app", "sync"}); err != nil {
+	err := root.Run(ctx, []string{"app", "sync"})
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -843,7 +846,8 @@ func TestGetSyncFlagsFromCmd_VerboseFlag(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	if err := root.Run(ctx, []string{"app", "sync", "--verbose"}); err != nil {
+	err := root.Run(ctx, []string{"app", "sync", "--verbose"})
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 

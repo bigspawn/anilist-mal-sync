@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -22,23 +23,23 @@ const (
 	StrategyNameTitle = "TitleStrategy"
 )
 
-// TargetFindStrategy defines a strategy for finding targets
+// TargetFindStrategy defines a strategy for finding targets.
 type TargetFindStrategy interface {
 	FindTarget(ctx context.Context, src Source, existingTargets map[TargetID]Target, prefix string, report *SyncReport) (Target, bool, error)
 	Name() string
 }
 
-// StrategyChain manages a chain of target finding strategies
+// StrategyChain manages a chain of target finding strategies.
 type StrategyChain struct {
 	strategies []TargetFindStrategy
 }
 
-// NewStrategyChain creates a new strategy chain
+// NewStrategyChain creates a new strategy chain.
 func NewStrategyChain(strategies ...TargetFindStrategy) *StrategyChain {
 	return &StrategyChain{strategies: strategies}
 }
 
-// FindTarget executes strategies in order until one succeeds
+// FindTarget executes strategies in order until one succeeds.
 func (sc *StrategyChain) FindTarget(
 	ctx context.Context, src Source, existingTargets map[TargetID]Target, prefix string, report *SyncReport,
 ) (Target, error) {
@@ -156,7 +157,7 @@ func (s ManualMappingStrategy) lookupReverse(_, malID int) (int, bool) {
 	return 0, false
 }
 
-// IDStrategy finds targets by TargetID in existing targets map
+// IDStrategy finds targets by TargetID in existing targets map.
 type IDStrategy struct{}
 
 func (s IDStrategy) Name() string {
@@ -176,7 +177,7 @@ func (s IDStrategy) FindTarget(
 	return target, found, nil
 }
 
-// TitleStrategy finds targets by title comparison with existing targets
+// TitleStrategy finds targets by title comparison with existing targets.
 type TitleStrategy struct{}
 
 func (s TitleStrategy) Name() string {
@@ -184,7 +185,7 @@ func (s TitleStrategy) Name() string {
 }
 
 // shouldRejectMatch checks if a potential match should be rejected
-// Returns true if the match should be rejected with appropriate logging
+// Returns true if the match should be rejected with appropriate logging.
 func shouldRejectMatch(ctx context.Context, src Source, target Target, prefix string, report *SyncReport) bool {
 	// Check MAL ID mismatch
 	srcID := src.GetTargetID()
@@ -280,7 +281,7 @@ func (s TitleStrategy) FindTarget(
 	return nil, false, nil
 }
 
-// MALIDStrategy finds targets by searching AniList using source MAL ID
+// MALIDStrategy finds targets by searching AniList using source MAL ID.
 type MALIDStrategy struct {
 	Service MediaServiceWithMALID
 }
@@ -299,7 +300,7 @@ func (s MALIDStrategy) FindTarget(
 	// Check for context cancellation before potentially long-running search
 	select {
 	case <-ctx.Done():
-		return nil, false, fmt.Errorf("context cancelled during MAL ID search")
+		return nil, false, errors.New("context cancelled during MAL ID search")
 	default:
 	}
 
@@ -335,7 +336,7 @@ func (s MALIDStrategy) FindTarget(
 	return target, true, nil
 }
 
-// APISearchStrategy finds targets by making API calls
+// APISearchStrategy finds targets by making API calls.
 type APISearchStrategy struct {
 	Service MediaService
 }
@@ -354,7 +355,7 @@ func (s APISearchStrategy) FindTarget(
 	// Check for context cancellation before potentially long-running search
 	select {
 	case <-ctx.Done():
-		return nil, false, fmt.Errorf("context cancelled during API search")
+		return nil, false, errors.New("context cancelled during API search")
 	default:
 	}
 

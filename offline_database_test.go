@@ -162,9 +162,9 @@ func TestParseAODFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test-db.json")
 
-	testData := map[string]interface{}{
+	testData := map[string]any{
 		"lastUpdate": "2026-01-15",
-		"data": []map[string]interface{}{
+		"data": []map[string]any{
 			{
 				"sources": []string{
 					"https://myanimelist.net/anime/10378",

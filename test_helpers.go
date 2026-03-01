@@ -10,4 +10,3 @@ func setTestDirection(t *testing.T, dir SyncDirection) context.Context {
 	t.Helper()
 	return WithDirection(t.Context(), dir)
 }
-

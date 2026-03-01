@@ -11,10 +11,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func writeJSON(t *testing.T, w http.ResponseWriter, v interface{}) {
+func writeJSON(t *testing.T, w http.ResponseWriter, v any) {
 	t.Helper()
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(v); err != nil {
+	err := json.NewEncoder(w).Encode(v)
+	if err != nil {
 		t.Fatalf("failed to encode JSON response: %v", err)
 	}
 }

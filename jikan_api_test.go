@@ -21,9 +21,9 @@ func newTestJikanClient(t *testing.T, serverURL, cacheDir string) *JikanClient {
 	}
 }
 
-func jikanMangaResponse(id int, title, titleEN, titleJP string) map[string]interface{} {
-	return map[string]interface{}{
-		"data": map[string]interface{}{
+func jikanMangaResponse(id int, title, titleEN, titleJP string) map[string]any {
+	return map[string]any{
+		"data": map[string]any{
 			"mal_id":         id,
 			"title":          title,
 			"title_english":  titleEN,
@@ -37,22 +37,22 @@ func jikanMangaResponse(id int, title, titleEN, titleJP string) map[string]inter
 	}
 }
 
-func jikanSearchResponseHelper(entries ...map[string]interface{}) map[string]interface{} {
-	data := make([]interface{}, 0, len(entries))
+func jikanSearchResponseHelper(entries ...map[string]any) map[string]any {
+	data := make([]any, 0, len(entries))
 	for _, e := range entries {
 		data = append(data, e)
 	}
-	return map[string]interface{}{
+	return map[string]any{
 		"data": data,
-		"pagination": map[string]interface{}{
+		"pagination": map[string]any{
 			"last_visible_page": 1,
 			"has_next_page":     false,
 		},
 	}
 }
 
-func jikanSearchEntry(id int, title, titleEN, titleJP string) map[string]interface{} {
-	return map[string]interface{}{
+func jikanSearchEntry(id int, title, titleEN, titleJP string) map[string]any {
+	return map[string]any{
 		"mal_id":         id,
 		"title":          title,
 		"title_english":  titleEN,

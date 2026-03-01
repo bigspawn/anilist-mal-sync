@@ -263,7 +263,7 @@ func TestStatistics_ResetIdempotent(t *testing.T) {
 	}
 
 	// Reset multiple times
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		stats.Reset()
 		assert.Equal(t, 0, stats.UpdatedCount, "Reset should be idempotent (iteration %d)", i)
 		assert.Equal(t, 0, stats.SkippedCount, "Reset should be idempotent (iteration %d)", i)

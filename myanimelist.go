@@ -126,7 +126,7 @@ func (c *MyAnimeListClient) UpdateMangaByIDAndOptions(ctx context.Context, id in
 	return nil
 }
 
-// newMyAnimeListOAuth creates MAL OAuth with optional initialization
+// newMyAnimeListOAuth creates MAL OAuth with optional initialization.
 func newMyAnimeListOAuth(ctx context.Context, config Config, initWithToken bool) (*OAuth, error) {
 	verifier := oauth2.GenerateVerifier()
 
