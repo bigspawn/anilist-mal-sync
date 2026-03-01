@@ -784,7 +784,7 @@ func TestGetSyncFlagsFromCmd_ReverseDirection(t *testing.T) {
 	root := NewCLI()
 	for _, c := range root.Commands {
 		if c.Name == "sync" {
-			c.Action = func(ctx context.Context, cmd *cli.Command) error {
+			c.Action = func(_ context.Context, cmd *cli.Command) error {
 				_, gotReverse = getSyncFlagsFromCmd(cmd)
 				return nil
 			}
@@ -809,7 +809,7 @@ func TestGetSyncFlagsFromCmd_NoReverse(t *testing.T) {
 	root := NewCLI()
 	for _, c := range root.Commands {
 		if c.Name == "sync" {
-			c.Action = func(ctx context.Context, cmd *cli.Command) error {
+			c.Action = func(_ context.Context, cmd *cli.Command) error {
 				_, gotReverse = getSyncFlagsFromCmd(cmd)
 				return nil
 			}
@@ -834,7 +834,7 @@ func TestGetSyncFlagsFromCmd_VerboseFlag(t *testing.T) {
 	root := NewCLI()
 	for _, c := range root.Commands {
 		if c.Name == "sync" {
-			c.Action = func(ctx context.Context, cmd *cli.Command) error {
+			c.Action = func(_ context.Context, cmd *cli.Command) error {
 				gotVerbose, _ = getSyncFlagsFromCmd(cmd)
 				return nil
 			}
