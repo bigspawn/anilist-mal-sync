@@ -39,7 +39,8 @@ volumes:
   tokens:
 
 # Usage:
-# 1. Replace environment variables above with your credentials
-# 2. Authenticate: docker-compose run --rm --service-ports sync login all
-# 3. Preview changes (dry run): docker-compose run --rm sync sync --dry-run
+# 1. Copy to docker-compose.yaml and replace environment variables above with your credentials
+# 2. Authenticate (needs port 18080 for OAuth): docker-compose run --rm --service-ports sync login
+# 3. Preview changes (dry run): docker-compose run --rm sync sync --dry-run --all
 # 4. Start watch daemon: docker-compose up -d
+# 5. Check logs: docker-compose logs -f sync

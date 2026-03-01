@@ -27,7 +27,7 @@ COPY --from=builder /build/main ./main
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-LABEL org.opencontainers.image.source="https://github.com/username/anilist-mal-sync" \
+LABEL org.opencontainers.image.source="https://github.com/bigspawn/anilist-mal-sync" \
     org.opencontainers.image.description="Synchronization service for AniList and MyAnimeList" \
     org.opencontainers.image.licenses="MIT"
 
