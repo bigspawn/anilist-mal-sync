@@ -33,8 +33,10 @@ type Warning struct {
 // NewSyncReport creates a new sync report
 func NewSyncReport() *SyncReport {
 	return &SyncReport{
-		Warnings:           []Warning{},
-		DuplicateConflicts: []DuplicateConflict{},
+		Warnings:            []Warning{},
+		UnmappedItems:       []UnmappedEntry{},
+		DuplicateConflicts:  []DuplicateConflict{},
+		FavoritesMismatches: []FavoriteMismatch{},
 	}
 }
 

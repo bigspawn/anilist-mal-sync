@@ -18,8 +18,8 @@ type Source interface {
 	GetTitle() string
 	GetStringDiffWithTarget(Target) string
 	SameProgressWithTarget(Target) bool
-	SameTypeWithTarget(Target) bool
-	SameTitleWithTarget(Target) bool
+	SameTypeWithTarget(ctx context.Context, t Target) bool
+	SameTitleWithTarget(ctx context.Context, t Target) bool
 	String() string
 }
 
@@ -267,8 +267,8 @@ func (u *Updater) resolveConflictGroup(
 		if group[i].strategyIdx != group[j].strategyIdx {
 			return group[i].strategyIdx < group[j].strategyIdx
 		}
-		iTitle := group[i].src.SameTitleWithTarget(group[i].target)
-		jTitle := group[j].src.SameTitleWithTarget(group[j].target)
+		iTitle := group[i].src.SameTitleWithTarget(ctx, group[i].target)
+		jTitle := group[j].src.SameTitleWithTarget(ctx, group[j].target)
 		return iTitle && !jTitle
 	})
 
@@ -516,8 +516,4 @@ func (u *Updater) trackUnmapped(src Source, reason string) {
 	u.UnmappedList = append(u.UnmappedList, entry)
 }
 
-// DPrintf is deprecated - use LogDebug with context instead
-func DPrintf(_ string, _ ...any) {
-	// Deprecated: use LogDebug(ctx, ...) instead
-	// This function is kept for backward compatibility but does nothing
-}
+

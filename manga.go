@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -157,7 +158,7 @@ func (m Manga) SameProgressWithTarget(t Target) bool {
 	return true
 }
 
-func (m Manga) SameTypeWithTarget(t Target) bool {
+func (m Manga) SameTypeWithTarget(ctx context.Context, t Target) bool {
 	b, ok := t.(Manga)
 	if !ok {
 		return false
@@ -174,7 +175,7 @@ func (m Manga) SameTypeWithTarget(t Target) bool {
 	}
 
 	// Use the comprehensive title matching logic
-	if m.SameTitleWithTarget(t) {
+	if m.SameTitleWithTarget(ctx, t) {
 		return true
 	}
 
@@ -188,17 +189,13 @@ func (m Manga) SameTypeWithTarget(t Target) bool {
 	return false
 }
 
-func (m Manga) SameTitleWithTarget(t Target) bool {
+func (m Manga) SameTitleWithTarget(ctx context.Context, t Target) bool {
 	b, ok := t.(Manga)
 	if !ok {
 		return false
 	}
 
-	return titleMatchingLevels(m.TitleEN, m.TitleJP, m.TitleRomaji, b.TitleEN, b.TitleJP, b.TitleRomaji)
-}
-
-func (m Manga) GetUpdateMyAnimeListStatusOption() []mal.UpdateMyAnimeListStatusOption {
-	return nil
+	return titleMatchingLevels(ctx, m.TitleEN, m.TitleJP, m.TitleRomaji, b.TitleEN, b.TitleJP, b.TitleRomaji)
 }
 
 func (m Manga) GetTitle() string {
@@ -259,7 +256,9 @@ func (m Manga) GetUpdateOptions() []mal.UpdateMyMangaListStatusOption {
 	return opts
 }
 
-func newMangaFromMediaListEntry(mediaList verniy.MediaList, scoreFormat verniy.ScoreFormat, reverse bool) (Manga, error) {
+func newMangaFromMediaListEntry(
+	ctx context.Context, mediaList verniy.MediaList, scoreFormat verniy.ScoreFormat, reverse bool,
+) (Manga, error) {
 	if mediaList.Media == nil {
 		return Manga{}, errors.New("media is nil")
 	}
@@ -275,7 +274,7 @@ func newMangaFromMediaListEntry(mediaList verniy.MediaList, scoreFormat verniy.S
 	var score int
 	if mediaList.Score != nil {
 		// Normalize AniList score to MAL format (0-10)
-		score = normalizeMangaScoreForMAL(*mediaList.Score, scoreFormat)
+		score = normalizeMangaScoreForMAL(ctx, *mediaList.Score, scoreFormat)
 	}
 
 	var progress int
@@ -430,11 +429,13 @@ func mapAnilistMangaStatustToStatus(s verniy.MediaListStatus) MangaStatus {
 
 // newMangasFromMediaListGroups converts AniList media list groups to domain Manga list.
 // reverse=false: forward-sync sources; reverse=true: reverse-sync targets.
-func newMangasFromMediaListGroups(groups []verniy.MediaListGroup, scoreFormat verniy.ScoreFormat, reverse bool) []Manga {
+func newMangasFromMediaListGroups(
+	ctx context.Context, groups []verniy.MediaListGroup, scoreFormat verniy.ScoreFormat, reverse bool,
+) []Manga {
 	res := make([]Manga, 0, len(groups))
 	for _, group := range groups {
 		for _, mediaList := range group.Entries {
-			r, err := newMangaFromMediaListEntry(mediaList, scoreFormat, reverse)
+			r, err := newMangaFromMediaListEntry(ctx, mediaList, scoreFormat, reverse)
 			if err != nil {
 				log.Printf("Error creating manga from media list entry: %v", err)
 				continue

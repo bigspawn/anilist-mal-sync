@@ -407,12 +407,14 @@ func capitalizeFirst(s string) string {
 	return strings.ToUpper(s[:1]) + s[1:]
 }
 
-func printGlobalFavorites(logger *Logger, report *SyncReport, reverse bool) {
+func printGlobalFavorites(logger *Logger, report *SyncReport, _ bool) {
 	if report == nil {
 		return
 	}
 
-	// Print favorites summary if any were added or mismatches exist
+	// Print favorites summary if any were added or mismatches exist.
+	// Mismatches are only populated by ReportMismatches() which runs in
+	// forward (AniList→MAL) direction only, so direction label is always AniList→MAL.
 	if report.FavoritesAdded == 0 && !report.HasFavoritesMismatches() {
 		return
 	}
@@ -423,10 +425,6 @@ func printGlobalFavorites(logger *Logger, report *SyncReport, reverse bool) {
 	}
 
 	if report.HasFavoritesMismatches() {
-		direction := "AniList→MAL"
-		if reverse {
-			direction = "MAL→AniList"
-		}
-		logger.Info("Favorites: %d mismatches (%s, report only)", len(report.FavoritesMismatches), direction)
+		logger.Info("Favorites: %d mismatches (AniList→MAL, report only)", len(report.FavoritesMismatches))
 	}
 }

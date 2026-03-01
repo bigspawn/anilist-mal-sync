@@ -10,6 +10,7 @@
 package main
 
 import (
+	context "context"
 	reflect "reflect"
 
 	gomock "go.uber.org/mock/gomock"
@@ -124,31 +125,31 @@ func (mr *MockSourceMockRecorder) SameProgressWithTarget(arg0 any) *gomock.Call 
 }
 
 // SameTitleWithTarget mocks base method.
-func (m *MockSource) SameTitleWithTarget(arg0 Target) bool {
+func (m *MockSource) SameTitleWithTarget(ctx context.Context, t Target) bool {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SameTitleWithTarget", arg0)
+	ret := m.ctrl.Call(m, "SameTitleWithTarget", ctx, t)
 	ret0, _ := ret[0].(bool)
 	return ret0
 }
 
 // SameTitleWithTarget indicates an expected call of SameTitleWithTarget.
-func (mr *MockSourceMockRecorder) SameTitleWithTarget(arg0 any) *gomock.Call {
+func (mr *MockSourceMockRecorder) SameTitleWithTarget(ctx, t any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SameTitleWithTarget", reflect.TypeOf((*MockSource)(nil).SameTitleWithTarget), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SameTitleWithTarget", reflect.TypeOf((*MockSource)(nil).SameTitleWithTarget), ctx, t)
 }
 
 // SameTypeWithTarget mocks base method.
-func (m *MockSource) SameTypeWithTarget(arg0 Target) bool {
+func (m *MockSource) SameTypeWithTarget(ctx context.Context, t Target) bool {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SameTypeWithTarget", arg0)
+	ret := m.ctrl.Call(m, "SameTypeWithTarget", ctx, t)
 	ret0, _ := ret[0].(bool)
 	return ret0
 }
 
 // SameTypeWithTarget indicates an expected call of SameTypeWithTarget.
-func (mr *MockSourceMockRecorder) SameTypeWithTarget(arg0 any) *gomock.Call {
+func (mr *MockSourceMockRecorder) SameTypeWithTarget(ctx, t any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SameTypeWithTarget", reflect.TypeOf((*MockSource)(nil).SameTypeWithTarget), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SameTypeWithTarget", reflect.TypeOf((*MockSource)(nil).SameTypeWithTarget), ctx, t)
 }
 
 // String mocks base method.

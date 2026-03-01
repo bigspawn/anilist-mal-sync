@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -167,7 +168,7 @@ func (a Anime) SameProgressWithTarget(t Target) bool {
 	return aa == bb
 }
 
-func (a Anime) SameTypeWithTarget(t Target) bool {
+func (a Anime) SameTypeWithTarget(ctx context.Context, t Target) bool {
 	// Type assertion to ensure we're comparing with another Anime
 	b, ok := t.(Anime)
 	if !ok {
@@ -185,17 +186,17 @@ func (a Anime) SameTypeWithTarget(t Target) bool {
 	}
 
 	// Use the comprehensive title matching logic
-	return a.SameTitleWithTarget(t)
+	return a.SameTitleWithTarget(ctx, t)
 }
 
-func (a Anime) SameTitleWithTarget(t Target) bool {
+func (a Anime) SameTitleWithTarget(ctx context.Context, t Target) bool {
 	b, ok := t.(Anime)
 	if !ok {
 		return false
 	}
 
 	// Check if titles match
-	if !titleMatchingLevels(
+	if !titleMatchingLevels(ctx,
 		a.TitleEN, a.TitleJP, a.TitleRomaji,
 		b.TitleEN, b.TitleJP, b.TitleRomaji,
 	) {
@@ -325,11 +326,13 @@ func (a Anime) String() string {
 
 // newAnimesFromMediaListGroups converts AniList media list groups to domain Anime list.
 // reverse=false: entries are forward-sync sources; reverse=true: reverse-sync targets.
-func newAnimesFromMediaListGroups(groups []verniy.MediaListGroup, scoreFormat verniy.ScoreFormat, reverse bool) []Anime {
+func newAnimesFromMediaListGroups(
+	ctx context.Context, groups []verniy.MediaListGroup, scoreFormat verniy.ScoreFormat, reverse bool,
+) []Anime {
 	res := make([]Anime, 0, len(groups))
 	for _, group := range groups {
 		for _, mediaList := range group.Entries {
-			a, err := newAnimeFromMediaListEntry(mediaList, scoreFormat, reverse)
+			a, err := newAnimeFromMediaListEntry(ctx, mediaList, scoreFormat, reverse)
 			if err != nil {
 				log.Printf("Error creating anime from media list entry: %v", err)
 				continue
@@ -341,7 +344,9 @@ func newAnimesFromMediaListGroups(groups []verniy.MediaListGroup, scoreFormat ve
 	return res
 }
 
-func newAnimeFromMediaListEntry(mediaList verniy.MediaList, scoreFormat verniy.ScoreFormat, reverse bool) (Anime, error) {
+func newAnimeFromMediaListEntry(
+	ctx context.Context, mediaList verniy.MediaList, scoreFormat verniy.ScoreFormat, reverse bool,
+) (Anime, error) {
 	if mediaList.Media == nil {
 		return Anime{}, errors.New("media is nil")
 	}
@@ -357,7 +362,7 @@ func newAnimeFromMediaListEntry(mediaList verniy.MediaList, scoreFormat verniy.S
 	var score int
 	if mediaList.Score != nil {
 		// Normalize AniList score to MAL format (0-10)
-		score = normalizeScoreForMAL(*mediaList.Score, scoreFormat)
+		score = normalizeScoreForMAL(ctx, *mediaList.Score, scoreFormat)
 	}
 
 	var progress int

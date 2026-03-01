@@ -386,7 +386,7 @@ func TestMatchJikanMangaToSource(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := matchJikanMangaToSource(&tt.jikan, tt.en, tt.jp, tt.romaji)
+			result := matchJikanMangaToSource(t.Context(), &tt.jikan, tt.en, tt.jp, tt.romaji)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -399,7 +399,7 @@ func TestFindBestJikanMatch(t *testing.T) {
 		{MalID: 13, Title: "One Piece", TitleEnglish: "One Piece", TitleJapanese: "ONE PIECE"},
 	}
 
-	malID := findBestJikanMatch(results, "One Piece", "ONE PIECE", "")
+	malID := findBestJikanMatch(t.Context(), results, "One Piece", "ONE PIECE", "")
 	assert.Equal(t, 13, malID)
 }
 
@@ -409,7 +409,7 @@ func TestFindBestJikanMatch_NoMatch(t *testing.T) {
 		{MalID: 100, Title: "Naruto", TitleEnglish: "Naruto", TitleJapanese: "ナルト"},
 	}
 
-	malID := findBestJikanMatch(results, "One Piece", "ONE PIECE", "")
+	malID := findBestJikanMatch(t.Context(), results, "One Piece", "ONE PIECE", "")
 	assert.Equal(t, 0, malID)
 }
 

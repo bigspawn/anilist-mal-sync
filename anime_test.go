@@ -245,7 +245,7 @@ func TestAnime_SameTypeWithTarget(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.source.SameTypeWithTarget(tt.target)
+			got := tt.source.SameTypeWithTarget(t.Context(), tt.target)
 			if got != tt.want {
 				t.Errorf("Anime.SameTypeWithTarget() = %v, want %v", got, tt.want)
 			}
@@ -864,7 +864,7 @@ func TestAnime_SameTitleWithTarget(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.source.SameTitleWithTarget(tt.target)
+			got := tt.source.SameTitleWithTarget(t.Context(), tt.target)
 			if got != tt.want {
 				t.Errorf("SameTitleWithTarget() = %v, want %v", got, tt.want)
 			}

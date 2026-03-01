@@ -73,12 +73,7 @@ var syncFlags = []cli.Flag{
 	},
 }
 
-// setSyncFlagsFromCmd sets global sync variables from command flags and returns (verbose, reverse).
-func setSyncFlagsFromCmd(cmd *cli.Command) (verboseOut bool, reverseOut bool) {
-	return getSyncFlagsFromCmd(cmd)
-}
-
-// getSyncFlagsFromCmd extracts sync flags, updates package-level globals (except reverseDirection),
+// getSyncFlagsFromCmd extracts sync flags, updates package-level globals,
 // and returns verbose and reverse values explicitly.
 func getSyncFlagsFromCmd(cmd *cli.Command) (verboseOut bool, reverseOut bool) {
 	forceVal := cmd.Bool("force")

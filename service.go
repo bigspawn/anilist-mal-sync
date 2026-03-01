@@ -160,7 +160,7 @@ func (s *AniListAnimeService) Update(ctx context.Context, id TargetID, src Sourc
 	if !ok {
 		return fmt.Errorf("source is not an anime")
 	}
-	anilistScore := denormalizeScoreForAniList(a.Score, s.scoreFormat)
+	anilistScore := denormalizeScoreForAniList(ctx, a.Score, s.scoreFormat)
 
 	var completedAt *time.Time
 	if a.Status == StatusCompleted {
@@ -232,7 +232,7 @@ func (s *AniListMangaService) Update(ctx context.Context, id TargetID, src Sourc
 	if !ok {
 		return fmt.Errorf("source is not a manga")
 	}
-	anilistScore := denormalizeMangaScoreForAniList(m.Score, s.scoreFormat)
+	anilistScore := denormalizeMangaScoreForAniList(ctx, m.Score, s.scoreFormat)
 
 	var completedAt *time.Time
 	if m.Status == MangaStatusCompleted {

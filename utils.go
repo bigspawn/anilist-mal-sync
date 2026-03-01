@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"math"
 	"regexp"
 	"strings"
@@ -149,100 +150,97 @@ func titleLevenshteinSimilarity(title1, title2 string) float64 {
 
 // Helper functions for title matching to reduce complexity
 
-func exactMatch(t1, t2, titleType string) bool {
-	if t1 == "" || t2 == "" {
+func exactMatch(ctx context.Context, t1, t2, titleType string) bool {
+	if t1 == "" || t2 == "" || !strings.EqualFold(t1, t2) {
 		return false
 	}
-	if strings.EqualFold(t1, t2) {
-		DPrintf("Exact match found %s: %s == %s", titleType, t1, t2)
-		return true
-	}
-	return false
+	LogDebug(ctx, "Exact match found %s: %s == %s", titleType, t1, t2)
+	return true
 }
 
-func normalizedMatch(t1, t2, titleType string) bool {
+func normalizedMatch(ctx context.Context, t1, t2, titleType string) bool {
 	if t1 == "" || t2 == "" {
 		return false
 	}
 	normalizedA := normalizeTitle(t1)
 	normalizedB := normalizeTitle(t2)
-	if normalizedA == normalizedB {
-		DPrintf("Normalized match found %s: '%s' == '%s' (original: '%s' vs '%s')",
-			titleType, normalizedA, normalizedB, t1, t2)
-		return true
+	if normalizedA != normalizedB {
+		return false
 	}
-	return false
+	LogDebug(ctx, "Normalized match found %s: '%s' == '%s' (original: '%s' vs '%s')",
+		titleType, normalizedA, normalizedB, t1, t2)
+	return true
 }
 
-func fuzzyMatch(t1, t2, titleType string, threshold float64) bool {
+func fuzzyMatch(ctx context.Context, t1, t2, titleType string, threshold float64) bool {
 	if t1 == "" || t2 == "" {
 		return false
 	}
 	similarity := titleSimilarity(t1, t2)
-	if similarity >= threshold {
-		DPrintf("Fuzzy match found %s: '%s' ~= '%s' (similarity: %.2f)", titleType, t1, t2, similarity)
-		return true
+	if similarity < threshold {
+		return false
 	}
-	return false
+	LogDebug(ctx, "Fuzzy match found %s: '%s' ~= '%s' (similarity: %.2f)", titleType, t1, t2, similarity)
+	return true
 }
 
-func levenshteinMatch(t1, t2, titleType string, threshold float64) bool {
+func levenshteinMatch(ctx context.Context, t1, t2, titleType string, threshold float64) bool {
 	if t1 == "" || t2 == "" {
 		return false
 	}
 	similarity := titleLevenshteinSimilarity(t1, t2)
-	if similarity >= threshold {
-		DPrintf("Levenshtein match found %s: '%s' ~= '%s' (similarity: %.2f)", titleType, t1, t2, similarity)
-		return true
+	if similarity < threshold {
+		return false
 	}
-	return false
+	LogDebug(ctx, "Levenshtein match found %s: '%s' ~= '%s' (similarity: %.2f)", titleType, t1, t2, similarity)
+	return true
 }
 
 // titleMatchingLevels performs multi-level title matching
-func titleMatchingLevels(titleEN1, titleJP1, titleRomaji1, titleEN2, titleJP2, titleRomaji2 string) bool {
+func titleMatchingLevels(ctx context.Context, titleEN1, titleJP1, titleRomaji1, titleEN2, titleJP2, titleRomaji2 string) bool {
 	// Level 1: Exact case-insensitive title matching
-	if exactMatch(titleEN1, titleEN2, "TitleEN") {
+	if exactMatch(ctx, titleEN1, titleEN2, "TitleEN") {
 		return true
 	}
-	if exactMatch(titleJP1, titleJP2, "TitleJP") {
+	if exactMatch(ctx, titleJP1, titleJP2, "TitleJP") {
 		return true
 	}
-	if exactMatch(titleRomaji1, titleRomaji2, "TitleRomaji") {
+	if exactMatch(ctx, titleRomaji1, titleRomaji2, "TitleRomaji") {
 		return true
 	}
 
 	// Level 2: Normalized exact matching (removes punctuation, brackets, etc.)
-	if normalizedMatch(titleEN1, titleEN2, "TitleEN") {
+	if normalizedMatch(ctx, titleEN1, titleEN2, "TitleEN") {
 		return true
 	}
-	if normalizedMatch(titleJP1, titleJP2, "TitleJP") {
+	if normalizedMatch(ctx, titleJP1, titleJP2, "TitleJP") {
 		return true
 	}
-	if normalizedMatch(titleRomaji1, titleRomaji2, "TitleRomaji") {
+	if normalizedMatch(ctx, titleRomaji1, titleRomaji2, "TitleRomaji") {
 		return true
 	}
 
 	// Level 3: Fuzzy matching with similarity threshold
 	const similarityThreshold = 98.0
-	if fuzzyMatch(titleEN1, titleEN2, "TitleEN", similarityThreshold) {
+	if fuzzyMatch(ctx, titleEN1, titleEN2, "TitleEN", similarityThreshold) {
 		return true
 	}
-	if fuzzyMatch(titleJP1, titleJP2, "TitleJP", similarityThreshold) {
+	if fuzzyMatch(ctx, titleJP1, titleJP2, "TitleJP", similarityThreshold) {
 		return true
 	}
-	if fuzzyMatch(titleRomaji1, titleRomaji2, "TitleRomaji", similarityThreshold) {
+	if fuzzyMatch(ctx, titleRomaji1, titleRomaji2, "TitleRomaji", similarityThreshold) {
 		return true
 	}
 
 	// Level 4: Levenshtein distance-based matching
 	const levenshteinThreshold = 98.0
-	if levenshteinMatch(titleEN1, titleEN2, "TitleEN", levenshteinThreshold) {
+	if levenshteinMatch(ctx, titleEN1, titleEN2, "TitleEN", levenshteinThreshold) {
 		return true
 	}
-	if levenshteinMatch(titleJP1, titleJP2, "TitleJP", levenshteinThreshold) {
+	if levenshteinMatch(ctx, titleJP1, titleJP2, "TitleJP", levenshteinThreshold) {
 		return true
 	}
-	if levenshteinMatch(titleRomaji1, titleRomaji2, "TitleRomaji", levenshteinThreshold) {
+	if levenshteinMatch(ctx, titleRomaji1, titleRomaji2, "TitleRomaji", levenshteinThreshold) {
 		return true
 	}
 
