@@ -50,12 +50,6 @@ type FavoriteMismatch struct {
 // It adds missing favorites on AniList but does not remove favorites
 // that exist on AniList but not on MAL (user may have intentionally
 // favorited different items on each service).
-//
-// Parameters:
-//   - animes: List of anime entries with both AniList and MAL IDs
-//   - mangas: List of manga entries with both AniList and MAL IDs
-//   - malAnimeFavs: Set of MAL IDs for anime favorites on MAL
-//   - malMangaFavs: Set of MAL IDs for manga favorites on MAL
 func (f *FavoritesSync) SyncToAniList(
 	ctx context.Context,
 	animes []Anime,
@@ -64,97 +58,97 @@ func (f *FavoritesSync) SyncToAniList(
 ) FavoritesResult {
 	result := FavoritesResult{}
 
-	// Sync anime favorites
 	for _, anime := range animes {
-		if anime.IDMal <= 0 {
-			LogDebug(ctx, "★ [Favorites] Skipping anime %q (no MAL ID)", anime.GetTitle())
-			result.Skipped++
-			continue
-		}
-
-		malFav := isFavorite(malAnimeFavs, anime.IDMal)
-		alFav := anime.IsFavourite
-
-		// MAL favorite but not AniList favorite -> add to AniList
-		if malFav && !alFav {
-			if f.dryRun {
-				LogInfoDryRun(ctx, "★ [Favorites] Would add anime %q (MAL ID %d, AniList ID %d) to AniList favorites",
-					anime.GetTitle(), anime.IDMal, anime.IDAnilist)
-				result.Added++
-			} else {
-				if err := f.toggleWithRateLimit(ctx, anime.IDAnilist, 0); err != nil {
-					LogWarn(ctx, "★ [Favorites] Failed to add anime %q to favorites: %v", anime.GetTitle(), err)
-					result.Errors++
-				} else {
-					LogInfo(ctx, "★ [Favorites] Added anime %q to AniList favorites", anime.GetTitle())
-					result.Added++
-				}
-			}
-			continue
-		}
-
-		// AniList favorite but not MAL favorite -> skip (don't remove)
-		if alFav && !malFav {
-			LogDebug(ctx, "★ [Favorites] Anime %q is favorited on AniList but not MAL (skipping removal)", anime.GetTitle())
-			result.Skipped++
-			continue
-		}
-
-		// Both favorited or neither -> already in sync
-		result.Skipped++
+		f.syncAnimeToAniList(ctx, anime, malAnimeFavs, &result)
 	}
 
-	// Sync manga favorites
 	for _, manga := range mangas {
-		if manga.IDMal <= 0 {
-			LogDebug(ctx, "★ [Favorites] Skipping manga %q (no MAL ID)", manga.GetTitle())
-			result.Skipped++
-			continue
-		}
-
-		malFav := isFavorite(malMangaFavs, manga.IDMal)
-		alFav := manga.IsFavourite
-
-		// MAL favorite but not AniList favorite -> add to AniList
-		if malFav && !alFav {
-			if f.dryRun {
-				LogInfoDryRun(ctx, "★ [Favorites] Would add manga %q (MAL ID %d, AniList ID %d) to AniList favorites",
-					manga.GetTitle(), manga.IDMal, manga.IDAnilist)
-				result.Added++
-			} else {
-				if err := f.toggleWithRateLimit(ctx, 0, manga.IDAnilist); err != nil {
-					LogWarn(ctx, "★ [Favorites] Failed to add manga %q to favorites: %v", manga.GetTitle(), err)
-					result.Errors++
-				} else {
-					LogInfo(ctx, "★ [Favorites] Added manga %q to AniList favorites", manga.GetTitle())
-					result.Added++
-				}
-			}
-			continue
-		}
-
-		// AniList favorite but not MAL favorite -> skip (don't remove)
-		if alFav && !malFav {
-			LogDebug(ctx, "★ [Favorites] Manga %q is favorited on AniList but not MAL (skipping removal)", manga.GetTitle())
-			result.Skipped++
-			continue
-		}
-
-		// Both favorited or neither -> already in sync
-		result.Skipped++
+		f.syncMangaToAniList(ctx, manga, malMangaFavs, &result)
 	}
 
 	return result
 }
 
+func (f *FavoritesSync) syncAnimeToAniList(ctx context.Context, anime Anime, malFavs map[int]struct{}, result *FavoritesResult) {
+	if anime.IDMal <= 0 {
+		LogDebug(ctx, "★ [Favorites] Skipping anime %q (no MAL ID)", anime.GetTitle())
+		result.Skipped++
+		return
+	}
+
+	malFav := isFavorite(malFavs, anime.IDMal)
+	alFav := anime.IsFavourite
+
+	switch {
+	case malFav && !alFav:
+		f.addAnimeToAniList(ctx, anime, result)
+	case alFav && !malFav:
+		LogDebug(ctx, "★ [Favorites] Anime %q is favorited on AniList but not MAL (skipping removal)", anime.GetTitle())
+		result.Skipped++
+	default:
+		result.Skipped++
+	}
+}
+
+func (f *FavoritesSync) addAnimeToAniList(ctx context.Context, anime Anime, result *FavoritesResult) {
+	if f.dryRun {
+		LogInfoDryRun(ctx, "★ [Favorites] Would add anime %q (MAL ID %d, AniList ID %d) to AniList favorites",
+			anime.GetTitle(), anime.IDMal, anime.IDAnilist)
+		result.Added++
+		return
+	}
+
+	if err := f.toggleWithRateLimit(ctx, anime.IDAnilist, 0); err != nil {
+		LogWarn(ctx, "★ [Favorites] Failed to add anime %q to favorites: %v", anime.GetTitle(), err)
+		result.Errors++
+		return
+	}
+
+	LogInfo(ctx, "★ [Favorites] Added anime %q to AniList favorites", anime.GetTitle())
+	result.Added++
+}
+
+func (f *FavoritesSync) syncMangaToAniList(ctx context.Context, manga Manga, malFavs map[int]struct{}, result *FavoritesResult) {
+	if manga.IDMal <= 0 {
+		LogDebug(ctx, "★ [Favorites] Skipping manga %q (no MAL ID)", manga.GetTitle())
+		result.Skipped++
+		return
+	}
+
+	malFav := isFavorite(malFavs, manga.IDMal)
+	alFav := manga.IsFavourite
+
+	switch {
+	case malFav && !alFav:
+		f.addMangaToAniList(ctx, manga, result)
+	case alFav && !malFav:
+		LogDebug(ctx, "★ [Favorites] Manga %q is favorited on AniList but not MAL (skipping removal)", manga.GetTitle())
+		result.Skipped++
+	default:
+		result.Skipped++
+	}
+}
+
+func (f *FavoritesSync) addMangaToAniList(ctx context.Context, manga Manga, result *FavoritesResult) {
+	if f.dryRun {
+		LogInfoDryRun(ctx, "★ [Favorites] Would add manga %q (MAL ID %d, AniList ID %d) to AniList favorites",
+			manga.GetTitle(), manga.IDMal, manga.IDAnilist)
+		result.Added++
+		return
+	}
+
+	if err := f.toggleWithRateLimit(ctx, 0, manga.IDAnilist); err != nil {
+		LogWarn(ctx, "★ [Favorites] Failed to add manga %q to favorites: %v", manga.GetTitle(), err)
+		result.Errors++
+		return
+	}
+
+	LogInfo(ctx, "★ [Favorites] Added manga %q to AniList favorites", manga.GetTitle())
+	result.Added++
+}
+
 // ReportMismatches compares favorites between AniList and MAL and reports differences.
 // This is used for the AniList -> MAL direction where we cannot write to MAL.
-//
-// Parameters:
-//   - animes: List of anime entries with both AniList and MAL IDs
-//   - mangas: List of manga entries with both AniList and MAL IDs
-//   - malAnimeFavs: Set of MAL IDs for anime favorites on MAL
-//   - malMangaFavs: Set of MAL IDs for manga favorites on MAL
 func (f *FavoritesSync) ReportMismatches(
 	ctx context.Context,
 	animes []Anime,
@@ -165,57 +159,47 @@ func (f *FavoritesSync) ReportMismatches(
 		Mismatches: make([]FavoriteMismatch, 0),
 	}
 
-	// Compare anime favorites
 	for _, anime := range animes {
 		if anime.IDMal <= 0 {
 			continue
 		}
-
-		malFav := isFavorite(malAnimeFavs, anime.IDMal)
-		alFav := anime.IsFavourite
-
-		if malFav != alFav {
+		if isFavorite(malAnimeFavs, anime.IDMal) != anime.IsFavourite {
 			result.Mismatches = append(result.Mismatches, FavoriteMismatch{
 				Title:     anime.GetTitle(),
 				AniListID: anime.IDAnilist,
 				MALID:     anime.IDMal,
 				MediaType: "anime",
-				OnAniList: alFav,
-				OnMAL:     malFav,
+				OnAniList: anime.IsFavourite,
+				OnMAL:     isFavorite(malAnimeFavs, anime.IDMal),
 			})
 		}
 	}
 
-	// Compare manga favorites
 	for _, manga := range mangas {
 		if manga.IDMal <= 0 {
 			continue
 		}
-
-		malFav := isFavorite(malMangaFavs, manga.IDMal)
-		alFav := manga.IsFavourite
-
-		if malFav != alFav {
+		if isFavorite(malMangaFavs, manga.IDMal) != manga.IsFavourite {
 			result.Mismatches = append(result.Mismatches, FavoriteMismatch{
 				Title:     manga.GetTitle(),
 				AniListID: manga.IDAnilist,
 				MALID:     manga.IDMal,
 				MediaType: "manga",
-				OnAniList: alFav,
-				OnMAL:     malFav,
+				OnAniList: manga.IsFavourite,
+				OnMAL:     isFavorite(malMangaFavs, manga.IDMal),
 			})
 		}
 	}
 
-	// Log mismatches
 	for _, mm := range result.Mismatches {
-		direction := "only on"
-		if mm.OnAniList && !mm.OnMAL {
-			direction = "only on AniList"
-		} else if !mm.OnAniList && mm.OnMAL {
-			direction = "only on MAL"
+		switch {
+		case mm.OnAniList && !mm.OnMAL:
+			LogInfo(ctx, "★ [Favorites] %s %q is only on AniList", mm.MediaType, mm.Title)
+		case !mm.OnAniList && mm.OnMAL:
+			LogInfo(ctx, "★ [Favorites] %s %q is only on MAL", mm.MediaType, mm.Title)
+		default:
+			LogInfo(ctx, "★ [Favorites] %s %q is in unknown state", mm.MediaType, mm.Title)
 		}
-		LogInfo(ctx, "★ [Favorites] %s %q is %s", mm.MediaType, mm.Title, direction)
 	}
 
 	return result
@@ -230,7 +214,11 @@ func isFavorite(favSet map[int]struct{}, malID int) bool {
 // toggleWithRateLimit calls ToggleFavourite with rate limiting to avoid hitting AniList limits.
 // AniList allows ~90 requests/minute, so we add a small delay between calls (~700ms).
 func (f *FavoritesSync) toggleWithRateLimit(ctx context.Context, animeID, mangaID int) error {
-	// Rate limit: ~90 req/min = ~700ms between requests
-	time.Sleep(700 * time.Millisecond)
+	const rateLimitDelay = 700 * time.Millisecond
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(rateLimitDelay):
+	}
 	return f.toggler.ToggleFavourite(ctx, animeID, mangaID)
 }

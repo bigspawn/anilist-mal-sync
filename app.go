@@ -675,65 +675,52 @@ func (a *App) buildMangaFavoritesListFromMappings(
 func (a *App) syncFavorites(ctx context.Context) {
 	LogStage(ctx, "Syncing favorites...")
 
-	// Fetch MAL favorites via Jikan API
 	malAnimeFavs, malMangaFavs, err := a.jikanClient.GetUserFavorites(ctx, a.config.MyAnimeList.Username)
 	if err != nil {
 		LogWarn(ctx, "★ [Favorites] Failed to fetch MAL favorites: %v (skipping favorites sync)", err)
 		return
 	}
 
-	var result FavoritesResult
-
-	if *reverseDirection {
-		// MAL -> AniList: actually sync (add missing favorites on AniList)
-		// Build favorites list from MAL entries + resolved AniList IDs from updater mappings
-		animeForFavorites := a.buildFavoritesListFromMappings(
-			a.fetchedAnimeFromMAL,
-			a.reverseAnimeUpdater.GetResolvedMappings(),
-		)
-		mangaForFavorites := a.buildMangaFavoritesListFromMappings(
-			a.fetchedMangaFromMAL,
-			a.reverseMangaUpdater.GetResolvedMappings(),
-		)
-
-		result = a.favSync.SyncToAniList(
-			ctx,
-			animeForFavorites,
-			mangaForFavorites,
-			malAnimeFavs,
-			malMangaFavs,
-		)
-
-		// Add result to sync report for summary display
-		a.syncReport.AddFavoritesResult(result)
-
-		if result.Added > 0 {
-			LogInfoSuccess(ctx, "★ Favorites sync complete: +%d added on AniList (%d skipped)",
-				result.Added, result.Skipped)
-		} else {
-			LogInfo(ctx, "★ Favorites sync complete: all in sync (%d entries checked)", result.Skipped)
-		}
-
-		if result.Errors > 0 {
-			LogWarn(ctx, "★ Favorites sync had %d errors", result.Errors)
-		}
+	if DirectionFromContext(ctx) == SyncDirectionReverse {
+		a.syncFavoritesReverse(ctx, malAnimeFavs, malMangaFavs)
 	} else {
-		// AniList -> MAL: only report (cannot write to MAL)
-		result = a.favSync.ReportMismatches(
-			ctx,
-			a.fetchedAnimeFromAniList,
-			a.fetchedMangaFromAniList,
-			malAnimeFavs,
-			malMangaFavs,
-		)
+		a.syncFavoritesForward(ctx, malAnimeFavs, malMangaFavs)
+	}
+}
 
-		// Add mismatches to sync report
-		a.syncReport.AddFavoritesResult(result)
+// syncFavoritesReverse handles MAL → AniList favorites sync (adds missing on AniList).
+func (a *App) syncFavoritesReverse(ctx context.Context, malAnimeFavs, malMangaFavs map[int]struct{}) {
+	animeForFavorites := a.buildFavoritesListFromMappings(
+		a.fetchedAnimeFromMAL,
+		a.reverseAnimeUpdater.GetResolvedMappings(),
+	)
+	mangaForFavorites := a.buildMangaFavoritesListFromMappings(
+		a.fetchedMangaFromMAL,
+		a.reverseMangaUpdater.GetResolvedMappings(),
+	)
 
-		if len(result.Mismatches) > 0 {
-			LogInfo(ctx, "★ Favorites: %d mismatches (AniList→MAL, report only)", len(result.Mismatches))
-		} else {
-			LogInfoSuccess(ctx, "★ Favorites complete: all in sync")
-		}
+	result := a.favSync.SyncToAniList(ctx, animeForFavorites, mangaForFavorites, malAnimeFavs, malMangaFavs)
+	a.syncReport.AddFavoritesResult(result)
+
+	if result.Added > 0 {
+		LogInfoSuccess(ctx, "★ Favorites sync complete: +%d added on AniList (%d skipped)", result.Added, result.Skipped)
+	} else {
+		LogInfo(ctx, "★ Favorites sync complete: all in sync (%d entries checked)", result.Skipped)
+	}
+
+	if result.Errors > 0 {
+		LogWarn(ctx, "★ Favorites sync had %d errors", result.Errors)
+	}
+}
+
+// syncFavoritesForward handles AniList → MAL favorites (report-only, MAL API has no write).
+func (a *App) syncFavoritesForward(ctx context.Context, malAnimeFavs, malMangaFavs map[int]struct{}) {
+	result := a.favSync.ReportMismatches(ctx, a.fetchedAnimeFromAniList, a.fetchedMangaFromAniList, malAnimeFavs, malMangaFavs)
+	a.syncReport.AddFavoritesResult(result)
+
+	if len(result.Mismatches) > 0 {
+		LogInfo(ctx, "★ Favorites: %d mismatches (AniList→MAL, report only)", len(result.Mismatches))
+	} else {
+		LogInfoSuccess(ctx, "★ Favorites complete: all in sync")
 	}
 }
