@@ -81,7 +81,7 @@ func getSyncFlagsFromCmd(cmd *cli.Command) (verboseOut bool, reverseOut bool) {
 	mangaVal := cmd.Bool("manga")
 	allVal := cmd.Bool("all")
 	verboseVal := cmd.Bool("verbose")
-	reverseVal := cmd.Bool("reverse")
+	reverseVal := cmd.Bool("reverse-direction")
 
 	forceSync = &forceVal
 	dryRun = &dryVal
