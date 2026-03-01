@@ -10,7 +10,8 @@ COPY . .
 
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -mod=vendor -ldflags="-w -s" -o main
+ARG VERSION=dev
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -mod=vendor -ldflags="-w -s -X main.version=${VERSION}" -o main
 
 FROM alpine:3.19
 
@@ -26,7 +27,7 @@ COPY --from=builder /build/main ./main
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-LABEL org.opencontainers.image.source="https://github.com/username/anilist-mal-sync" \
+LABEL org.opencontainers.image.source="https://github.com/bigspawn/anilist-mal-sync" \
     org.opencontainers.image.description="Synchronization service for AniList and MyAnimeList" \
     org.opencontainers.image.licenses="MIT"
 

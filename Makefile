@@ -6,6 +6,8 @@
 BINARY_NAME=anilist-mal-sync
 LINT_VERSION=v2.10.1
 DOCKER_LINT_CMD=docker run --rm -v $(PWD):/app -w /app golangci/golangci-lint:$(LINT_VERSION)
+VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+LDFLAGS=-ldflags "-X main.version=$(VERSION)"
 
 .DEFAULT_GOAL := help
 
@@ -50,7 +52,7 @@ install:
 
 # Build the application
 build:
-	go build -o $(BINARY_NAME) .
+	go build $(LDFLAGS) -o $(BINARY_NAME) .
 
 # Run sync in dry-run mode (reads ANILIST_MAL_SYNC_CONFIG from .env file)
 dry-run:

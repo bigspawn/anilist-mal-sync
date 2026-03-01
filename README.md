@@ -16,6 +16,31 @@ Program to synchronize your AniList and MyAnimeList accounts.
 - Offline ID mapping using anime-offline-database (prevents incorrect season matches)
 - Optional ARM API integration for online ID lookups
 
+## What gets synced
+
+For each entry in your list the following fields are synchronized from source to target:
+
+| Field | Synced |
+|-------|--------|
+| Status (watching / completed / on-hold / dropped / plan to watch) | ✅ |
+| Score (automatically normalized between AniList and MAL score formats) | ✅ |
+| Progress (episodes watched / chapters + volumes read) | ✅ |
+| Start date | ✅ (nil source date never overwrites a set target date) |
+| Finish date | ✅ (only when status is Completed) |
+| Favorites | ✅ optional, via `--favorites` flag |
+
+**Conflict rule:** the source service always wins. In the default direction (AniList → MAL) your AniList data overwrites MAL. Use `--reverse-direction` to flip.
+
+See [docs/date-sync.md](docs/date-sync.md) for detailed date synchronization rules.
+
+## Prerequisites
+
+| Deployment | Requirements |
+|---|---|
+| **Docker** | [Docker](https://docs.docker.com/get-docker/) + [docker compose](https://docs.docker.com/compose/install/) (v2, built-in) or legacy `docker-compose` (v1) |
+| **Binary (go install)** | [Go 1.25+](https://go.dev/dl/) |
+| **Local build** | [Go 1.25+](https://go.dev/dl/), git |
+
 ## Quick Start (Docker)
 
 ### Step 1: Create OAuth applications
@@ -32,12 +57,19 @@ Program to synchronize your AniList and MyAnimeList accounts.
 
 ### Step 2: Configure
 
-Download [`docker-compose.example.yaml`](docker-compose.example.yaml) and edit credentials:
+Download and rename the example compose file, then fill in your credentials:
+
+```bash
+cp docker-compose.example.yaml docker-compose.yaml
+```
+
+Edit `docker-compose.yaml` with your credentials:
 
 ```yaml
 services:
   sync:
     image: ghcr.io/bigspawn/anilist-mal-sync:latest
+    command: ["watch", "--once"]
     ports:
       - "18080:18080"
     environment:
@@ -51,8 +83,8 @@ services:
       - MAL_CLIENT_ID=your_mal_client_id
       - MAL_CLIENT_SECRET=your_mal_secret
       - MAL_USERNAME=your_mal_username
-      # Optional: Watch mode interval (e.g., 12h, 1h, 30m)
-      # - WATCH_INTERVAL=12h
+      # Watch mode interval (min: 1h, max: 168h / 7 days)
+      - WATCH_INTERVAL=12h
       # Optional: Manual mappings file path
       # - MAPPINGS_FILE_PATH=/home/appuser/.config/anilist-mal-sync/mappings.yaml
       # Optional: ID Mapping settings
@@ -66,6 +98,7 @@ services:
       # - JIKAN_API_ENABLED=false  # Enable Jikan API for manga ID mapping
       # - JIKAN_API_CACHE_DIR=/home/appuser/.config/anilist-mal-sync/jikan-cache
       # - JIKAN_API_CACHE_MAX_AGE=168h
+      # - FAVORITES_SYNC_ENABLED=false  # Enable favorites sync (requires Jikan API)
     volumes:
       - tokens:/home/appuser/.config/anilist-mal-sync
     restart: unless-stopped
@@ -77,30 +110,52 @@ volumes:
 ### Step 3: Authenticate
 
 ```bash
-docker-compose run --rm --service-ports sync login all
+docker-compose run --rm --service-ports sync login
 ```
 
-Follow the URLs printed in terminal.
+The tool will print two URLs — one for MyAnimeList and one for AniList. For each:
+1. Copy the URL and open it in your browser
+2. Authorize the application on the website
+3. Your browser will redirect to `http://localhost:18080/callback` — the tool captures this automatically
+4. Repeat for both services (MAL first, then AniList)
+
+> **Note:** The `--service-ports` flag is required here so that the OAuth redirect to port 18080 reaches the container. Make sure port 18080 is free on your host.
+
+Tokens are saved into the `tokens` Docker volume and persist across restarts.
 
 ### Step 4: Run
 
-#### Step 4.1: Run dry-run mode
+#### Step 4.1: Preview changes (dry run)
 
-First, run dry-run mode to preview what will be synced without making actual changes.
+**Recommended before the first real sync.** On a large list the tool may update hundreds of
+entries at once — dry run lets you see exactly what will change without touching anything.
 
 ```bash
-docker-compose run --rm --service-ports sync sync --dry-run
+docker-compose run --rm sync sync --dry-run --all
 ```
 
-#### Step 4.2: Run real synchronization
+#### Step 4.2: Start the sync daemon
 
-After a successful dry-run, you can start the service with real sync:
+`docker-compose up -d` starts the container in **watch mode** (`--once` flag causes an
+immediate first sync, then it repeats every `WATCH_INTERVAL` hours in the background).
 
 ```bash
 docker-compose up -d
 ```
 
-Done!
+Done! The service will sync your lists every 12 hours (or whatever you set in `WATCH_INTERVAL`).
+
+To check that the service started correctly and view sync output:
+
+```bash
+docker-compose logs -f sync
+```
+
+> **Note:** `WATCH_INTERVAL` accepts values between `1h` and `168h` (7 days).
+> To run a one-off sync instead of the daemon use:
+> ```bash
+> docker-compose run --rm sync sync
+> ```
 
 ## Commands
 
@@ -113,15 +168,19 @@ Done!
 | `watch` | Run sync on interval |
 | `unmapped` | Show and manage unmapped entries from last sync |
 
+**Global options** (available for all commands):
+| Short | Long | Description |
+|-------|------|-------------|
+| `-c` | `--config` | Path to config file (optional, uses env vars if not specified) |
+
 **Login/Logout options:**
 | Short | Long | Description |
 |-------|------|-------------|
-| `-s` | `--service` | Service: `anilist`, `myanimelist`, `all` (default) |
+| `-s` | `--service` | Service: `anilist`, `myanimelist`, `all` (default: `all`) |
 
 **Sync options:**
 | Short | Long | Description |
 |-------|------|-------------|
-| `-c` | `--config` | Path to config file (optional, uses env vars if not specified) |
 | `-f` | `--force` | Force sync all entries |
 | `-d` | `--dry-run` | Dry run without making changes |
 | | `--manga` | Sync manga instead of anime |
@@ -139,7 +198,7 @@ Done!
 | Short | Long | Description |
 |-------|------|-------------|
 | `-i` | `--interval` | Sync interval: 1h-168h (overrides config) |
-| | `--once` | Sync immediately then start watching |
+| | `--once` | Run one sync immediately, then start the interval loop. **Without this flag the first sync is delayed by the full interval.** |
 
 Interval can be set via `--interval` flag or in `config.yaml` under `watch.interval`.
 
@@ -200,31 +259,51 @@ favorites:
 
 ## ID Mapping Strategies
 
-The tool uses different ID mapping strategies for anime and manga:
+The tool uses different ID mapping strategies for anime and manga, and the chain differs by direction.
 
-### Anime ID Mapping
-When syncing anime (default or `--all` mode), the following strategies are used in order:
+### Forward direction (AniList → MAL, default)
+
+**Anime** (`sync` or `sync --all`):
 1. **Manual Mapping** - User-defined AniList↔MAL mappings from `mappings.yaml`
 2. **Direct ID lookup** - If the entry already exists in your target list
 3. **Offline Database** (optional, enabled by default) - Local database from [anime-offline-database](https://github.com/manami-project/anime-offline-database)
 4. **Hato API** (optional, enabled by default) - Online API for anime/manga ID mapping
 5. **ARM API** (optional, disabled by default) - Online fallback to [arm-server](https://arm.haglund.dev)
 6. **Title matching** - Match by title similarity
-7. **API search** - Search the target service API
+7. **API search** - Search the MAL API
 
-### Manga ID Mapping
-When syncing manga (`--manga` mode), the following strategies are used:
+**Manga** (`sync --manga` or `sync --all`):
 1. **Manual Mapping** - User-defined AniList↔MAL mappings from `mappings.yaml`
 2. **Direct ID lookup** - If the entry already exists in your target list
 3. **Hato API** (optional, enabled by default) - Online API for manga ID mapping
 4. **Title matching** - Match by title similarity
 5. **Jikan API** (optional, disabled by default) - Online API for manga ID mapping via [Jikan](https://jikan.moe/) (unofficial MAL API)
-6. **API search** - Search the target service API
+6. **API search** - Search the MAL API
 
-**Note:**
+### Reverse direction (MAL → AniList, `--reverse-direction`)
+
+**Anime** (`sync --reverse-direction`):
+1. **Manual Mapping** - User-defined AniList↔MAL mappings from `mappings.yaml`
+2. **Direct ID lookup** - If the entry already exists in your target list
+3. **Offline Database** (optional, enabled by default)
+4. **Hato API** (optional, enabled by default)
+5. **ARM API** (optional, disabled by default)
+6. **Title matching**
+7. **MAL ID lookup** - Find AniList entry by MAL ID directly
+8. **API search** - Search the AniList API
+
+**Manga** (`sync --manga --reverse-direction`):
+1. **Manual Mapping**
+2. **Direct ID lookup**
+3. **Hato API** (optional, enabled by default)
+4. **Title matching**
+5. **Jikan API** (optional, disabled by default)
+6. **MAL ID lookup** - Find AniList entry by MAL ID directly
+7. **API search** - Search the AniList API
+
+**Notes:**
 - The offline database and ARM API are anime-only and automatically disabled when using `--manga` flag (without `--all`) to improve startup performance.
 - Hato API supports both anime and manga and is enabled by default.
-- In reverse sync mode (`--reverse-direction`), an additional **MAL ID lookup** strategy is used before API search to find entries by MAL ID on AniList.
 
 ### Manual Mappings & Ignore Rules
 
@@ -268,8 +347,10 @@ Configuration can be provided entirely via environment variables (recommended fo
 - `MAL_CLIENT_SECRET` - MyAnimeList Client Secret (also accepts `CLIENT_SECRET_MYANIMELIST`)
 - `MAL_USERNAME` - MyAnimeList username
 
+**Required for `watch` mode:**
+- `WATCH_INTERVAL` - Sync interval (e.g., `12h`, `24h`); range `1h`–`168h`. Without this (or `--interval` flag) the watch command fails.
+
 **Optional:**
-- `WATCH_INTERVAL` - Sync interval for watch mode (e.g., `12h`, `24h`)
 - `HTTP_TIMEOUT` - HTTP client timeout for API requests (default: `30s`, e.g., `10s`, `1m`)
 - `OAUTH_PORT` - OAuth server port (default: `18080`)
 - `OAUTH_REDIRECT_URI` - OAuth redirect URI (default: `http://localhost:18080/callback`)
@@ -363,15 +444,43 @@ For detailed documentation, see [docs/favorites-sync.md](docs/favorites-sync.md)
 
 ## Advanced
 
-### Install as binary
+### Install as binary (without Docker)
 
+Requires **Go 1.25+** ([download](https://go.dev/dl/)).
+
+**Option A — install from registry:**
 ```bash
 go install github.com/bigspawn/anilist-mal-sync@latest
-anilist-mal-sync login all
-anilist-mal-sync sync
 ```
 
+**Option B — clone and build locally:**
+```bash
+git clone https://github.com/bigspawn/anilist-mal-sync.git
+cd anilist-mal-sync
+go build -o anilist-mal-sync .
+```
+
+**First run:**
+```bash
+# 1. Create config file
+cp config.example.yaml config.yaml
+# Edit config.yaml with your AniList and MAL credentials
+
+# 2. Authenticate (opens OAuth flow on port 18080)
+anilist-mal-sync -c config.yaml login
+
+# 3. Preview changes before syncing
+anilist-mal-sync -c config.yaml sync --dry-run --all
+
+# 4. Run sync
+anilist-mal-sync -c config.yaml sync
+```
+
+Tokens are saved to `~/.config/anilist-mal-sync/token.json` by default.
+
 ### Docker
+
+> **docker compose vs docker-compose:** Examples use `docker-compose` (CLI v1). If your system has Docker Compose v2 (bundled with modern Docker Desktop / Engine), replace `docker-compose` with `docker compose` (no hyphen).
 
 See [Quick Start](#quick-start-docker) for the recommended setup.
 
@@ -399,7 +508,7 @@ Or run watch command manually:
 docker-compose run --rm sync watch --interval=12h
 ```
 
-**Interval limits:** 1h - 168h (7 days)
+**Interval limits:** 1h - 168h (7 days). `WATCH_INTERVAL` (or `--interval`) is **required** for watch mode — without it the command exits with an error.
 
 ### Scheduling (non-Docker)
 
@@ -427,17 +536,15 @@ Use your system's scheduler for periodic sync:
 
 **Token expired**
 - Run `anilist-mal-sync status` to check
-- Run `anilist-mal-sync login all` to reauthenticate
+- Run `anilist-mal-sync login` to reauthenticate (re-authenticates both services)
 
 ## Disclaimer
 
 This project is not affiliated with AniList or MyAnimeList. Use at your own risk.
 
-## TODO
+## Roadmap
 
-- [ ] Sync favorites
-- [x] Sync MAL to AniList
-- [ ] Sync rewatching and rereading
+- [ ] Sync rewatching and rereading counts
 
 ## Credits
 

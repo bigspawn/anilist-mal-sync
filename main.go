@@ -5,6 +5,10 @@ import (
 	"os"
 )
 
+// version is set at build time via -ldflags "-X main.version=<tag>".
+// Falls back to "dev" when built without the flag (e.g. go run .).
+var version = "dev"
+
 // Default values for flags - used when sync is not called via CLI (e.g., tests).
 var (
 	defaultForce   = false

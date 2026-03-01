@@ -10,7 +10,7 @@ Go CLI application that synchronizes anime/manga lists bidirectionally between A
 
 ```bash
 make install    # Install all dev tools (golangci-lint, gofumpt, goimports, gci, govulncheck)
-make build      # Build binary: go build -o anilist-mal-sync ./cmd/main.go
+make build      # Build binary: go build -o anilist-mal-sync .
 make test       # Run all tests: go test ./... -v
 make generate   # Generate mocks using mockgen (run before tests if interfaces change)
 make fmt        # Format with gofumpt
@@ -141,10 +141,11 @@ LogDebug(ctx, "Processing item %d", id)
 
 - `github.com/rl404/verniy` - AniList GraphQL client
 - `github.com/nstratos/go-myanimelist` - MAL API client
-- `github.com/Sethispr/jikanGo` - Jikan API client for manga
+- Jikan API — custom HTTP client in `jikan_api.go` (no external library)
 - `github.com/urfave/cli/v3` - CLI framework
-- `github.com/cenkalti/backoff/v4` - Retry logic
-- `gopkg.in/yaml.v3` - YAML marshaling with comments
+- HTTP retry — custom exponential backoff in `http_retry.go` (no external library)
+- `gopkg.in/yaml.v2` - Config file parsing (`config.go`)
+- `gopkg.in/yaml.v3` - Mappings file parsing with comments (`mappings.go`)
 - `go.uber.org/mock` - Mock generation for tests
 - `anime-offline-database` - Offline ID mapping (downloaded from GitHub releases)
 
