@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"testing"
 
 	"github.com/rl404/verniy"
@@ -8,7 +9,6 @@ import (
 
 // Test constructors
 func TestNewMALAnimeService(t *testing.T) {
-	t.Parallel()
 	var client *MyAnimeListClient
 	service := NewMALAnimeService(client)
 
@@ -18,7 +18,6 @@ func TestNewMALAnimeService(t *testing.T) {
 }
 
 func TestNewMALMangaService(t *testing.T) {
-	t.Parallel()
 	var client *MyAnimeListClient
 	service := NewMALMangaService(client)
 
@@ -28,10 +27,9 @@ func TestNewMALMangaService(t *testing.T) {
 }
 
 func TestNewAniListAnimeService(t *testing.T) {
-	t.Parallel()
 	var client *AnilistClient
 	scoreFormat := verniy.ScoreFormatPoint10
-	service := NewAniListAnimeService(client, scoreFormat)
+	service := NewAniListAnimeService(client, scoreFormat, false)
 
 	if service.client != client {
 		t.Error("client should be set")
@@ -42,10 +40,9 @@ func TestNewAniListAnimeService(t *testing.T) {
 }
 
 func TestNewAniListMangaService(t *testing.T) {
-	t.Parallel()
 	var client *AnilistClient
 	scoreFormat := verniy.ScoreFormatPoint10
-	service := NewAniListMangaService(client, scoreFormat)
+	service := NewAniListMangaService(client, scoreFormat, false)
 
 	if service.client != client {
 		t.Error("client should be set")
@@ -56,7 +53,6 @@ func TestNewAniListMangaService(t *testing.T) {
 }
 
 func TestNewStrategyChain(t *testing.T) {
-	t.Parallel()
 	strategy1 := IDStrategy{}
 	strategy2 := TitleStrategy{}
 
@@ -68,7 +64,6 @@ func TestNewStrategyChain(t *testing.T) {
 }
 
 func TestNewStatistics(t *testing.T) {
-	t.Parallel()
 	stats := NewStatistics()
 
 	if stats.StatusCounts == nil {
@@ -81,7 +76,6 @@ func TestNewStatistics(t *testing.T) {
 
 // Test service client assignment
 func TestMALAnimeService_Client(t *testing.T) {
-	t.Parallel()
 	client := &MyAnimeListClient{}
 	service := NewMALAnimeService(client)
 
@@ -91,7 +85,6 @@ func TestMALAnimeService_Client(t *testing.T) {
 }
 
 func TestMALMangaService_Client(t *testing.T) {
-	t.Parallel()
 	client := &MyAnimeListClient{}
 	service := NewMALMangaService(client)
 
@@ -101,9 +94,8 @@ func TestMALMangaService_Client(t *testing.T) {
 }
 
 func TestAniListAnimeService_Client(t *testing.T) {
-	t.Parallel()
 	client := &AnilistClient{}
-	service := NewAniListAnimeService(client, verniy.ScoreFormatPoint10)
+	service := NewAniListAnimeService(client, verniy.ScoreFormatPoint10, false)
 
 	if service.client != client {
 		t.Error("client should be assigned correctly")
@@ -111,9 +103,8 @@ func TestAniListAnimeService_Client(t *testing.T) {
 }
 
 func TestAniListMangaService_Client(t *testing.T) {
-	t.Parallel()
 	client := &AnilistClient{}
-	service := NewAniListMangaService(client, verniy.ScoreFormatPoint10)
+	service := NewAniListMangaService(client, verniy.ScoreFormatPoint10, false)
 
 	if service.client != client {
 		t.Error("client should be assigned correctly")
@@ -122,7 +113,6 @@ func TestAniListMangaService_Client(t *testing.T) {
 
 // Test service score format handling
 func TestAniListAnimeService_ScoreFormat(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name        string
 		scoreFormat verniy.ScoreFormat
@@ -135,8 +125,7 @@ func TestAniListAnimeService_ScoreFormat(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			service := NewAniListAnimeService(nil, tt.scoreFormat)
+			service := NewAniListAnimeService(nil, tt.scoreFormat, false)
 
 			if service.scoreFormat != tt.scoreFormat {
 				t.Error("scoreFormat should be set correctly")
@@ -146,7 +135,6 @@ func TestAniListAnimeService_ScoreFormat(t *testing.T) {
 }
 
 func TestAniListMangaService_ScoreFormat(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name        string
 		scoreFormat verniy.ScoreFormat
@@ -159,8 +147,7 @@ func TestAniListMangaService_ScoreFormat(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			service := NewAniListMangaService(nil, tt.scoreFormat)
+			service := NewAniListMangaService(nil, tt.scoreFormat, false)
 
 			if service.scoreFormat != tt.scoreFormat {
 				t.Error("scoreFormat should be set correctly")
@@ -171,9 +158,8 @@ func TestAniListMangaService_ScoreFormat(t *testing.T) {
 
 // Test service Update methods with invalid source type (type assertion)
 func TestMALAnimeService_Update_InvalidSource(t *testing.T) {
-	t.Parallel()
 	service := NewMALAnimeService(nil)
-	ctx := t.Context()
+	ctx := context.Background()
 
 	// Pass Manga as source to Anime service - should fail type assertion
 	mangaSource := Manga{IDMal: 12345, TitleEN: "Test Manga"}
@@ -189,9 +175,8 @@ func TestMALAnimeService_Update_InvalidSource(t *testing.T) {
 }
 
 func TestMALMangaService_Update_InvalidSource(t *testing.T) {
-	t.Parallel()
 	service := NewMALMangaService(nil)
-	ctx := t.Context()
+	ctx := context.Background()
 
 	// Pass Anime as source to Manga service - should fail type assertion
 	animeSource := Anime{IDMal: 12345, TitleEN: "Test Anime"}
@@ -207,9 +192,8 @@ func TestMALMangaService_Update_InvalidSource(t *testing.T) {
 }
 
 func TestAniListAnimeService_Update_InvalidSource(t *testing.T) {
-	t.Parallel()
-	service := NewAniListAnimeService(nil, verniy.ScoreFormatPoint10)
-	ctx := t.Context()
+	service := NewAniListAnimeService(nil, verniy.ScoreFormatPoint10, false)
+	ctx := context.Background()
 
 	// Pass Manga as source to Anime service
 	mangaSource := Manga{IDMal: 12345, TitleEN: "Test Manga"}
@@ -224,9 +208,8 @@ func TestAniListAnimeService_Update_InvalidSource(t *testing.T) {
 }
 
 func TestAniListMangaService_Update_InvalidSource(t *testing.T) {
-	t.Parallel()
-	service := NewAniListMangaService(nil, verniy.ScoreFormatPoint10)
-	ctx := t.Context()
+	service := NewAniListMangaService(nil, verniy.ScoreFormatPoint10, false)
+	ctx := context.Background()
 
 	// Pass Anime as source to Manga service
 	animeSource := Anime{IDMal: 12345, TitleEN: "Test Anime"}

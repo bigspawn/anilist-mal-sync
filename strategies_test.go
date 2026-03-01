@@ -11,8 +11,7 @@ import (
 
 // TestIDStrategy_FindsExistingTarget tests that IDStrategy finds targets by ID when they exist
 func TestIDStrategy_FindsExistingTarget(t *testing.T) {
-	// Cannot use t.Parallel() due to global reverseDirection variable access
-	ctx := setTestDirection(t, SyncDirectionForward)
+	ctx := context.Background()
 	strategy := IDStrategy{}
 
 	source := Anime{
@@ -45,8 +44,7 @@ func TestIDStrategy_FindsExistingTarget(t *testing.T) {
 
 // TestIDStrategy_NotFoundInUserList tests that IDStrategy returns false when ID not in user's list
 func TestIDStrategy_NotFoundInUserList(t *testing.T) {
-	// Cannot use t.Parallel() due to global reverseDirection variable access
-	ctx := setTestDirection(t, SyncDirectionForward)
+	ctx := context.Background()
 	strategy := IDStrategy{}
 
 	source := Anime{
@@ -80,8 +78,7 @@ func TestIDStrategy_NotFoundInUserList(t *testing.T) {
 // TestTitleStrategy_ShouldRejectMismatchedMALIDs tests the bug where TitleStrategy
 // matches entries with different MAL IDs, causing repeated updates
 func TestTitleStrategy_ShouldRejectMismatchedMALIDs(t *testing.T) {
-	// Cannot use t.Parallel() due to global reverseDirection variable access
-	ctx := setTestDirection(t, SyncDirectionForward)
+	ctx := context.Background()
 	strategy := TitleStrategy{}
 
 	tests := []struct {
@@ -187,8 +184,7 @@ func TestTitleStrategy_ShouldRejectMismatchedMALIDs(t *testing.T) {
 // TestTitleStrategy_ShouldRejectLargeEpisodeCountDifference tests that TitleStrategy
 // should reject matches when episode counts differ significantly
 func TestTitleStrategy_ShouldRejectLargeEpisodeCountDifference(t *testing.T) {
-	// Cannot use t.Parallel() due to global reverseDirection variable access
-	ctx := setTestDirection(t, SyncDirectionForward)
+	ctx := context.Background()
 	strategy := TitleStrategy{}
 
 	tests := []struct {
@@ -289,8 +285,7 @@ func TestTitleStrategy_ShouldRejectLargeEpisodeCountDifference(t *testing.T) {
 
 // TestStrategyChain_Integration tests the full strategy chain behavior
 func TestStrategyChain_Integration(t *testing.T) {
-	t.Parallel()
-	ctx := t.Context()
+	ctx := context.Background()
 
 	// Real-world scenario: DanMachi OVA not in user's MAL list
 	source := Anime{
@@ -338,28 +333,28 @@ func TestStrategyChain_Integration(t *testing.T) {
 
 // TestMALIDStrategy_FindsTargetByMALID tests that MALIDStrategy finds targets by MAL ID
 func TestMALIDStrategy_FindsTargetByMALID(t *testing.T) {
-	// Set reverse direction for this test (MAL -> AniList sync)
-	// Cannot use t.Parallel() due to global reverseDirection variable access
-	ctx := setTestDirection(t, SyncDirectionReverse)
+	ctx := context.Background()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	// Source from MAL with IDMal set
+	// Source from MAL with IDMal set (reverse sync — MAL→AniList)
 	source := Anime{
 		IDMal:       37341, // Laid-Back Camp Specials on MAL
 		IDAnilist:   0,
 		TitleEN:     "Laid-Back Camp Specials",
 		TitleJP:     "ゆるキャン△ スペシャル",
 		NumEpisodes: 3,
+		isReverse:   true,
 	}
 
-	// Target from AniList with different title but same MAL ID
+	// Target from AniList with different title but same MAL ID (isReverse=true: key=IDAnilist)
 	apiTarget := Anime{
 		IDMal:       37341,
 		IDAnilist:   101206,
 		TitleEN:     "",
 		TitleJP:     "ゆるキャン△ OVA", // Different title on AniList
 		NumEpisodes: 3,
+		isReverse:   true,
 	}
 
 	existingTargets := map[TargetID]Target{
@@ -400,25 +395,26 @@ func TestMALIDStrategy_FindsTargetByMALID(t *testing.T) {
 
 // TestMALIDStrategy_ReturnsExistingUserTarget tests that MALIDStrategy returns existing target from user's list
 func TestMALIDStrategy_ReturnsExistingUserTarget(t *testing.T) {
-	// Set reverse direction for this test (MAL -> AniList sync)
-	// Cannot use t.Parallel() due to global reverseDirection variable access
-	ctx := setTestDirection(t, SyncDirectionReverse)
+	ctx := context.Background()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	// Source: MAL anime in reverse sync
 	source := Anime{
 		IDMal:       37341,
 		IDAnilist:   0,
 		TitleEN:     "Laid-Back Camp Specials",
 		NumEpisodes: 3,
+		isReverse:   true,
 	}
 
-	// API returns this target
+	// API returns this target (isReverse=true: GetTargetID()=IDAnilist=101206)
 	apiTarget := Anime{
 		IDMal:       37341,
 		IDAnilist:   101206,
 		TitleJP:     "ゆるキャン△ OVA",
 		NumEpisodes: 3,
+		isReverse:   true,
 	}
 
 	// But user has this in their list (with different status)
@@ -430,6 +426,7 @@ func TestMALIDStrategy_ReturnsExistingUserTarget(t *testing.T) {
 		Status:      StatusCompleted,
 		Progress:    3,
 		Score:       8,
+		isReverse:   true,
 	}
 
 	existingTargets := map[TargetID]Target{
@@ -456,8 +453,6 @@ func TestMALIDStrategy_ReturnsExistingUserTarget(t *testing.T) {
 		t.Error("Expected target to be Anime type")
 	}
 
-	t.Logf("targetAnime.IDMal = %d, targetAnime.IDAnilist = %d", targetAnime.IDMal, targetAnime.IDAnilist)
-
 	if targetAnime.Status != StatusCompleted {
 		t.Errorf("Expected user's target status (completed), got %v", targetAnime.Status)
 	}
@@ -469,17 +464,17 @@ func TestMALIDStrategy_ReturnsExistingUserTarget(t *testing.T) {
 
 // TestMALIDStrategy_SkipsZeroMALID tests that MALIDStrategy skips when source has no MAL ID
 func TestMALIDStrategy_SkipsZeroMALID(t *testing.T) {
-	// Set reverse direction for this test (MAL -> AniList sync)
-	// Cannot use t.Parallel() due to global reverseDirection variable access
-	ctx := setTestDirection(t, SyncDirectionReverse)
+	ctx := context.Background()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	// Source with no MAL ID (reverse sync — GetSourceID() returns IDMal=0)
 	source := Anime{
 		IDMal:       0, // No MAL ID
 		IDAnilist:   0,
 		TitleEN:     "Test Anime",
 		NumEpisodes: 12,
+		isReverse:   true,
 	}
 
 	existingTargets := map[TargetID]Target{}
@@ -506,8 +501,7 @@ func TestMALIDStrategy_SkipsZeroMALID(t *testing.T) {
 
 // TestMALIDStrategy_ContextCancellation tests that MALIDStrategy respects context cancellation
 func TestMALIDStrategy_ContextCancellation(t *testing.T) {
-	// Cannot use t.Parallel() due to global reverseDirection variable access
-	ctx, cancel := context.WithCancel(setTestDirection(t, SyncDirectionReverse))
+	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
 
 	ctrl := gomock.NewController(t)
@@ -518,6 +512,7 @@ func TestMALIDStrategy_ContextCancellation(t *testing.T) {
 		IDAnilist:   0,
 		TitleEN:     "Test Anime",
 		NumEpisodes: 12,
+		isReverse:   true,
 	}
 
 	existingTargets := map[TargetID]Target{}
@@ -544,9 +539,7 @@ func TestMALIDStrategy_ContextCancellation(t *testing.T) {
 
 // TestMALIDStrategy_ErrorHandling tests that MALIDStrategy properly handles API errors
 func TestMALIDStrategy_ErrorHandling(t *testing.T) {
-	// Set reverse direction for this test (MAL -> AniList sync)
-	// Cannot use t.Parallel() due to global reverseDirection variable access
-	ctx := setTestDirection(t, SyncDirectionReverse)
+	ctx := context.Background()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -555,6 +548,7 @@ func TestMALIDStrategy_ErrorHandling(t *testing.T) {
 		IDAnilist:   0,
 		TitleEN:     "Non-existent Anime",
 		NumEpisodes: 12,
+		isReverse:   true,
 	}
 
 	existingTargets := map[TargetID]Target{}
@@ -582,21 +576,23 @@ func TestMALIDStrategy_ErrorHandling(t *testing.T) {
 func TestAnime_GetSourceID(t *testing.T) {
 	t.Parallel()
 
-	source := Anime{
+	base := Anime{
 		IDMal:     12345,
 		IDAnilist: 67890,
 		TitleEN:   "Test Anime",
 	}
 
-	// Normal sync: source is AniList, so source ID is IDAnilist
-	got := GetSourceIDWithDirection(source, SyncDirectionForward)
-	if got != 67890 {
+	// Normal sync (isReverse=false): source is AniList, so source ID is IDAnilist
+	forwardSrc := base
+	forwardSrc.isReverse = false
+	if got := forwardSrc.GetSourceID(); got != 67890 {
 		t.Errorf("Normal sync: expected source ID 67890 (AniList), got %d", got)
 	}
 
-	// Reverse sync: source is MAL, so source ID is IDMal
-	got = GetSourceIDWithDirection(source, SyncDirectionReverse)
-	if got != 12345 {
+	// Reverse sync (isReverse=true): source is MAL, so source ID is IDMal
+	reverseSrc := base
+	reverseSrc.isReverse = true
+	if got := reverseSrc.GetSourceID(); got != 12345 {
 		t.Errorf("Reverse sync: expected source ID 12345 (MAL), got %d", got)
 	}
 }
@@ -605,28 +601,29 @@ func TestAnime_GetSourceID(t *testing.T) {
 func TestManga_GetSourceID(t *testing.T) {
 	t.Parallel()
 
-	source := Manga{
+	base := Manga{
 		IDMal:     11111,
 		IDAnilist: 22222,
 		TitleEN:   "Test Manga",
 	}
 
-	// Normal sync: source is AniList, so source ID is IDAnilist
-	got := GetSourceIDWithDirection(source, SyncDirectionForward)
-	if got != 22222 {
+	// Normal sync (isReverse=false): source is AniList, so source ID is IDAnilist
+	forwardSrc := base
+	forwardSrc.isReverse = false
+	if got := forwardSrc.GetSourceID(); got != 22222 {
 		t.Errorf("Normal sync: expected source ID 22222 (AniList), got %d", got)
 	}
 
-	// Reverse sync: source is MAL, so source ID is IDMal
-	got = GetSourceIDWithDirection(source, SyncDirectionReverse)
-	if got != 11111 {
+	// Reverse sync (isReverse=true): source is MAL, so source ID is IDMal
+	reverseSrc := base
+	reverseSrc.isReverse = true
+	if got := reverseSrc.GetSourceID(); got != 11111 {
 		t.Errorf("Reverse sync: expected source ID 11111 (MAL), got %d", got)
 	}
 }
 
 // TestStrategy_Name tests the Name() method for all strategies
 func TestIDStrategy_Name(t *testing.T) {
-	t.Parallel()
 	strategy := IDStrategy{}
 	if got := strategy.Name(); got != StrategyNameID {
 		t.Errorf("Name() = %v, want %v", got, StrategyNameID)
@@ -634,7 +631,6 @@ func TestIDStrategy_Name(t *testing.T) {
 }
 
 func TestTitleStrategy_Name(t *testing.T) {
-	t.Parallel()
 	strategy := TitleStrategy{}
 	if got := strategy.Name(); got != StrategyNameTitle {
 		t.Errorf("Name() = %v, want %v", got, StrategyNameTitle)
@@ -642,7 +638,6 @@ func TestTitleStrategy_Name(t *testing.T) {
 }
 
 func TestMALIDStrategy_Name(t *testing.T) {
-	t.Parallel()
 	strategy := MALIDStrategy{}
 	if got := strategy.Name(); got != "MALIDStrategy" {
 		t.Errorf("Name() = %v, want %v", got, "MALIDStrategy")
@@ -650,7 +645,6 @@ func TestMALIDStrategy_Name(t *testing.T) {
 }
 
 func TestAPISearchStrategy_Name(t *testing.T) {
-	t.Parallel()
 	strategy := APISearchStrategy{}
 	if got := strategy.Name(); got != "APISearchStrategy" {
 		t.Errorf("Name() = %v, want %v", got, "APISearchStrategy")
@@ -658,7 +652,6 @@ func TestAPISearchStrategy_Name(t *testing.T) {
 }
 
 func TestStrategyChain_Name(t *testing.T) {
-	t.Parallel()
 	chain := NewStrategyChain(IDStrategy{}, TitleStrategy{})
 	// StrategyChain doesn't have a Name() method, but we can test it contains strategies
 	if len(chain.strategies) != 2 {
@@ -668,8 +661,6 @@ func TestStrategyChain_Name(t *testing.T) {
 
 // TestAPISearchStrategy_FindTarget tests the APISearchStrategy
 func TestAPISearchStrategy_FindTarget(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name            string
 		source          Source
@@ -774,7 +765,7 @@ func TestAPISearchStrategy_FindTarget(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			ctx := setTestDirection(t, SyncDirectionForward)
+			ctx := context.Background()
 			if tt.name == "context cancelled" {
 				var cancel context.CancelFunc
 				ctx, cancel = context.WithCancel(ctx)
@@ -812,11 +803,10 @@ func TestAPISearchStrategy_FindTarget(t *testing.T) {
 }
 
 func TestAPISearchStrategy_FindTarget_SameTypeMatch(t *testing.T) {
-	t.Parallel()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	ctx := t.Context()
+	ctx := context.Background()
 
 	source := Anime{
 		IDMal:       0,
@@ -855,11 +845,10 @@ func TestAPISearchStrategy_FindTarget_SameTypeMatch(t *testing.T) {
 }
 
 func TestAPISearchStrategy_FindTarget_IgnoresTypeMismatch(t *testing.T) {
-	t.Parallel()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	ctx := t.Context()
+	ctx := context.Background()
 
 	source := Anime{
 		IDMal:       0,
@@ -897,7 +886,6 @@ func TestAPISearchStrategy_FindTarget_IgnoresTypeMismatch(t *testing.T) {
 }
 
 func TestManualMappingStrategy_Name(t *testing.T) {
-	t.Parallel()
 	strategy := ManualMappingStrategy{}
 	if got := strategy.Name(); got != "ManualMappingStrategy" {
 		t.Errorf("Name() = %v, want ManualMappingStrategy", got)
@@ -905,8 +893,7 @@ func TestManualMappingStrategy_Name(t *testing.T) {
 }
 
 func TestManualMappingStrategy_NilMappings(t *testing.T) {
-	t.Parallel()
-	ctx := t.Context()
+	ctx := context.Background()
 	strategy := ManualMappingStrategy{Mappings: nil}
 
 	source := Anime{IDAnilist: 100, IDMal: 0, TitleEN: "Test"}
@@ -923,14 +910,14 @@ func TestManualMappingStrategy_NilMappings(t *testing.T) {
 }
 
 func TestManualMappingStrategy_FindsAnimeTarget(t *testing.T) {
-	// Cannot use t.Parallel() due to global reverseDirection variable access
-	ctx := setTestDirection(t, SyncDirectionForward)
+	ctx := context.Background()
 	mappings := &MappingsConfig{
 		ManualMappings: []ManualMapping{
 			{AniListID: 100, MALID: 200},
 		},
 	}
-	strategy := ManualMappingStrategy{Mappings: mappings}
+	// Forward sync: Reverse=false
+	strategy := ManualMappingStrategy{Mappings: mappings, Reverse: false}
 
 	source := Anime{IDAnilist: 100, IDMal: 0, TitleEN: "Test Anime"}
 	existingTargets := map[TargetID]Target{
@@ -950,14 +937,14 @@ func TestManualMappingStrategy_FindsAnimeTarget(t *testing.T) {
 }
 
 func TestManualMappingStrategy_FindsMangaTarget(t *testing.T) {
-	// Cannot use t.Parallel() due to global reverseDirection variable access
-	ctx := setTestDirection(t, SyncDirectionForward)
+	ctx := context.Background()
 	mappings := &MappingsConfig{
 		ManualMappings: []ManualMapping{
 			{AniListID: 300, MALID: 400},
 		},
 	}
-	strategy := ManualMappingStrategy{Mappings: mappings}
+	// Forward sync: Reverse=false
+	strategy := ManualMappingStrategy{Mappings: mappings, Reverse: false}
 
 	source := Manga{IDAnilist: 300, IDMal: 0, TitleEN: "Test Manga"}
 	existingTargets := map[TargetID]Target{
@@ -977,14 +964,13 @@ func TestManualMappingStrategy_FindsMangaTarget(t *testing.T) {
 }
 
 func TestManualMappingStrategy_NotInUserList(t *testing.T) {
-	// Cannot use t.Parallel() due to global reverseDirection variable access
-	ctx := setTestDirection(t, SyncDirectionForward)
+	ctx := context.Background()
 	mappings := &MappingsConfig{
 		ManualMappings: []ManualMapping{
 			{AniListID: 100, MALID: 200},
 		},
 	}
-	strategy := ManualMappingStrategy{Mappings: mappings}
+	strategy := ManualMappingStrategy{Mappings: mappings, Reverse: false}
 
 	source := Anime{IDAnilist: 100, IDMal: 0, TitleEN: "Test"}
 	existingTargets := map[TargetID]Target{} // empty - target 200 not in user's list
@@ -1002,14 +988,13 @@ func TestManualMappingStrategy_NotInUserList(t *testing.T) {
 }
 
 func TestManualMappingStrategy_NoMapping(t *testing.T) {
-	// Cannot use t.Parallel() due to global reverseDirection variable access
-	ctx := setTestDirection(t, SyncDirectionForward)
+	ctx := context.Background()
 	mappings := &MappingsConfig{
 		ManualMappings: []ManualMapping{
 			{AniListID: 100, MALID: 200},
 		},
 	}
-	strategy := ManualMappingStrategy{Mappings: mappings}
+	strategy := ManualMappingStrategy{Mappings: mappings, Reverse: false}
 
 	source := Anime{IDAnilist: 999, IDMal: 0, TitleEN: "Other Anime"}
 	existingTargets := map[TargetID]Target{
@@ -1030,8 +1015,7 @@ func TestManualMappingStrategy_NoMapping(t *testing.T) {
 
 // TestFindTargetWithMeta_ReturnsMetadata tests that FindTargetWithMeta returns strategy name and index
 func TestFindTargetWithMeta_ReturnsMetadata(t *testing.T) {
-	t.Parallel()
-	ctx := t.Context()
+	ctx := context.Background()
 
 	source := Anime{
 		IDMal:       0, // No MAL ID, so IDStrategy won't find it
@@ -1076,8 +1060,7 @@ func TestFindTargetWithMeta_ReturnsMetadata(t *testing.T) {
 
 // TestFindTargetWithMeta_FirstStrategy tests that FindTargetWithMeta returns idx=0 for first strategy
 func TestFindTargetWithMeta_FirstStrategy(t *testing.T) {
-	// Cannot use t.Parallel() due to global reverseDirection variable access
-	ctx := setTestDirection(t, SyncDirectionForward)
+	ctx := context.Background()
 
 	source := Anime{
 		IDMal:       12345,
@@ -1114,8 +1097,7 @@ func TestFindTargetWithMeta_FirstStrategy(t *testing.T) {
 
 // TestFindTargetWithMeta_NoMatch tests that FindTargetWithMeta returns error when no strategy matches
 func TestFindTargetWithMeta_NoMatch(t *testing.T) {
-	t.Parallel()
-	ctx := t.Context()
+	ctx := context.Background()
 
 	source := Anime{
 		IDMal:       99999,
@@ -1140,19 +1122,19 @@ func TestFindTargetWithMeta_NoMatch(t *testing.T) {
 }
 
 func TestManualMappingStrategy_ReverseSync(t *testing.T) {
-	// Cannot use t.Parallel() due to global reverseDirection variable access
-	ctx := setTestDirection(t, SyncDirectionReverse)
+	ctx := context.Background()
 	mappings := &MappingsConfig{
 		ManualMappings: []ManualMapping{
 			{AniListID: 100, MALID: 200},
 		},
 	}
-	strategy := ManualMappingStrategy{Mappings: mappings}
+	// Reverse sync: Reverse=true
+	strategy := ManualMappingStrategy{Mappings: mappings, Reverse: true}
 
-	// In reverse sync: source has MAL ID, target is AniList
-	source := Anime{IDMal: 200, IDAnilist: 0, TitleEN: "Test Anime"}
+	// In reverse sync: source has MAL ID (isReverse=true), target is AniList (isReverse=true)
+	source := Anime{IDMal: 200, IDAnilist: 0, TitleEN: "Test Anime", isReverse: true}
 	existingTargets := map[TargetID]Target{
-		100: Anime{IDAnilist: 100, TitleEN: "Test Anime AniList"},
+		100: Anime{IDAnilist: 100, TitleEN: "Test Anime AniList", isReverse: true},
 	}
 
 	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]", nil)

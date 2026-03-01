@@ -20,14 +20,11 @@ func runSync(ctx context.Context, cmd *cli.Command) error {
 	configPath := cmd.String("config")
 
 	// Set package-level vars for compatibility with existing code
-	verboseVal := setSyncFlagsFromCmd(cmd)
+	verboseVal, reverseVal := getSyncFlagsFromCmd(cmd)
 
 	// Initialize logger and add to context
 	logger := NewLogger(verboseVal)
 	ctx = logger.WithContext(ctx)
-
-	// Get direction flag and add to context
-	reverseVal := cmd.Bool("reverse-direction")
 	var direction SyncDirection
 	if reverseVal {
 		direction = SyncDirectionReverse
@@ -43,7 +40,7 @@ func runSync(ctx context.Context, cmd *cli.Command) error {
 
 	applySyncFlagsToConfig(cmd, &config)
 
-	app, err := NewApp(ctx, config)
+	app, err := NewApp(ctx, config, reverseVal)
 	if err != nil {
 		return fmt.Errorf("create app: %w", err)
 	}

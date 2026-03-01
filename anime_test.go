@@ -121,7 +121,6 @@ func TestSameDates(t *testing.T) {
 }
 
 func TestAnime_SameTypeWithTarget(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name   string
 		source Anime
@@ -246,7 +245,7 @@ func TestAnime_SameTypeWithTarget(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.source.SameTypeWithTarget(tt.target)
+			got := tt.source.SameTypeWithTarget(t.Context(), tt.target)
 			if got != tt.want {
 				t.Errorf("Anime.SameTypeWithTarget() = %v, want %v", got, tt.want)
 			}
@@ -255,7 +254,6 @@ func TestAnime_SameTypeWithTarget(t *testing.T) {
 }
 
 func TestAnime_IsPotentiallyIncorrectMatch(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name     string
 		source   Anime
@@ -373,7 +371,6 @@ func TestAnime_IsPotentiallyIncorrectMatch(t *testing.T) {
 }
 
 func TestAnime_GetUpdateOptions(t *testing.T) {
-	t.Parallel()
 	date1 := time.Date(2024, 12, 18, 0, 0, 0, 0, time.UTC)
 	date2 := time.Date(2024, 12, 19, 0, 0, 0, 0, time.UTC)
 
@@ -458,7 +455,6 @@ func TestAnime_GetUpdateOptions(t *testing.T) {
 }
 
 func TestAnime_GetTargetID(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name         string
 		anime        Anime
@@ -506,22 +502,17 @@ func TestAnime_GetTargetID(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-
-			var direction SyncDirection
-			if tt.reverse {
-				direction = SyncDirectionReverse
-			}
-			got := GetTargetIDWithDirection(tt.anime, direction)
-
+			a := tt.anime
+			a.isReverse = tt.reverse
+			got := a.GetTargetID()
 			if got != tt.wantTargetID {
-				t.Errorf("GetTargetIDWithDirection() = %v, want %v", got, tt.wantTargetID)
+				t.Errorf("GetTargetID() = %v, want %v", got, tt.wantTargetID)
 			}
 		})
 	}
 }
 
 func TestAnime_GetAniListID(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name  string
 		anime Anime
@@ -556,7 +547,6 @@ func TestAnime_GetAniListID(t *testing.T) {
 }
 
 func TestAnime_GetMALID(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name  string
 		anime Anime
@@ -590,71 +580,7 @@ func TestAnime_GetMALID(t *testing.T) {
 	}
 }
 
-func TestAnime_GetSourceIDWithDirection(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name      string
-		anime     Anime
-		reverse   bool
-		wantSrcID int
-	}{
-		{
-			name: "normal sync returns AniList ID",
-			anime: Anime{
-				IDMal:     12345,
-				IDAnilist: 67890,
-			},
-			reverse:   false,
-			wantSrcID: 67890,
-		},
-		{
-			name: "reverse sync returns MAL ID",
-			anime: Anime{
-				IDMal:     12345,
-				IDAnilist: 67890,
-			},
-			reverse:   true,
-			wantSrcID: 12345,
-		},
-		{
-			name: "zero AniList ID in normal mode",
-			anime: Anime{
-				IDMal:     12345,
-				IDAnilist: 0,
-			},
-			reverse:   false,
-			wantSrcID: 0,
-		},
-		{
-			name: "zero MAL ID in reverse mode",
-			anime: Anime{
-				IDMal:     0,
-				IDAnilist: 67890,
-			},
-			reverse:   true,
-			wantSrcID: 0,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			var direction SyncDirection
-			if tt.reverse {
-				direction = SyncDirectionReverse
-			}
-			got := GetSourceIDWithDirection(tt.anime, direction)
-
-			if got != tt.wantSrcID {
-				t.Errorf("GetSourceIDWithDirection() = %v, want %v", got, tt.wantSrcID)
-			}
-		})
-	}
-}
-
 func TestAnime_GetStatusString(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name   string
 		status Status
@@ -704,7 +630,6 @@ func TestAnime_GetStatusString(t *testing.T) {
 }
 
 func TestAnime_SameProgressWithTarget(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name   string
 		source Anime
@@ -842,7 +767,6 @@ func TestAnime_SameProgressWithTarget(t *testing.T) {
 }
 
 func TestAnime_SameTitleWithTarget(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name   string
 		source Anime
@@ -939,7 +863,7 @@ func TestAnime_SameTitleWithTarget(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.source.SameTitleWithTarget(tt.target)
+			got := tt.source.SameTitleWithTarget(t.Context(), tt.target)
 			if got != tt.want {
 				t.Errorf("SameTitleWithTarget() = %v, want %v", got, tt.want)
 			}
@@ -948,7 +872,6 @@ func TestAnime_SameTitleWithTarget(t *testing.T) {
 }
 
 func TestAnime_IdenticalTitleMatch(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name   string
 		source Anime
@@ -1022,7 +945,6 @@ func TestAnime_IdenticalTitleMatch(t *testing.T) {
 }
 
 func TestAnime_GetTitle(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name  string
 		anime Anime
@@ -1077,7 +999,6 @@ func TestAnime_GetTitle(t *testing.T) {
 }
 
 func TestAnime_String(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name  string
 		anime Anime

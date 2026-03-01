@@ -24,6 +24,9 @@ type App struct {
 	jikanClient        *JikanClient
 	mappings           *MappingsConfig
 	favSync            *FavoritesSync
+	reverse            bool // true for MAL→AniList direction
+	mangaSync          bool // true when only manga is synced
+	allSync            bool // true when both anime and manga are synced
 
 	offlineStrategy *OfflineDatabaseStrategy
 
@@ -41,10 +44,11 @@ type App struct {
 	fetchedMangaFromMAL     []Manga
 }
 
-// NewApp creates a new App instance with configured clients and updaters
+// NewApp creates a new App instance with configured clients and updaters.
+// reverse=true selects MAL→AniList direction; false (default) = AniList→MAL.
 //
 //nolint:funlen // Function creates multiple services and updaters - acceptable complexity
-func NewApp(ctx context.Context, config Config) (*App, error) {
+func NewApp(ctx context.Context, config Config, reverse bool) (*App, error) {
 	LogStage(ctx, "Initializing...")
 
 	oauthMAL, err := NewMyAnimeListOAuth(ctx, config)
@@ -71,11 +75,11 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 	}
 	LogDebug(ctx, "AniList score format: %s", scoreFormat)
 
-	// Create services
+	// Create services — AniList services know the direction so they set isReverse on returned entries.
 	malAnimeService := NewMALAnimeService(malClient)
 	malMangaService := NewMALMangaService(malClient)
-	anilistAnimeService := NewAniListAnimeService(anilistClient, scoreFormat)
-	anilistMangaService := NewAniListMangaService(anilistClient, scoreFormat)
+	anilistAnimeService := NewAniListAnimeService(anilistClient, scoreFormat, reverse)
+	anilistMangaService := NewAniListMangaService(anilistClient, scoreFormat, reverse)
 
 	// Determine if anime synchronization will be performed.
 	// Offline database and ARM API are only needed for anime, not for manga.
@@ -88,7 +92,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		LogWarn(ctx, "Failed to load mappings: %v (continuing without)", err)
 		mappings = &MappingsConfig{}
 	}
-	manualStrategy := ManualMappingStrategy{Mappings: mappings}
+	manualStrategy := ManualMappingStrategy{Mappings: mappings, Reverse: reverse}
 
 	// Build ignore titles from mappings + hardcoded defaults
 	defaultIgnoreTitles := map[string]struct{}{
@@ -110,7 +114,11 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		ignoreMALIDs[id] = struct{}{}
 	}
 
-	// Create updaters
+	// Create updaters — forward (AniList→MAL) and reverse (MAL→AniList).
+	// ManualMappingStrategy is shared but direction-aware via its Reverse field.
+	// Forward strategies have Reverse=false (default); reverse strategies have Reverse=true.
+	reverseManualStrategy := ManualMappingStrategy{Mappings: mappings, Reverse: true}
+
 	animeUpdater := &Updater{
 		Prefix:       "AniList to MAL Anime",
 		Service:      malAnimeService,
@@ -119,6 +127,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		IgnoreIDs:    ignoreAniListIDs,
 		ForceSync:    *forceSync,
 		DryRun:       *dryRun,
+		Reverse:      false,
 		MediaType:    mediaTypeAnime,
 		StrategyChain: NewStrategyChain(
 			manualStrategy,
@@ -139,6 +148,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		IgnoreIDs:    ignoreAniListIDs,
 		ForceSync:    *forceSync,
 		DryRun:       *dryRun,
+		Reverse:      false,
 		MediaType:    mediaTypeManga,
 		StrategyChain: NewStrategyChain(
 			manualStrategy,
@@ -158,9 +168,10 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		IgnoreIDs:    ignoreMALIDs,
 		ForceSync:    *forceSync,
 		DryRun:       *dryRun,
+		Reverse:      true,
 		MediaType:    mediaTypeAnime,
 		StrategyChain: NewStrategyChain(
-			manualStrategy,
+			reverseManualStrategy,
 			IDStrategy{},
 			offlineStrategy,
 			hatoStrategy,
@@ -179,9 +190,10 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		IgnoreIDs:    ignoreMALIDs,
 		ForceSync:    *forceSync,
 		DryRun:       *dryRun,
+		Reverse:      true,
 		MediaType:    mediaTypeManga,
 		StrategyChain: NewStrategyChain(
-			manualStrategy,
+			reverseManualStrategy,
 			IDStrategy{},
 			hatoStrategy,
 			TitleStrategy{},
@@ -198,7 +210,7 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 	// Create favorites sync if enabled
 	var favSync *FavoritesSync
 	if config.Favorites.Enabled {
-		favSync = NewFavoritesSync(anilistClient, jikanClient, *dryRun)
+		favSync = NewFavoritesSync(anilistClient, *dryRun)
 		LogInfoSuccess(ctx, "★ Favorites sync enabled")
 	}
 
@@ -212,6 +224,9 @@ func NewApp(ctx context.Context, config Config) (*App, error) {
 		mappings:            mappings,
 		offlineStrategy:     offlineStrategy,
 		favSync:             favSync,
+		reverse:             reverse,
+		mangaSync:           *mangaSync,
+		allSync:             *allSync,
 		animeUpdater:        animeUpdater,
 		mangaUpdater:        mangaUpdater,
 		reverseAnimeUpdater: reverseAnimeUpdater,
@@ -289,16 +304,21 @@ func (a *App) Refresh(ctx context.Context) {
 	} {
 		u.Statistics = NewStatistics()
 		u.UnmappedList = nil
+		u.ResolvedMappings = nil
 	}
 }
 
 func (a *App) Run(ctx context.Context) error {
+	// Reset cached lists at the start of each run (important for watch mode).
+	a.fetchedAnimeFromAniList = nil
+	a.fetchedAnimeFromMAL = nil
+	a.fetchedMangaFromAniList = nil
+	a.fetchedMangaFromMAL = nil
+
 	startTime := time.Now()
 
-	direction := DirectionFromContext(ctx)
-
 	var err error
-	if direction == SyncDirectionReverse {
+	if a.reverse {
 		err = a.runReverseSync(ctx)
 	} else {
 		err = a.runNormalSync(ctx)
@@ -306,7 +326,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	// Collect statistics for global summary
 	var updaters []*Updater
-	if direction == SyncDirectionReverse {
+	if a.reverse {
 		updaters = []*Updater{a.reverseAnimeUpdater, a.reverseMangaUpdater}
 	} else {
 		updaters = []*Updater{a.animeUpdater, a.mangaUpdater}
@@ -325,7 +345,7 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	// Print global summary
-	PrintGlobalSummary(ctx, stats, a.syncReport, time.Since(startTime))
+	PrintGlobalSummary(ctx, stats, a.syncReport, time.Since(startTime), a.reverse)
 
 	return err
 }
@@ -357,13 +377,13 @@ func (a *App) saveUnmappedState(ctx context.Context, updaters []*Updater) {
 }
 
 func (a *App) runNormalSync(ctx context.Context) error {
-	if *mangaSync || *allSync {
+	if a.mangaSync || a.allSync {
 		if err := a.syncManga(ctx); err != nil {
 			return fmt.Errorf("error syncing manga: %w", err)
 		}
 	}
 
-	if !(*mangaSync) || *allSync {
+	if !(a.mangaSync) || a.allSync {
 		if err := a.syncAnime(ctx); err != nil {
 			return fmt.Errorf("error syncing anime: %w", err)
 		}
@@ -387,13 +407,13 @@ func (a *App) runNormalSync(ctx context.Context) error {
 }
 
 func (a *App) runReverseSync(ctx context.Context) error {
-	if *mangaSync || *allSync {
+	if a.mangaSync || a.allSync {
 		if err := a.reverseSyncManga(ctx); err != nil {
 			return fmt.Errorf("error reverse syncing manga: %w", err)
 		}
 	}
 
-	if !(*mangaSync) || *allSync {
+	if !(a.mangaSync) || a.allSync {
 		if err := a.reverseSyncAnime(ctx); err != nil {
 			return fmt.Errorf("error reverse syncing anime: %w", err)
 		}
@@ -444,10 +464,10 @@ func (a *App) performSync(ctx context.Context, mediaType string, reverse bool, u
 
 	if reverse {
 		// Reverse sync: MAL -> AniList
-		srcs, tgts, err = a.fetchReverseSyncData(ctx, mediaType, updater.Prefix)
+		srcs, tgts, err = a.fetchFromMALToAnilist(ctx, mediaType, updater.Prefix)
 	} else {
 		// Normal sync: AniList -> MAL
-		srcs, tgts, err = a.fetchNormalSyncData(ctx, mediaType, updater.Prefix)
+		srcs, tgts, err = a.fetchFromAnilistToMAL(ctx, mediaType, updater.Prefix)
 	}
 
 	if err != nil {
@@ -460,14 +480,6 @@ func (a *App) performSync(ctx context.Context, mediaType string, reverse bool, u
 	// Don't print individual stats or reset - global summary will be printed at the end
 
 	return nil
-}
-
-// fetchData is a generic helper for fetching data from both services
-func (a *App) fetchData(ctx context.Context, mediaType string, fromAnilist bool, prefix string) ([]Source, []Target, error) {
-	if fromAnilist {
-		return a.fetchFromAnilistToMAL(ctx, mediaType, prefix)
-	}
-	return a.fetchFromMALToAnilist(ctx, mediaType, prefix)
 }
 
 // fetchFromAnilistToMAL fetches data for AniList -> MAL sync.
@@ -490,12 +502,14 @@ func (a *App) fetchFromAnilistToMAL(ctx context.Context, mediaType string, prefi
 			return nil, nil, fmt.Errorf("error getting user anime list from mal: %w", err)
 		}
 
-		srcs := newSourcesFromAnimes(newAnimesFromMediaListGroups(srcList, a.anilistScoreFormat))
-		tgts := newTargetsFromAnimes(newAnimesFromMalUserAnimes(tgtList))
+		animeList := newAnimesFromMediaListGroups(ctx, srcList, a.anilistScoreFormat, false)
+		malList := newAnimesFromMalUserAnimes(tgtList, false)
+		srcs := newSourcesFromAnimes(animeList)
+		tgts := newTargetsFromAnimes(malList)
 
 		// Cache lists for favorites sync
-		a.fetchedAnimeFromAniList = newAnimesFromMediaListGroups(srcList, a.anilistScoreFormat)
-		a.fetchedAnimeFromMAL = newAnimesFromMalUserAnimes(tgtList)
+		a.fetchedAnimeFromAniList = animeList
+		a.fetchedAnimeFromMAL = malList
 
 		LogDebug(ctx, "[%s] Got %d from AniList, %d from MAL", prefix, len(srcs), len(tgts))
 
@@ -514,12 +528,14 @@ func (a *App) fetchFromAnilistToMAL(ctx context.Context, mediaType string, prefi
 		return nil, nil, fmt.Errorf("error getting user manga list from mal: %w", err)
 	}
 
-	srcs := newSourcesFromMangas(newMangasFromMediaListGroups(srcList, a.anilistScoreFormat))
-	tgts := newTargetsFromMangas(newMangasFromMalUserMangas(tgtList))
+	mangaList := newMangasFromMediaListGroups(ctx, srcList, a.anilistScoreFormat, false)
+	malMangaList := newMangasFromMalUserMangas(tgtList, false)
+	srcs := newSourcesFromMangas(mangaList)
+	tgts := newTargetsFromMangas(malMangaList)
 
 	// Cache lists for favorites sync
-	a.fetchedMangaFromAniList = newMangasFromMediaListGroups(srcList, a.anilistScoreFormat)
-	a.fetchedMangaFromMAL = newMangasFromMalUserMangas(tgtList)
+	a.fetchedMangaFromAniList = mangaList
+	a.fetchedMangaFromMAL = malMangaList
 
 	LogDebug(ctx, "[%s] Got %d from AniList, %d from MAL", prefix, len(srcs), len(tgts))
 
@@ -544,12 +560,14 @@ func (a *App) fetchFromMALToAnilist(ctx context.Context, mediaType string, prefi
 			return nil, nil, fmt.Errorf("error getting user anime list from anilist: %w", err)
 		}
 
-		srcs := newSourcesFromAnimes(newAnimesFromMalUserAnimes(srcList))
-		tgts := newTargetsFromAnimes(newAnimesFromMediaListGroups(tgtList, a.anilistScoreFormat))
+		malAnimeList := newAnimesFromMalUserAnimes(srcList, true)
+		anilistAnimeList := newAnimesFromMediaListGroups(ctx, tgtList, a.anilistScoreFormat, true)
+		srcs := newSourcesFromAnimes(malAnimeList)
+		tgts := newTargetsFromAnimes(anilistAnimeList)
 
 		// Cache lists for favorites sync
-		a.fetchedAnimeFromMAL = newAnimesFromMalUserAnimes(srcList)
-		a.fetchedAnimeFromAniList = newAnimesFromMediaListGroups(tgtList, a.anilistScoreFormat)
+		a.fetchedAnimeFromMAL = malAnimeList
+		a.fetchedAnimeFromAniList = anilistAnimeList
 
 		LogDebug(ctx, "[%s] Got %d from MAL, %d from AniList", prefix, len(srcs), len(tgts))
 
@@ -568,26 +586,18 @@ func (a *App) fetchFromMALToAnilist(ctx context.Context, mediaType string, prefi
 		return nil, nil, fmt.Errorf("error getting user manga list from anilist: %w", err)
 	}
 
-	srcs := newSourcesFromMangas(newMangasFromMalUserMangas(srcList))
-	tgts := newTargetsFromMangas(newMangasFromMediaListGroups(tgtList, a.anilistScoreFormat))
+	malMangaList := newMangasFromMalUserMangas(srcList, true)
+	anilistMangaList := newMangasFromMediaListGroups(ctx, tgtList, a.anilistScoreFormat, true)
+	srcs := newSourcesFromMangas(malMangaList)
+	tgts := newTargetsFromMangas(anilistMangaList)
 
 	// Cache lists for favorites sync
-	a.fetchedMangaFromMAL = newMangasFromMalUserMangas(srcList)
-	a.fetchedMangaFromAniList = newMangasFromMediaListGroups(tgtList, a.anilistScoreFormat)
+	a.fetchedMangaFromMAL = malMangaList
+	a.fetchedMangaFromAniList = anilistMangaList
 
 	LogDebug(ctx, "[%s] Got %d from MAL, %d from AniList", prefix, len(srcs), len(tgts))
 
 	return srcs, tgts, nil
-}
-
-// fetchNormalSyncData fetches data for AniList -> MAL sync
-func (a *App) fetchNormalSyncData(ctx context.Context, mediaType string, prefix string) ([]Source, []Target, error) {
-	return a.fetchData(ctx, mediaType, true, prefix)
-}
-
-// fetchReverseSyncData fetches data for MAL -> AniList sync
-func (a *App) fetchReverseSyncData(ctx context.Context, mediaType string, prefix string) ([]Source, []Target, error) {
-	return a.fetchData(ctx, mediaType, false, prefix)
 }
 
 // buildFavoritesListFromMappings creates a list of anime/manga for favorites sync
@@ -672,6 +682,8 @@ func (a *App) buildMangaFavoritesListFromMappings(
 
 // syncFavorites performs favorites synchronization between AniList and MAL.
 // This is a separate phase that runs after the main status/progress sync.
+// If only --manga or --anime was used, the cache for the other type is nil and
+// favorites for that type are silently skipped (logged as warning).
 func (a *App) syncFavorites(ctx context.Context) {
 	LogStage(ctx, "Syncing favorites...")
 
@@ -681,7 +693,7 @@ func (a *App) syncFavorites(ctx context.Context) {
 		return
 	}
 
-	if DirectionFromContext(ctx) == SyncDirectionReverse {
+	if a.reverse {
 		a.syncFavoritesReverse(ctx, malAnimeFavs, malMangaFavs)
 	} else {
 		a.syncFavoritesForward(ctx, malAnimeFavs, malMangaFavs)
@@ -690,14 +702,15 @@ func (a *App) syncFavorites(ctx context.Context) {
 
 // syncFavoritesReverse handles MAL → AniList favorites sync (adds missing on AniList).
 func (a *App) syncFavoritesReverse(ctx context.Context, malAnimeFavs, malMangaFavs map[int]struct{}) {
-	animeForFavorites := a.buildFavoritesListFromMappings(
-		a.fetchedAnimeFromMAL,
-		a.reverseAnimeUpdater.GetResolvedMappings(),
-	)
-	mangaForFavorites := a.buildMangaFavoritesListFromMappings(
-		a.fetchedMangaFromMAL,
-		a.reverseMangaUpdater.GetResolvedMappings(),
-	)
+	if a.fetchedAnimeFromMAL == nil {
+		LogWarn(ctx, "★ [Favorites] Anime list not synced — anime favorites skipped (use --all to include)")
+	}
+	if a.fetchedMangaFromMAL == nil {
+		LogWarn(ctx, "★ [Favorites] Manga list not synced — manga favorites skipped (use --all to include)")
+	}
+
+	animeForFavorites := a.buildFavoritesListFromMappings(a.fetchedAnimeFromMAL, a.reverseAnimeUpdater.GetResolvedMappings())
+	mangaForFavorites := a.buildMangaFavoritesListFromMappings(a.fetchedMangaFromMAL, a.reverseMangaUpdater.GetResolvedMappings())
 
 	result := a.favSync.SyncToAniList(ctx, animeForFavorites, mangaForFavorites, malAnimeFavs, malMangaFavs)
 	a.syncReport.AddFavoritesResult(result)
@@ -715,6 +728,13 @@ func (a *App) syncFavoritesReverse(ctx context.Context, malAnimeFavs, malMangaFa
 
 // syncFavoritesForward handles AniList → MAL favorites (report-only, MAL API has no write).
 func (a *App) syncFavoritesForward(ctx context.Context, malAnimeFavs, malMangaFavs map[int]struct{}) {
+	if a.fetchedAnimeFromAniList == nil {
+		LogWarn(ctx, "★ [Favorites] Anime list not synced — anime favorites skipped (use --all to include)")
+	}
+	if a.fetchedMangaFromAniList == nil {
+		LogWarn(ctx, "★ [Favorites] Manga list not synced — manga favorites skipped (use --all to include)")
+	}
+
 	result := a.favSync.ReportMismatches(ctx, a.fetchedAnimeFromAniList, a.fetchedMangaFromAniList, malAnimeFavs, malMangaFavs)
 	a.syncReport.AddFavoritesResult(result)
 

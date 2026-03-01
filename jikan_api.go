@@ -277,7 +277,7 @@ func (c *JikanClient) doRequest(ctx context.Context, apiURL string) (*http.Respo
 
 // matchJikanMangaToSource checks if a Jikan manga result matches a source manga
 // by comparing titles using the existing multi-level title matching.
-func matchJikanMangaToSource(jikanData *JikanMangaData, srcTitleEN, srcTitleJP, srcTitleRomaji string) bool {
+func matchJikanMangaToSource(ctx context.Context, jikanData *JikanMangaData, srcTitleEN, srcTitleJP, srcTitleRomaji string) bool {
 	// Build all possible Jikan titles to compare against
 	jikanTitles := make([]struct{ en, jp, romaji string }, 0, 1+len(jikanData.TitleSynonyms))
 	jikanTitles = append(jikanTitles, struct{ en, jp, romaji string }{jikanData.TitleEnglish, jikanData.TitleJapanese, jikanData.Title})
@@ -288,7 +288,7 @@ func matchJikanMangaToSource(jikanData *JikanMangaData, srcTitleEN, srcTitleJP, 
 	}
 
 	for _, jt := range jikanTitles {
-		if titleMatchingLevels(srcTitleEN, srcTitleJP, srcTitleRomaji, jt.en, jt.jp, jt.romaji) {
+		if titleMatchingLevels(ctx, srcTitleEN, srcTitleJP, srcTitleRomaji, jt.en, jt.jp, jt.romaji) {
 			return true
 		}
 	}
@@ -310,9 +310,9 @@ func matchJikanMangaToSource(jikanData *JikanMangaData, srcTitleEN, srcTitleJP, 
 
 // findBestJikanMatch finds the best matching manga from Jikan search results.
 // Returns the MAL ID of the best match, or 0 if no match found.
-func findBestJikanMatch(results []JikanMangaData, srcTitleEN, srcTitleJP, srcTitleRomaji string) int {
+func findBestJikanMatch(ctx context.Context, results []JikanMangaData, srcTitleEN, srcTitleJP, srcTitleRomaji string) int {
 	for _, result := range results {
-		if matchJikanMangaToSource(&result, srcTitleEN, srcTitleJP, srcTitleRomaji) {
+		if matchJikanMangaToSource(ctx, &result, srcTitleEN, srcTitleJP, srcTitleRomaji) {
 			return result.MalID
 		}
 	}

@@ -15,15 +15,13 @@ type favouriteToggler interface {
 // AniList -> MAL direction can only report differences.
 type FavoritesSync struct {
 	toggler favouriteToggler
-	jikan   *JikanClient
 	dryRun  bool
 }
 
 // NewFavoritesSync creates a new FavoritesSync instance.
-func NewFavoritesSync(anilist *AnilistClient, jikan *JikanClient, dryRun bool) *FavoritesSync {
+func NewFavoritesSync(anilist *AnilistClient, dryRun bool) *FavoritesSync {
 	return &FavoritesSync{
 		toggler: anilist,
-		jikan:   jikan,
 		dryRun:  dryRun,
 	}
 }
@@ -195,7 +193,7 @@ func (f *FavoritesSync) ReportMismatches(
 		switch {
 		case mm.OnAniList && !mm.OnMAL:
 			LogInfo(ctx, "★ [Favorites] %s %q is only on AniList", mm.MediaType, mm.Title)
-		case !mm.OnAniList && mm.OnMAL:
+		case mm.OnMAL && !mm.OnAniList:
 			LogInfo(ctx, "★ [Favorites] %s %q is only on MAL", mm.MediaType, mm.Title)
 		default:
 			LogInfo(ctx, "★ [Favorites] %s %q is in unknown state", mm.MediaType, mm.Title)
@@ -212,7 +210,8 @@ func isFavorite(favSet map[int]struct{}, malID int) bool {
 }
 
 // toggleWithRateLimit calls ToggleFavourite with rate limiting to avoid hitting AniList limits.
-// AniList allows ~90 requests/minute, so we add a small delay between calls (~700ms).
+// AniList allows ~90 requests/minute, so we add a small delay between calls.
+// The delay respects context cancellation — returns ctx.Err() immediately if cancelled.
 func (f *FavoritesSync) toggleWithRateLimit(ctx context.Context, animeID, mangaID int) error {
 	const rateLimitDelay = 700 * time.Millisecond
 	select {

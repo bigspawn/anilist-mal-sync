@@ -23,7 +23,7 @@ func newLoggingRoundTripper(base http.RoundTripper, verbose bool) http.RoundTrip
 func (l *loggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	ctx := req.Context()
 
-	if *verbose {
+	if l.verbose {
 		LogDebugHTTP(ctx, "%s %s", req.Method, req.URL)
 		start := time.Now()
 

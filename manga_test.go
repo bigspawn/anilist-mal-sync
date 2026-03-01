@@ -7,7 +7,6 @@ import (
 )
 
 func TestManga_SameTypeWithTarget(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name   string
 		source Manga
@@ -150,7 +149,7 @@ func TestManga_SameTypeWithTarget(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.source.SameTypeWithTarget(tt.target)
+			got := tt.source.SameTypeWithTarget(t.Context(), tt.target)
 			if got != tt.want {
 				t.Errorf("Manga.SameTypeWithTarget() = %v, want %v", got, tt.want)
 			}
@@ -159,7 +158,6 @@ func TestManga_SameTypeWithTarget(t *testing.T) {
 }
 
 func TestManga_GetTargetID(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name         string
 		manga        Manga
@@ -207,22 +205,17 @@ func TestManga_GetTargetID(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-
-			var direction SyncDirection
-			if tt.reverse {
-				direction = SyncDirectionReverse
-			}
-			got := GetTargetIDWithDirection(tt.manga, direction)
-
+			m := tt.manga
+			m.isReverse = tt.reverse
+			got := m.GetTargetID()
 			if got != tt.wantTargetID {
-				t.Errorf("GetTargetIDWithDirection() = %v, want %v", got, tt.wantTargetID)
+				t.Errorf("GetTargetID() = %v, want %v", got, tt.wantTargetID)
 			}
 		})
 	}
 }
 
 func TestManga_GetAniListID(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name  string
 		manga Manga
@@ -257,7 +250,6 @@ func TestManga_GetAniListID(t *testing.T) {
 }
 
 func TestManga_GetMALID(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name  string
 		manga Manga
@@ -292,7 +284,6 @@ func TestManga_GetMALID(t *testing.T) {
 }
 
 func TestManga_GetStatusString(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name   string
 		status MangaStatus
@@ -342,7 +333,6 @@ func TestManga_GetStatusString(t *testing.T) {
 }
 
 func TestManga_SameProgressWithTarget(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name   string
 		source Manga
@@ -457,7 +447,6 @@ func TestManga_SameProgressWithTarget(t *testing.T) {
 }
 
 func TestManga_SameTitleWithTarget(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name   string
 		source Manga
@@ -518,7 +507,7 @@ func TestManga_SameTitleWithTarget(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.source.SameTitleWithTarget(tt.target)
+			got := tt.source.SameTitleWithTarget(t.Context(), tt.target)
 			if got != tt.want {
 				t.Errorf("SameTitleWithTarget() = %v, want %v", got, tt.want)
 			}
@@ -527,7 +516,6 @@ func TestManga_SameTitleWithTarget(t *testing.T) {
 }
 
 func TestManga_GetTitle(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name  string
 		manga Manga
@@ -582,7 +570,6 @@ func TestManga_GetTitle(t *testing.T) {
 }
 
 func TestManga_String(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name  string
 		manga Manga
@@ -814,7 +801,6 @@ func TestManga_GetStringDiffWithTarget_Dates(t *testing.T) {
 }
 
 func TestManga_GetUpdateOptions(t *testing.T) {
-	t.Parallel()
 	date1 := time.Date(2024, 12, 18, 0, 0, 0, 0, time.UTC)
 	date2 := time.Date(2024, 12, 19, 0, 0, 0, 0, time.UTC)
 

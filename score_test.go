@@ -70,7 +70,7 @@ func TestNormalizeScoreForMAL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := normalizeScoreForMAL(tt.score, tt.format)
+			result := normalizeScoreForMAL(t.Context(), tt.score, tt.format)
 			if result != tt.expected {
 				t.Errorf("normalizeScoreForMAL(%v, %v) = %v; want %v (%s)",
 					tt.score, tt.format, result, tt.expected, tt.description)
@@ -140,7 +140,7 @@ func TestDenormalizeScoreForAniList(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := denormalizeScoreForAniList(tt.score, tt.format)
+			result := denormalizeScoreForAniList(t.Context(), tt.score, tt.format)
 			if result != tt.expected {
 				t.Errorf("denormalizeScoreForAniList(%v, %v) = %v; want %v (%s)",
 					tt.score, tt.format, result, tt.expected, tt.description)
@@ -213,7 +213,7 @@ func TestNormalizeMangaScoreForMAL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := normalizeMangaScoreForMAL(tt.score, tt.format)
+			result := normalizeMangaScoreForMAL(t.Context(), tt.score, tt.format)
 			if result != tt.expected {
 				t.Errorf("normalizeMangaScoreForMAL(%v, %v) = %v; want %v (%s)",
 					tt.score, tt.format, result, tt.expected, tt.description)
@@ -283,7 +283,7 @@ func TestDenormalizeMangaScoreForAniList(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result := denormalizeMangaScoreForAniList(tt.score, tt.format)
+			result := denormalizeMangaScoreForAniList(t.Context(), tt.score, tt.format)
 			if result != tt.expected {
 				t.Errorf("denormalizeMangaScoreForAniList(%v, %v) = %v; want %v (%s)",
 					tt.score, tt.format, result, tt.expected, tt.description)
@@ -310,8 +310,8 @@ func TestRoundTripNormalizeDenormalize(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			normalized := normalizeScoreForMAL(tt.originalScore, tt.format)
-			denormalized := denormalizeScoreForAniList(normalized, tt.format)
+			normalized := normalizeScoreForMAL(t.Context(), tt.originalScore, tt.format)
+			denormalized := denormalizeScoreForAniList(t.Context(), normalized, tt.format)
 
 			t.Logf("Round trip: %.1f -> %d -> %d (%s)",
 				tt.originalScore, normalized, denormalized, tt.description)
@@ -347,8 +347,8 @@ func TestRoundTripNormalizeDenormalizeManga(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			normalized := normalizeMangaScoreForMAL(tt.originalScore, tt.format)
-			denormalized := denormalizeMangaScoreForAniList(normalized, tt.format)
+			normalized := normalizeMangaScoreForMAL(t.Context(), tt.originalScore, tt.format)
+			denormalized := denormalizeMangaScoreForAniList(t.Context(), normalized, tt.format)
 
 			t.Logf("Round trip: %.1f -> %d -> %d (%s)",
 				tt.originalScore, normalized, denormalized, tt.description)

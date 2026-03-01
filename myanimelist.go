@@ -77,7 +77,7 @@ func (c *MyAnimeListClient) UpdateAnimeByIDAndOptions(ctx context.Context, id in
 	}
 
 	// Log update details for debugging
-	DPrintf("[DEBUG] Updating MAL ID %d with opts: %+v", id, opts)
+	LogDebug(ctx, "[MAL] Updating MAL ID %d with opts: %+v", id, opts)
 
 	_, _, err := c.c.Anime.UpdateMyListStatus(ctx, id, opts...)
 	if err != nil {
@@ -183,12 +183,12 @@ func fetchAllPages[T any](
 			return nil, err
 		}
 
-		DPrintf("[DEBUG] %s: fetched page %d with %d items (next offset: %d)", operationName, pageNum, len(items), resp.NextOffset)
+		LogDebug(ctx, "[MAL] %s: fetched page %d with %d items (next offset: %d)", operationName, pageNum, len(items), resp.NextOffset)
 
 		result = append(result, items...)
 
 		if resp.NextOffset == 0 {
-			DPrintf("[DEBUG] %s: finished pagination, total %d items across %d page(s)", operationName, len(result), pageNum)
+			LogDebug(ctx, "[MAL] %s: finished pagination, total %d items across %d page(s)", operationName, len(result), pageNum)
 			break
 		}
 

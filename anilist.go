@@ -352,26 +352,6 @@ func (c *AnilistClient) UpdateMangaEntry(
 	return nil
 }
 
-// ToggleFavouriteResponse represents the response from AniList ToggleFavourite mutation.
-// The response contains nested "nodes" arrays matching the GraphQL query structure:
-// anime { nodes { id } }, manga { nodes { id } }.
-type ToggleFavouriteResponse struct {
-	Data struct {
-		ToggleFavourite struct {
-			Anime struct {
-				Nodes []struct {
-					ID int `json:"id"`
-				} `json:"nodes"`
-			} `json:"anime"`
-			Manga struct {
-				Nodes []struct {
-					ID int `json:"id"`
-				} `json:"nodes"`
-			} `json:"manga"`
-		} `json:"ToggleFavourite"`
-	} `json:"data"`
-}
-
 // ToggleFavourite toggles the favorite status of an anime or manga on AniList.
 // Only one of animeID or mangaID should be provided (non-zero) per call.
 // The ToggleFavourite mutation is idempotent: calling it on an already-favorited
@@ -435,11 +415,6 @@ func (c *AnilistClient) ToggleFavourite(ctx context.Context, animeID, mangaID in
 
 	if len(graphqlResp.Errors) > 0 {
 		return fmt.Errorf("GraphQL errors: %+v", graphqlResp.Errors)
-	}
-
-	var response ToggleFavouriteResponse
-	if err := json.Unmarshal(responseBody, &response); err != nil {
-		return fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 
 	return nil

@@ -194,7 +194,7 @@ func TestExactMatch_EdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := exactMatch(tt.t1, tt.t2, tt.titleType)
+			got := exactMatch(t.Context(), tt.t1, tt.t2, tt.titleType)
 			if got != tt.wantResult {
 				t.Errorf("exactMatch() = %v, want %v", got, tt.wantResult)
 			}
@@ -298,7 +298,7 @@ func TestAnime_SameTypeWithTarget_NilAndZero(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.anime.SameTypeWithTarget(tt.target)
+			got := tt.anime.SameTypeWithTarget(t.Context(), tt.target)
 			if got != tt.want {
 				t.Errorf("SameTypeWithTarget() = %v, want %v", got, tt.want)
 			}

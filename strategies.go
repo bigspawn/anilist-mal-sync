@@ -80,6 +80,7 @@ func (sc *StrategyChain) FindTargetWithMeta(
 // This should be the first strategy in the chain.
 type ManualMappingStrategy struct {
 	Mappings *MappingsConfig
+	Reverse  bool // true for MAL→AniList direction
 }
 
 func (s ManualMappingStrategy) Name() string {
@@ -122,9 +123,8 @@ func (s ManualMappingStrategy) lookupManualMapping(ctx context.Context, src Sour
 	return 0, false
 }
 
-func (s ManualMappingStrategy) lookupByIDs(ctx context.Context, anilistID, malID int) (int, bool) {
-	direction := DirectionFromContext(ctx)
-	if direction == SyncDirectionReverse {
+func (s ManualMappingStrategy) lookupByIDs(_ context.Context, anilistID, malID int) (int, bool) {
+	if s.Reverse {
 		return s.lookupReverse(anilistID, malID)
 	}
 	return s.lookupForward(anilistID, malID)
@@ -145,15 +145,11 @@ func (s ManualMappingStrategy) lookupForward(anilistID, malID int) (int, bool) {
 	return 0, false
 }
 
-func (s ManualMappingStrategy) lookupReverse(anilistID, malID int) (int, bool) {
-	// MAL→AniList: source has MAL ID, need AniList ID
+func (s ManualMappingStrategy) lookupReverse(_, malID int) (int, bool) {
+	// MAL→AniList: source is a MAL entry with IDAnilist=0 (set by newAnimeFromMalAnime
+	// when reverse=true). Only MAL ID is meaningful here.
 	if malID > 0 {
 		if id, ok := s.Mappings.GetManualAniListID(malID); ok {
-			return id, true
-		}
-	}
-	if anilistID > 0 {
-		if id, ok := s.Mappings.GetManualAniListID(anilistID); ok {
 			return id, true
 		}
 	}
@@ -170,8 +166,7 @@ func (s IDStrategy) Name() string {
 func (s IDStrategy) FindTarget(
 	ctx context.Context, src Source, existingTargets map[TargetID]Target, prefix string, _ *SyncReport,
 ) (Target, bool, error) {
-	direction := DirectionFromContext(ctx)
-	srcID := GetTargetIDWithDirection(src, direction)
+	srcID := src.GetTargetID()
 	target, found := existingTargets[srcID]
 	if found {
 		LogDebugDecision(ctx, "[%s] Found target by ID %d (direct lookup in user's list): %s", prefix, srcID, target.GetTitle())
@@ -269,7 +264,7 @@ func (s TitleStrategy) FindTarget(
 	}
 
 	for _, target := range targetSlice {
-		if src.SameTitleWithTarget(target) && src.SameTypeWithTarget(target) {
+		if src.SameTitleWithTarget(ctx, target) && src.SameTypeWithTarget(ctx, target) {
 			// Check for potential mismatches and reject if needed
 			if shouldRejectMatch(ctx, src, target, prefix, report) {
 				continue
@@ -308,8 +303,7 @@ func (s MALIDStrategy) FindTarget(
 	default:
 	}
 
-	direction := DirectionFromContext(ctx)
-	srcID := GetSourceIDWithDirection(src, direction)
+	srcID := src.GetSourceID()
 	if srcID <= 0 {
 		return nil, false, nil
 	}
@@ -396,7 +390,7 @@ func (s APISearchStrategy) FindTarget(
 			}
 			// Verify title similarity to avoid matching different entries
 			// (e.g., multiple AniList volumes matching a single MAL umbrella series)
-			if !src.SameTitleWithTarget(existingTarget) {
+			if !src.SameTitleWithTarget(ctx, existingTarget) {
 				LogDebugDecision(ctx, "[%s] Rejecting API name search match due to title mismatch: %q vs %q",
 					prefix, src.GetTitle(), existingTarget.GetTitle())
 				continue
@@ -405,7 +399,7 @@ func (s APISearchStrategy) FindTarget(
 			return existingTarget, true, nil
 		}
 
-		if src.SameTypeWithTarget(tgt) {
+		if src.SameTypeWithTarget(ctx, tgt) {
 			LogDebugDecision(ctx, "[%s] Found target by API name search (not in user's list): %s", prefix, tgt.GetTitle())
 			return tgt, true, nil
 		}
@@ -685,7 +679,7 @@ func (s JikanAPIStrategy) findMALTarget(
 	for _, query := range titles {
 		results := s.Client.SearchManga(ctx, query)
 
-		malID := findBestJikanMatch(results, src.TitleEN, src.TitleJP, src.TitleRomaji)
+		malID := findBestJikanMatch(ctx, results, src.TitleEN, src.TitleJP, src.TitleRomaji)
 		if malID <= 0 {
 			continue
 		}
@@ -718,7 +712,7 @@ func (s JikanAPIStrategy) findAniListTarget(
 			continue
 		}
 
-		if matchJikanMangaToSource(jikanData, tgtManga.TitleEN, tgtManga.TitleJP, tgtManga.TitleRomaji) {
+		if matchJikanMangaToSource(ctx, jikanData, tgtManga.TitleEN, tgtManga.TitleJP, tgtManga.TitleRomaji) {
 			LogDebugDecision(ctx, "[%s] Found target by Jikan API: MAL %d -> %s (AniList %d)",
 				prefix, src.IDMal, tgtManga.GetTitle(), tgtManga.IDAnilist)
 			return target, true, nil

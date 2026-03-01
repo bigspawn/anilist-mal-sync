@@ -14,15 +14,15 @@ var (
 	defaultVerbose = false
 )
 
-// Package-level vars for backward compatibility with app.go/updater.go
-// These are set by sync command
+// Package-level vars for flags that don't affect domain-object behaviour.
+// reverseDirection has been removed: it is now passed explicitly as a bool
+// parameter to NewApp and stored in App.reverse.
 var (
-	forceSync        = &defaultForce
-	dryRun           = &defaultDryRun
-	mangaSync        = &defaultManga
-	allSync          = &defaultAll
-	verbose          = &defaultVerbose
-	reverseDirection = new(bool) // Default to false (forward sync), kept for GetTargetID()/GetSourceID() compatibility
+	forceSync = &defaultForce
+	dryRun    = &defaultDryRun
+	mangaSync = &defaultManga
+	allSync   = &defaultAll
+	verbose   = &defaultVerbose
 )
 
 func main() {

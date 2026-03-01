@@ -1,9 +1,13 @@
 package main
 
-import "github.com/rl404/verniy"
+import (
+	"context"
+
+	"github.com/rl404/verniy"
+)
 
 // normalizeScoreForMAL converts AniList score to 0-10 int format
-func normalizeScoreForMAL(anilistScore float64, scoreFormat verniy.ScoreFormat) int {
+func normalizeScoreForMAL(ctx context.Context, anilistScore float64, scoreFormat verniy.ScoreFormat) int {
 	if anilistScore == 0 {
 		return 0
 	}
@@ -13,7 +17,7 @@ func normalizeScoreForMAL(anilistScore float64, scoreFormat verniy.ScoreFormat) 
 	switch scoreFormat {
 	case verniy.ScoreFormatPoint100:
 		normalized = anilistScore / 10.0
-		DPrintf("Score normalized (POINT_100): %.1f → %.1f", anilistScore, normalized)
+		LogDebug(ctx, "Score normalized (POINT_100): %.1f → %.1f", anilistScore, normalized)
 
 	case verniy.ScoreFormatPoint100Decimal: // "POINT_10_DECIMAL"
 		normalized = anilistScore
@@ -23,16 +27,16 @@ func normalizeScoreForMAL(anilistScore float64, scoreFormat verniy.ScoreFormat) 
 
 	case verniy.ScoreFormatPoint5:
 		normalized = anilistScore * 2.0
-		DPrintf("Score normalized (POINT_5): %.1f → %.1f", anilistScore, normalized)
+		LogDebug(ctx, "Score normalized (POINT_5): %.1f → %.1f", anilistScore, normalized)
 
 	case verniy.ScoreFormatPoint3:
 		normalized = (anilistScore / 3.0) * 10.0
-		DPrintf("Score normalized (POINT_3): %.1f → %.1f", anilistScore, normalized)
+		LogDebug(ctx, "Score normalized (POINT_3): %.1f → %.1f", anilistScore, normalized)
 
 	default:
 		if anilistScore > 10 {
 			normalized = anilistScore / 10.0
-			DPrintf("Score normalized (unknown): %.1f → %.1f", anilistScore, normalized)
+			LogDebug(ctx, "Score normalized (unknown): %.1f → %.1f", anilistScore, normalized)
 		} else {
 			normalized = anilistScore
 		}
@@ -40,7 +44,7 @@ func normalizeScoreForMAL(anilistScore float64, scoreFormat verniy.ScoreFormat) 
 
 	// Clamp 0-10
 	if normalized > 10 {
-		DPrintf("Score %.1f > 10, clamping", normalized)
+		LogDebug(ctx, "Score %.1f > 10, clamping", normalized)
 		normalized = 10
 	}
 	if normalized < 0 {
@@ -56,7 +60,7 @@ func normalizeScoreForMAL(anilistScore float64, scoreFormat verniy.ScoreFormat) 
 }
 
 // denormalizeScoreForAniList converts 0-10 int format back to AniList format
-func denormalizeScoreForAniList(normalizedScore int, scoreFormat verniy.ScoreFormat) int {
+func denormalizeScoreForAniList(ctx context.Context, normalizedScore int, scoreFormat verniy.ScoreFormat) int {
 	if normalizedScore == 0 {
 		return 0
 	}
@@ -66,7 +70,7 @@ func denormalizeScoreForAniList(normalizedScore int, scoreFormat verniy.ScoreFor
 	switch scoreFormat {
 	case verniy.ScoreFormatPoint100:
 		result = float64(normalizedScore) * 10.0
-		DPrintf("Score denormalized (POINT_100): %d → %.1f", normalizedScore, result)
+		LogDebug(ctx, "Score denormalized (POINT_100): %d → %.1f", normalizedScore, result)
 
 	case verniy.ScoreFormatPoint100Decimal: // "POINT_10_DECIMAL"
 		result = float64(normalizedScore)
@@ -76,14 +80,14 @@ func denormalizeScoreForAniList(normalizedScore int, scoreFormat verniy.ScoreFor
 
 	case verniy.ScoreFormatPoint5:
 		result = float64(normalizedScore) / 2.0
-		DPrintf("Score denormalized (POINT_5): %d → %.1f", normalizedScore, result)
+		LogDebug(ctx, "Score denormalized (POINT_5): %d → %.1f", normalizedScore, result)
 
 	case verniy.ScoreFormatPoint3:
 		result = (float64(normalizedScore) / 10.0) * 3.0
 		if result < 1 && normalizedScore > 0 {
 			result = 1
 		}
-		DPrintf("Score denormalized (POINT_3): %d → %.1f", normalizedScore, result)
+		LogDebug(ctx, "Score denormalized (POINT_3): %d → %.1f", normalizedScore, result)
 
 	default:
 		result = float64(normalizedScore)
@@ -95,12 +99,12 @@ func denormalizeScoreForAniList(normalizedScore int, scoreFormat verniy.ScoreFor
 
 // normalizeMangaScoreForMAL converts AniList manga score to 0-10 int format
 // Same logic as normalizeScoreForMAL but for manga
-func normalizeMangaScoreForMAL(anilistScore float64, scoreFormat verniy.ScoreFormat) int {
-	return normalizeScoreForMAL(anilistScore, scoreFormat)
+func normalizeMangaScoreForMAL(ctx context.Context, anilistScore float64, scoreFormat verniy.ScoreFormat) int {
+	return normalizeScoreForMAL(ctx, anilistScore, scoreFormat)
 }
 
 // denormalizeMangaScoreForAniList converts 0-10 int format back to AniList manga format
 // Same logic as denormalizeScoreForAniList but for manga
-func denormalizeMangaScoreForAniList(normalizedScore int, scoreFormat verniy.ScoreFormat) int {
-	return denormalizeScoreForAniList(normalizedScore, scoreFormat)
+func denormalizeMangaScoreForAniList(ctx context.Context, normalizedScore int, scoreFormat verniy.ScoreFormat) int {
+	return denormalizeScoreForAniList(ctx, normalizedScore, scoreFormat)
 }
