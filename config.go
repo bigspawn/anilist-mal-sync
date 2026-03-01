@@ -76,6 +76,10 @@ type JikanAPIConfig struct {
 	CacheMaxAge string `yaml:"cache_max_age"`
 }
 
+type FavoritesConfig struct {
+	Enabled bool `yaml:"enabled"`
+}
+
 type Config struct {
 	OAuth            OAuthConfig           `yaml:"oauth"`
 	Anilist          SiteConfig            `yaml:"anilist"`
@@ -87,6 +91,7 @@ type Config struct {
 	ARMAPI           ARMAPIConfig          `yaml:"arm_api"`
 	HatoAPI          HatoAPIConfig         `yaml:"hato_api"`
 	JikanAPI         JikanAPIConfig        `yaml:"jikan_api"`
+	Favorites        FavoritesConfig       `yaml:"favorites"`
 	MappingsFilePath string                `yaml:"mappings_file_path"`
 }
 
@@ -141,6 +146,9 @@ func loadConfigFromEnv() (Config, error) {
 			CacheDir:    getEnvOrDefault("JIKAN_API_CACHE_DIR", getDefaultJikanCacheDir()),
 			CacheMaxAge: getEnvOrDefault("JIKAN_API_CACHE_MAX_AGE", "168h"),
 		},
+		Favorites: FavoritesConfig{
+			Enabled: getEnvBoolOrDefault("FAVORITES_SYNC_ENABLED", false),
+		},
 		MappingsFilePath: getEnvOrDefault("MAPPINGS_FILE_PATH", getDefaultMappingsPath()),
 	}
 	return cfg, nil
@@ -189,6 +197,7 @@ func overrideConfigFromEnv(cfg *Config) {
 	overrideARMAPIFromEnv(&cfg.ARMAPI)
 	overrideHatoAPIFromEnv(&cfg.HatoAPI)
 	overrideJikanAPIFromEnv(&cfg.JikanAPI)
+	overrideFavoritesFromEnv(&cfg.Favorites)
 	overrideStringFromEnv(&cfg.MappingsFilePath, "MAPPINGS_FILE_PATH")
 }
 
@@ -252,6 +261,10 @@ func overrideJikanAPIFromEnv(jc *JikanAPIConfig) {
 	overrideBoolFromEnv(&jc.Enabled, "JIKAN_API_ENABLED")
 	overrideStringFromEnv(&jc.CacheDir, "JIKAN_API_CACHE_DIR")
 	overrideStringFromEnv(&jc.CacheMaxAge, "JIKAN_API_CACHE_MAX_AGE")
+}
+
+func overrideFavoritesFromEnv(fc *FavoritesConfig) {
+	overrideBoolFromEnv(&fc.Enabled, "FAVORITES_SYNC_ENABLED")
 }
 
 // overrideStringFromEnv overrides a string field from environment variables.

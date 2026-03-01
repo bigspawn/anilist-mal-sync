@@ -40,6 +40,7 @@ type Updater struct {
 	DryRun        bool         // Skip actual updates
 	MediaType     string       // "anime" or "manga" — used for unmapped tracking
 	UnmappedList  []UnmappedEntry
+	ResolvedMappings []resolvedMapping // Saved for favorites sync
 }
 
 // resolvedMapping holds a source→target mapping with strategy metadata.
@@ -74,6 +75,9 @@ func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target, repo
 
 	// Phase 2: Deduplicate (detect N:1 conflicts)
 	kept, conflicts := u.deduplicateMappings(ctx, resolved)
+
+	// Save resolved mappings for favorites sync (before processing to preserve target state)
+	u.ResolvedMappings = kept
 
 	// Phase 3: Process
 	u.processResolvedMappings(ctx, kept, report)
@@ -362,6 +366,12 @@ func (u *Updater) recordUnmapped(ctx context.Context, unmapped []Source) {
 	for _, src := range unmapped {
 		u.trackUnmapped(ctx, src, "no matching entry found on target service")
 	}
+}
+
+// GetResolvedMappings returns the source→target mappings from the last Update call.
+// This is used for favorites sync to get mapped AniList IDs for MAL entries.
+func (u *Updater) GetResolvedMappings() []resolvedMapping {
+	return u.ResolvedMappings
 }
 
 func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts map[TargetID]Target, report *SyncReport) {
