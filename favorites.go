@@ -5,10 +5,6 @@ import (
 	"time"
 )
 
-// rateLimitDelay is the delay between AniList ToggleFavourite calls.
-// AniList allows ~90 requests/minute, so ~700 ms between requests is safe.
-const rateLimitDelay = 700 * time.Millisecond
-
 // favouriteToggler abstracts the AniList ToggleFavourite mutation for testability.
 type favouriteToggler interface {
 	ToggleFavourite(ctx context.Context, animeID, mangaID int) error
@@ -17,8 +13,6 @@ type favouriteToggler interface {
 // FavoritesSync handles synchronization of favorites between AniList and MAL.
 // Due to API limitations, only MAL -> AniList direction can write;
 // AniList -> MAL direction can only report differences.
-//
-// MAL favorites are fetched via Jikan API (a.jikanClient in App), not stored here.
 type FavoritesSync struct {
 	toggler favouriteToggler
 	dryRun  bool
