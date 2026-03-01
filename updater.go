@@ -111,10 +111,12 @@ func (u *Updater) filterSources(ctx context.Context, srcs []Source) []Source {
 			LogDebug(ctx, "[%s] Skipping source with empty status: %s", u.Prefix, src.String())
 			continue
 		}
+		// Count all valid entries in Total (including ignored ones).
+		// This ensures Total == Updated + Skipped + Errors in the summary.
+		u.Statistics.IncrementTotal()
 		if u.isIgnored(ctx, src) {
 			continue
 		}
-		u.Statistics.IncrementTotal()
 		filtered = append(filtered, src)
 	}
 	return filtered

@@ -752,6 +752,107 @@ func TestCLI_WatchCommand_IntervalHasShortAlias(t *testing.T) {
 }
 
 // =============================================================================
+// getSyncFlagsFromCmd Regression Tests
+// =============================================================================
+
+// saveGlobalSyncFlags saves package-level sync flag globals and returns a
+// restore function. Use with defer in tests that call getSyncFlagsFromCmd
+// to prevent global state leakage between parallel tests.
+func saveGlobalSyncFlags() func() {
+	savedVerbose := verbose
+	savedForce := forceSync
+	savedDry := dryRun
+	savedManga := mangaSync
+	savedAll := allSync
+	return func() {
+		verbose = savedVerbose
+		forceSync = savedForce
+		dryRun = savedDry
+		mangaSync = savedManga
+		allSync = savedAll
+	}
+}
+
+// TestGetSyncFlagsFromCmd_ReverseDirection ensures the --reverse-direction flag
+// is correctly read by getSyncFlagsFromCmd. This is a regression test for a bug
+// where cmd.Bool("reverse") was used instead of cmd.Bool("reverse-direction"),
+// causing the flag to always return false.
+func TestGetSyncFlagsFromCmd_ReverseDirection(t *testing.T) {
+	defer saveGlobalSyncFlags()()
+
+	var gotReverse bool
+	root := NewCLI()
+	for _, c := range root.Commands {
+		if c.Name == "sync" {
+			c.Action = func(ctx context.Context, cmd *cli.Command) error {
+				_, gotReverse = getSyncFlagsFromCmd(cmd)
+				return nil
+			}
+			break
+		}
+	}
+
+	ctx := context.Background()
+	if err := root.Run(ctx, []string{"app", "sync", "--reverse-direction"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !gotReverse {
+		t.Error("getSyncFlagsFromCmd: reverseOut should be true when --reverse-direction is passed")
+	}
+}
+
+func TestGetSyncFlagsFromCmd_NoReverse(t *testing.T) {
+	defer saveGlobalSyncFlags()()
+
+	var gotReverse bool
+	root := NewCLI()
+	for _, c := range root.Commands {
+		if c.Name == "sync" {
+			c.Action = func(ctx context.Context, cmd *cli.Command) error {
+				_, gotReverse = getSyncFlagsFromCmd(cmd)
+				return nil
+			}
+			break
+		}
+	}
+
+	ctx := context.Background()
+	if err := root.Run(ctx, []string{"app", "sync"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if gotReverse {
+		t.Error("getSyncFlagsFromCmd: reverseOut should be false when --reverse-direction is not passed")
+	}
+}
+
+func TestGetSyncFlagsFromCmd_VerboseFlag(t *testing.T) {
+	defer saveGlobalSyncFlags()()
+
+	var gotVerbose bool
+	root := NewCLI()
+	for _, c := range root.Commands {
+		if c.Name == "sync" {
+			c.Action = func(ctx context.Context, cmd *cli.Command) error {
+				gotVerbose, _ = getSyncFlagsFromCmd(cmd)
+				return nil
+			}
+			break
+		}
+	}
+
+	ctx := context.Background()
+	if err := root.Run(ctx, []string{"app", "sync", "--verbose"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !gotVerbose {
+		t.Error("getSyncFlagsFromCmd: verboseOut should be true when --verbose is passed")
+	}
+}
+
+// =============================================================================
 // Helper Functions
 // =============================================================================
 
