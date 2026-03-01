@@ -49,14 +49,28 @@ linters:
     # Style and formatting
     - asciicheck
     - bidichk
+    - canonicalheader
     - containedctx
     - contextcheck
+    - dupword
     - durationcheck
     - errname
     - exhaustive
+    - exptostd
+    - fatcontext
     - forbidigo
     - forcetypeassert
     - gocheckcompilerdirectives
+    - godot
+    - iface
+    - importas
+    - intrange
+    - mirror
+    - modernize
+    - noinlineerr
+    - perfsprint
+    - tagalign
+    - usetesting
   exclusions:
     rules:
       - text: "exported: exported"

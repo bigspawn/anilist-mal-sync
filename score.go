@@ -6,7 +6,7 @@ import (
 	"github.com/rl404/verniy"
 )
 
-// normalizeScoreForMAL converts AniList score to 0-10 int format
+// normalizeScoreForMAL converts AniList score to 0-10 int format.
 func normalizeScoreForMAL(ctx context.Context, anilistScore float64, scoreFormat verniy.ScoreFormat) int {
 	if anilistScore == 0 {
 		return 0
@@ -59,7 +59,7 @@ func normalizeScoreForMAL(ctx context.Context, anilistScore float64, scoreFormat
 	return int(normalized + 0.5)
 }
 
-// denormalizeScoreForAniList converts 0-10 int format back to AniList format
+// denormalizeScoreForAniList converts 0-10 int format back to AniList format.
 func denormalizeScoreForAniList(ctx context.Context, normalizedScore int, scoreFormat verniy.ScoreFormat) int {
 	if normalizedScore == 0 {
 		return 0
@@ -98,13 +98,13 @@ func denormalizeScoreForAniList(ctx context.Context, normalizedScore int, scoreF
 }
 
 // normalizeMangaScoreForMAL converts AniList manga score to 0-10 int format
-// Same logic as normalizeScoreForMAL but for manga
+// Same logic as normalizeScoreForMAL but for manga.
 func normalizeMangaScoreForMAL(ctx context.Context, anilistScore float64, scoreFormat verniy.ScoreFormat) int {
 	return normalizeScoreForMAL(ctx, anilistScore, scoreFormat)
 }
 
 // denormalizeMangaScoreForAniList converts 0-10 int format back to AniList manga format
-// Same logic as denormalizeScoreForAniList but for manga
+// Same logic as denormalizeScoreForAniList but for manga.
 func denormalizeMangaScoreForAniList(ctx context.Context, normalizedScore int, scoreFormat verniy.ScoreFormat) int {
 	return denormalizeScoreForAniList(ctx, normalizedScore, scoreFormat)
 }

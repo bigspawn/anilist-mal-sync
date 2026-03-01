@@ -89,12 +89,12 @@ func (m Manga) GetTargetID() TargetID {
 	return TargetID(m.IDMal)
 }
 
-// GetAniListID returns the AniList ID
+// GetAniListID returns the AniList ID.
 func (m Manga) GetAniListID() TargetID {
 	return TargetID(m.IDAnilist)
 }
 
-// GetMALID returns the MAL ID
+// GetMALID returns the MAL ID.
 func (m Manga) GetMALID() TargetID {
 	return TargetID(m.IDMal)
 }

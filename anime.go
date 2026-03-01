@@ -89,12 +89,12 @@ func (a Anime) GetTargetID() TargetID {
 	return TargetID(a.IDMal)
 }
 
-// GetAniListID returns the AniList ID
+// GetAniListID returns the AniList ID.
 func (a Anime) GetAniListID() TargetID {
 	return TargetID(a.IDAnilist)
 }
 
-// GetMALID returns the MAL ID
+// GetMALID returns the MAL ID.
 func (a Anime) GetMALID() TargetID {
 	return TargetID(a.IDMal)
 }
@@ -225,7 +225,7 @@ func (a Anime) SameTitleWithTarget(ctx context.Context, t Target) bool {
 }
 
 // IsPotentiallyIncorrectMatch checks if a match might be incorrect
-// Returns true if the match should be rejected
+// Returns true if the match should be rejected.
 func (a Anime) IsPotentiallyIncorrectMatch(t Target) bool {
 	b, ok := t.(Anime)
 	if !ok {
@@ -257,7 +257,7 @@ func (a Anime) IsPotentiallyIncorrectMatch(t Target) bool {
 	return false
 }
 
-// IdenticalTitleMatch checks if titles are truly identical (not just similar)
+// IdenticalTitleMatch checks if titles are truly identical (not just similar).
 func (a Anime) IdenticalTitleMatch(b Anime) bool {
 	// Exact match on any title field
 	if a.TitleEN != "" && a.TitleEN == b.TitleEN {

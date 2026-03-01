@@ -4,10 +4,11 @@ import (
 	"context"
 	"math"
 	"regexp"
+	"slices"
 	"strings"
 )
 
-// levenshteinDistance calculates the Levenshtein distance between two strings
+// levenshteinDistance calculates the Levenshtein distance between two strings.
 func levenshteinDistance(s1, s2 string) int {
 	if len(s1) == 0 {
 		return len(s2)
@@ -49,14 +50,14 @@ func levenshteinDistance(s1, s2 string) int {
 	return matrix[len(s1)][len(s2)]
 }
 
-// min3 returns the minimum of three integers
+// min3 returns the minimum of three integers.
 func min3(a, b, c int) int {
 	return int(math.Min(math.Min(float64(a), float64(b)), float64(c)))
 }
 
 var betweenBraketsRegexp = regexp.MustCompile(`\(.*\)`)
 
-// normalizeTitle normalizes a title for better comparison
+// normalizeTitle normalizes a title for better comparison.
 func normalizeTitle(title string) string {
 	// Convert to lowercase
 	normalized := strings.ToLower(title)
@@ -83,7 +84,7 @@ func normalizeTitle(title string) string {
 	return normalized
 }
 
-// titleSimilarity calculates title similarity percentage between two strings
+// titleSimilarity calculates title similarity percentage between two strings.
 func titleSimilarity(title1, title2 string) float64 {
 	normalized1 := normalizeTitle(title1)
 	normalized2 := normalizeTitle(title2)
@@ -102,11 +103,8 @@ func titleSimilarity(title1, title2 string) float64 {
 
 	commonWords := 0
 	for _, word1 := range words1 {
-		for _, word2 := range words2 {
-			if word1 == word2 {
-				commonWords++
-				break
-			}
+		if slices.Contains(words2, word1) {
+			commonWords++
 		}
 	}
 
@@ -121,7 +119,7 @@ func titleSimilarity(title1, title2 string) float64 {
 	return similarity
 }
 
-// titleLevenshteinSimilarity calculates similarity using Levenshtein distance
+// titleLevenshteinSimilarity calculates similarity using Levenshtein distance.
 func titleLevenshteinSimilarity(title1, title2 string) float64 {
 	normalized1 := normalizeTitle(title1)
 	normalized2 := normalizeTitle(title2)
@@ -131,10 +129,7 @@ func titleLevenshteinSimilarity(title1, title2 string) float64 {
 	}
 
 	distance := levenshteinDistance(normalized1, normalized2)
-	maxLen := len(normalized1)
-	if len(normalized2) > maxLen {
-		maxLen = len(normalized2)
-	}
+	maxLen := max(len(normalized2), len(normalized1))
 
 	if maxLen == 0 {
 		return 100.0
@@ -196,7 +191,7 @@ func levenshteinMatch(ctx context.Context, t1, t2, titleType string, threshold f
 	return true
 }
 
-// titleMatchingLevels performs multi-level title matching
+// titleMatchingLevels performs multi-level title matching.
 func titleMatchingLevels(ctx context.Context, titleEN1, titleJP1, titleRomaji1, titleEN2, titleJP2, titleRomaji2 string) bool {
 	// Level 1: Exact case-insensitive title matching
 	if exactMatch(ctx, titleEN1, titleEN2, "TitleEN") {

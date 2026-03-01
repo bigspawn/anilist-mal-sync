@@ -184,7 +184,7 @@ func TestValidateInterval_ValidIntervals(t *testing.T) {
 	}
 }
 
-// validateInterval is a helper function extracted from runWatch for testing
+// validateInterval is a helper function extracted from runWatch for testing.
 func validateInterval(interval time.Duration) error {
 	if interval < minInterval {
 		return errors.New("interval must be at least 1h")
@@ -219,7 +219,8 @@ myanimelist:
 watch:
   interval: "12h"
 `
-	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
+	err := os.WriteFile(configPath, []byte(configContent), 0o600)
+	if err != nil {
 		t.Fatalf("failed to write config: %v", err)
 	}
 

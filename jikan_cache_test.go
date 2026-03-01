@@ -24,7 +24,7 @@ func TestJikanCache_SetGet(t *testing.T) {
 	tmpDir := t.TempDir()
 	cache := NewJikanCache(tmpDir, 168*time.Hour)
 
-	data, _ := json.Marshal(map[string]interface{}{"mal_id": 123, "title": "One Piece"})
+	data, _ := json.Marshal(map[string]any{"mal_id": 123, "title": "One Piece"})
 	cache.Set(123, data)
 
 	retrieved, found := cache.Get(123)
@@ -47,7 +47,7 @@ func TestJikanCache_SaveLoad(t *testing.T) {
 	tmpDir := t.TempDir()
 	cache := NewJikanCache(tmpDir, 168*time.Hour)
 
-	data, _ := json.Marshal(map[string]interface{}{"mal_id": 123, "title": "One Piece"})
+	data, _ := json.Marshal(map[string]any{"mal_id": 123, "title": "One Piece"})
 	cache.Set(123, data)
 
 	ctx := t.Context()
@@ -68,7 +68,7 @@ func TestJikanCache_Expiration(t *testing.T) {
 	tmpDir := t.TempDir()
 	cache := NewJikanCache(tmpDir, 1*time.Millisecond)
 
-	data, _ := json.Marshal(map[string]interface{}{"mal_id": 123})
+	data, _ := json.Marshal(map[string]any{"mal_id": 123})
 	cache.Set(123, data)
 
 	// Entry should be found immediately
@@ -88,7 +88,7 @@ func TestJikanCache_SearchSetGet(t *testing.T) {
 	tmpDir := t.TempDir()
 	cache := NewJikanCache(tmpDir, 168*time.Hour)
 
-	data, _ := json.Marshal([]map[string]interface{}{
+	data, _ := json.Marshal([]map[string]any{
 		{"mal_id": 123, "title": "One Piece"},
 		{"mal_id": 456, "title": "One Piece: Film Z"},
 	})
@@ -98,7 +98,7 @@ func TestJikanCache_SearchSetGet(t *testing.T) {
 	assert.True(t, found)
 	assert.NotNil(t, retrieved)
 
-	var results []map[string]interface{}
+	var results []map[string]any
 	err := json.Unmarshal(retrieved, &results)
 	assert.NoError(t, err)
 	assert.Len(t, results, 2)
@@ -109,7 +109,7 @@ func TestJikanCache_SearchExpiration(t *testing.T) {
 	tmpDir := t.TempDir()
 	cache := NewJikanCache(tmpDir, 1*time.Millisecond)
 
-	data, _ := json.Marshal([]map[string]interface{}{{"mal_id": 123}})
+	data, _ := json.Marshal([]map[string]any{{"mal_id": 123}})
 	cache.SetSearch("test", data)
 
 	_, found := cache.GetSearch("test")
@@ -129,7 +129,7 @@ func TestJikanCache_DirtyFlag(t *testing.T) {
 	ctx := t.Context()
 
 	// First save should create file
-	data, _ := json.Marshal(map[string]interface{}{"mal_id": 123})
+	data, _ := json.Marshal(map[string]any{"mal_id": 123})
 	cache.Set(123, data)
 	err := cache.Save(ctx)
 	assert.NoError(t, err)
@@ -150,7 +150,7 @@ func TestJikanCache_DirtyFlag(t *testing.T) {
 	assert.Equal(t, initialModTime, info2.ModTime(), "File should not be modified if cache is not dirty")
 
 	// Add new entry
-	data2, _ := json.Marshal(map[string]interface{}{"mal_id": 456})
+	data2, _ := json.Marshal(map[string]any{"mal_id": 456})
 	cache.Set(456, data2)
 
 	time.Sleep(10 * time.Millisecond)
@@ -182,7 +182,7 @@ func TestJikanCache_SearchNormalization(t *testing.T) {
 	tmpDir := t.TempDir()
 	cache := NewJikanCache(tmpDir, 168*time.Hour)
 
-	data, _ := json.Marshal([]map[string]interface{}{{"mal_id": 123}})
+	data, _ := json.Marshal([]map[string]any{{"mal_id": 123}})
 	cache.SetSearch("One Piece", data)
 
 	// Should find with different casing due to normalization

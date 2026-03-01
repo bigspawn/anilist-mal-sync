@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -110,7 +111,8 @@ func (c *JikanClient) GetMangaByMALID(ctx context.Context, malID int) (*JikanMan
 			return nil, false
 		}
 		var data JikanMangaData
-		if err := json.Unmarshal(cached, &data); err == nil {
+		err := json.Unmarshal(cached, &data)
+		if err == nil {
 			LogDebug(ctx, "[JIKAN CACHE] HIT: manga %d -> %s", malID, data.Title)
 			return &data, true
 		}
@@ -160,7 +162,8 @@ func (c *JikanClient) SearchManga(ctx context.Context, query string) []JikanMang
 	// Check cache first
 	if cached, found := c.cache.GetSearch(query); found {
 		var results []JikanMangaData
-		if err := json.Unmarshal(cached, &results); err == nil {
+		err := json.Unmarshal(cached, &results)
+		if err == nil {
 			LogDebug(ctx, "[JIKAN CACHE] HIT: search %q -> %d results", query, len(results))
 			return results
 		}
@@ -206,7 +209,7 @@ func (c *JikanClient) GetUserFavorites(ctx context.Context, username string) (
 	animeIDs map[int]struct{}, mangaIDs map[int]struct{}, err error,
 ) {
 	if username == "" {
-		return nil, nil, fmt.Errorf("username cannot be empty")
+		return nil, nil, errors.New("username cannot be empty")
 	}
 
 	apiURL := fmt.Sprintf("%s/users/%s/favorites", c.baseURL, url.PathEscape(username))

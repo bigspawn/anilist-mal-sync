@@ -7,7 +7,7 @@ import (
 	"github.com/rl404/verniy"
 )
 
-// Test constructors
+// Test constructors.
 func TestNewMALAnimeService(t *testing.T) {
 	var client *MyAnimeListClient
 	service := NewMALAnimeService(client)
@@ -74,7 +74,7 @@ func TestNewStatistics(t *testing.T) {
 	}
 }
 
-// Test service client assignment
+// Test service client assignment.
 func TestMALAnimeService_Client(t *testing.T) {
 	client := &MyAnimeListClient{}
 	service := NewMALAnimeService(client)
@@ -111,7 +111,7 @@ func TestAniListMangaService_Client(t *testing.T) {
 	}
 }
 
-// Test service score format handling
+// Test service score format handling.
 func TestAniListAnimeService_ScoreFormat(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -156,7 +156,7 @@ func TestAniListMangaService_ScoreFormat(t *testing.T) {
 	}
 }
 
-// Test service Update methods with invalid source type (type assertion)
+// Test service Update methods with invalid source type (type assertion).
 func TestMALAnimeService_Update_InvalidSource(t *testing.T) {
 	service := NewMALAnimeService(nil)
 	ctx := context.Background()
@@ -223,7 +223,7 @@ func TestAniListMangaService_Update_InvalidSource(t *testing.T) {
 	}
 }
 
-// Helper function for string contains check
+// Helper function for string contains check.
 func containsString(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(substr) == 0 || indexOfSubstring(s, substr) >= 0)
 }

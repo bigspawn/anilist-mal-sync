@@ -18,7 +18,7 @@ const (
 	ServiceAll         = "all"
 )
 
-// syncFlags are the common flags shared between sync and watch commands
+// syncFlags are the common flags shared between sync and watch commands.
 var syncFlags = []cli.Flag{
 	&cli.BoolFlag{
 		Name:    "force",
@@ -81,7 +81,7 @@ func getSyncFlagsFromCmd(cmd *cli.Command) (verboseOut bool, reverseOut bool) {
 	mangaVal := cmd.Bool("manga")
 	allVal := cmd.Bool("all")
 	verboseVal := cmd.Bool("verbose")
-	reverseVal := cmd.Bool("reverse")
+	reverseVal := cmd.Bool("reverse-direction")
 
 	forceSync = &forceVal
 	dryRun = &dryVal
@@ -120,7 +120,7 @@ func applySyncFlagsToConfig(cmd *cli.Command, cfg *Config) {
 	}
 }
 
-// NewCLI creates the root CLI command
+// NewCLI creates the root CLI command.
 func NewCLI() *cli.Command {
 	// Define flags for backward compatibility with old CLI behavior
 	configFlag := &cli.StringFlag{
@@ -231,7 +231,7 @@ func NewCLI() *cli.Command {
 	}
 }
 
-// RunCLI executes the CLI application
+// RunCLI executes the CLI application.
 func RunCLI() error {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
@@ -239,7 +239,8 @@ func RunCLI() error {
 	cmd := NewCLI()
 
 	// Run and show help only for CLI usage errors
-	if err := cmd.Run(ctx, os.Args); err != nil {
+	err := cmd.Run(ctx, os.Args)
+	if err != nil {
 		// Show help only for CLI usage errors (unknown command, invalid flags)
 		// Don't show help for runtime errors (network, API, etc.)
 		if IsCLIUsageError(err) {
@@ -250,13 +251,13 @@ func RunCLI() error {
 			// For other errors, just print the error message
 			fmt.Fprintf(os.Stderr, "\nError: %v\n\n", err)
 		}
-		return fmt.Errorf("command failed")
+		return errors.New("command failed")
 	}
 
 	return nil
 }
 
-// IsCancellationError checks if error is due to context cancellation (e.g., Ctrl+C)
+// IsCancellationError checks if error is due to context cancellation (e.g., Ctrl+C).
 func IsCancellationError(err error) bool {
 	if err == nil {
 		return false
@@ -264,7 +265,7 @@ func IsCancellationError(err error) bool {
 	return errors.Is(err, context.Canceled)
 }
 
-// IsCLIUsageError checks if error is related to incorrect CLI usage
+// IsCLIUsageError checks if error is related to incorrect CLI usage.
 func IsCLIUsageError(err error) bool {
 	if err == nil {
 		return false

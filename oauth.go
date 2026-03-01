@@ -15,8 +15,8 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// colorPrintf is a helper for colored output to stdout
-func colorPrintf(format string, args ...interface{}) {
+// colorPrintf is a helper for colored output to stdout.
+func colorPrintf(format string, args ...any) {
 	_, _ = fmt.Fprintf(os.Stdout, format, args...)
 }
 
@@ -51,7 +51,8 @@ func NewOAuth(
 		return nil, fmt.Errorf("path must be absolute: %s", tokenFilePath)
 	}
 
-	if err := createDirIfNotExists(tokenFilePath); err != nil {
+	err := createDirIfNotExists(tokenFilePath)
+	if err != nil {
 		return nil, err
 	}
 
@@ -256,7 +257,8 @@ func readTokenFile(tokenFilePath string) (*TokenFile, error) {
 		return nil, fmt.Errorf("error opening token file: %w", err)
 	}
 	defer func() {
-		if err := file.Close(); err != nil {
+		err := file.Close()
+		if err != nil {
 			log.Printf("Error closing token file: %v", err)
 		}
 	}()
@@ -297,7 +299,8 @@ func writeTokenFile(tokenFilePath string, tokenFile *TokenFile) error {
 
 	if err := tmpFile.Close(); err != nil {
 		// File already closed with error, just remove temp file
-		if err := os.Remove(tmpPath); err != nil {
+		err := os.Remove(tmpPath) //nolint:gosec // tmpPath from os.CreateTemp, not user input
+		if err != nil {
 			log.Printf("Error removing temp file %s: %v", tmpPath, err)
 		}
 		return fmt.Errorf("error closing temp file: %w", err)
@@ -314,10 +317,12 @@ func writeTokenFile(tokenFilePath string, tokenFile *TokenFile) error {
 // cleanupFile closes the file and removes it, logging any errors.
 // In cleanup paths, we still log errors for observability.
 func cleanupFile(f *os.File, path string) {
-	if err := f.Close(); err != nil {
+	err := f.Close()
+	if err != nil {
 		log.Printf("Error closing temp file %s: %v", path, err)
 	}
-	if err := os.Remove(path); err != nil {
+	err = os.Remove(path) //nolint:gosec // path is an internal temp file path, not user input
+	if err != nil {
 		log.Printf("Error removing temp file %s: %v", path, err)
 	}
 }
@@ -387,7 +392,8 @@ func startServer(oauth *OAuth, port string, done chan<- bool) *http.Server {
 
 	go func() {
 		log.Printf("Server started at http://localhost:%s", port)
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		err := server.ListenAndServe()
+		if err != nil && err != http.ErrServerClosed {
 			log.Printf("Error starting server: %v", err)
 		}
 		log.Println("Server stopped")
@@ -415,7 +421,8 @@ func getToken(ctx context.Context, oauth *OAuth, port string) {
 	defer func(ctx context.Context) {
 		shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
-		if err := server.Shutdown(shutdownCtx); err != nil {
+		err := server.Shutdown(shutdownCtx)
+		if err != nil {
 			log.Printf("Error shutting down server: %v", err)
 		}
 	}(ctx)
@@ -457,7 +464,8 @@ func createDirIfNotExists(path string) error {
 		return nil
 	}
 	if os.IsNotExist(err) {
-		if err = os.MkdirAll(dir, 0o700); err != nil {
+		err = os.MkdirAll(dir, 0o700)
+		if err != nil {
 			return fmt.Errorf("error creating directory: %w", err)
 		}
 		return nil

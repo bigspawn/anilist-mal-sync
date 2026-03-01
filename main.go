@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-// Default values for flags - used when sync is not called via CLI (e.g., tests)
+// Default values for flags - used when sync is not called via CLI (e.g., tests).
 var (
 	defaultForce   = false
 	defaultDryRun  = false
@@ -26,7 +26,8 @@ var (
 )
 
 func main() {
-	if err := RunCLI(); err != nil {
+	err := RunCLI()
+	if err != nil {
 		log.Printf("Error: %v", err)
 		os.Exit(1)
 	}

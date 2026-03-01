@@ -59,7 +59,8 @@ func LoadOfflineDatabase(ctx context.Context, cfg OfflineDatabaseConfig) (*Offli
 
 	exists := fileExists(dbPath)
 
-	if err := ensureDatabase(ctx, cfg, exists, dbPath, metaPath); err != nil {
+	err := ensureDatabase(ctx, cfg, exists, dbPath, metaPath)
+	if err != nil {
 		return nil, err
 	}
 
@@ -78,7 +79,8 @@ func ensureDatabase(ctx context.Context, cfg OfflineDatabaseConfig, exists bool,
 }
 
 func handleDownload(ctx context.Context, cacheDir, dbPath, metaPath string, exists bool) error {
-	if err := downloadAndCache(ctx, cacheDir, dbPath, metaPath); err != nil {
+	err := downloadAndCache(ctx, cacheDir, dbPath, metaPath)
+	if err != nil {
 		if !exists {
 			return fmt.Errorf("download offline database: %w", err)
 		}
@@ -214,19 +216,22 @@ func parseAODFile(filePath string) (*OfflineDatabase, error) {
 
 		switch key {
 		case "data":
-			if err := parseDataArray(decoder, db); err != nil {
+			err := parseDataArray(decoder, db)
+			if err != nil {
 				return nil, err
 			}
 		case "lastUpdate":
 			var lastUpdate string
-			if err := decoder.Decode(&lastUpdate); err != nil {
+			err := decoder.Decode(&lastUpdate)
+			if err != nil {
 				return nil, fmt.Errorf("decode lastUpdate: %w", err)
 			}
 			db.lastUpdate = lastUpdate
 		default:
 			// Skip unknown fields
 			var raw json.RawMessage
-			if err := decoder.Decode(&raw); err != nil {
+			err := decoder.Decode(&raw)
+			if err != nil {
 				return nil, fmt.Errorf("skip field %s: %w", key, err)
 			}
 		}
@@ -243,7 +248,8 @@ func parseDataArray(decoder *json.Decoder, db *OfflineDatabase) error {
 
 	for decoder.More() {
 		var entry AODEntry
-		if err := decoder.Decode(&entry); err != nil {
+		err := decoder.Decode(&entry)
+		if err != nil {
 			return fmt.Errorf("decode entry: %w", err)
 		}
 
@@ -278,7 +284,7 @@ func indexEntry(entry AODEntry, db *OfflineDatabase) {
 }
 
 // extractIDFromURL extracts a numeric ID from a URL with the given prefix.
-// Example: extractIDFromURL("https://myanimelist.net/anime/1535", "https://myanimelist.net/anime/") returns (1535, true)
+// Example: extractIDFromURL("https://myanimelist.net/anime/1535", "https://myanimelist.net/anime/") returns (1535, true).
 func extractIDFromURL(url, prefix string) (int, bool) {
 	if !strings.HasPrefix(url, prefix) {
 		return 0, false
@@ -297,7 +303,7 @@ func extractIDFromURL(url, prefix string) (int, bool) {
 	return id, true
 }
 
-// GitHub release API response (minimal fields)
+// GitHub release API response (minimal fields).
 type githubRelease struct {
 	TagName string        `json:"tag_name"`
 	Assets  []githubAsset `json:"assets"`

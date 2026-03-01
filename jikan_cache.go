@@ -45,7 +45,8 @@ func NewJikanCache(cacheDir string, maxAge time.Duration) *JikanCache {
 	}
 
 	if fileExists(filePath) {
-		if err := cache.load(); err != nil {
+		err := cache.load()
+		if err != nil {
 			LogWarn(context.Background(), "Failed to load Jikan cache: %v (starting fresh)", err)
 		}
 	}
@@ -91,7 +92,7 @@ func (c *JikanCache) GetSearch(query string) (json.RawMessage, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	key := fmt.Sprintf("search_%s", normalizeTitle(query))
+	key := "search_" + normalizeTitle(query)
 	entry, exists := c.entries[key]
 	if !exists {
 		return nil, false
@@ -109,7 +110,7 @@ func (c *JikanCache) SetSearch(query string, data json.RawMessage) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	key := fmt.Sprintf("search_%s", normalizeTitle(query))
+	key := "search_" + normalizeTitle(query)
 	c.entries[key] = JikanCacheEntry{
 		Data:     data,
 		CachedAt: time.Now(),

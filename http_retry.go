@@ -10,19 +10,19 @@ import (
 	"time"
 )
 
-// defaultBackoffConfig defines the default exponential backoff settings
+// defaultBackoffConfig defines the default exponential backoff settings.
 var defaultBackoffConfig = ExponentialBackoff{
 	InitialInterval: 1 * time.Second,
 	MaxInterval:     30 * time.Second,
 	Multiplier:      2.0,
 }
 
-// BackoffStrategy defines retry delay behavior
+// BackoffStrategy defines retry delay behavior.
 type BackoffStrategy interface {
 	Duration(attempt int) time.Duration
 }
 
-// ExponentialBackoff implements exponential backoff
+// ExponentialBackoff implements exponential backoff.
 type ExponentialBackoff struct {
 	InitialInterval time.Duration
 	MaxInterval     time.Duration
@@ -40,7 +40,7 @@ func (b *ExponentialBackoff) Duration(attempt int) time.Duration {
 	return time.Duration(delay)
 }
 
-// shouldRetryStatus determines if a response status code should trigger a retry
+// shouldRetryStatus determines if a response status code should trigger a retry.
 func shouldRetryStatus(statusCode int) bool {
 	return statusCode == http.StatusTooManyRequests ||
 		statusCode == http.StatusRequestTimeout ||
@@ -49,7 +49,7 @@ func shouldRetryStatus(statusCode int) bool {
 		(statusCode >= 500 && statusCode < 600)
 }
 
-// isRetryable determines if an error or response should trigger a retry
+// isRetryable determines if an error or response should trigger a retry.
 func isRetryable(err error, resp *http.Response) bool {
 	if err != nil {
 		errStr := err.Error()
@@ -60,7 +60,7 @@ func isRetryable(err error, resp *http.Response) bool {
 	return shouldRetryStatus(resp.StatusCode)
 }
 
-// cloneRequest creates a copy of an HTTP request, including its body
+// cloneRequest creates a copy of an HTTP request, including its body.
 func cloneRequest(req *http.Request) *http.Request {
 	r := req.Clone(req.Context())
 	if req.Body != nil && req.Body != http.NoBody {
@@ -72,14 +72,14 @@ func cloneRequest(req *http.Request) *http.Request {
 	return r
 }
 
-// retryableRoundTripper implements http.RoundTripper with retry logic
+// retryableRoundTripper implements http.RoundTripper with retry logic.
 type retryableRoundTripper struct {
 	underlying http.RoundTripper
 	maxRetries int
 	backoff    BackoffStrategy
 }
 
-// NewRetryableTransport wraps an http.Client's Transport with retry logic
+// NewRetryableTransport wraps an http.Client's Transport with retry logic.
 func NewRetryableTransport(baseClient *http.Client, maxRetries int) http.RoundTripper {
 	underlying := baseClient.Transport
 	if underlying == nil {
@@ -92,7 +92,7 @@ func NewRetryableTransport(baseClient *http.Client, maxRetries int) http.RoundTr
 	}
 }
 
-// RoundTrip executes a single HTTP transaction with retry logic
+// RoundTrip executes a single HTTP transaction with retry logic.
 func (t *retryableRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return executeWithRetry(req, t.maxRetries, t.backoff, func(req *http.Request) (*http.Response, error) {
 		return t.underlying.RoundTrip(req)
@@ -151,24 +151,24 @@ func executeWithRetry(
 	return nil, fmt.Errorf("max retries (%d) exhausted", maxRetries)
 }
 
-// withTimeout adds a timeout to the context for API calls
+// withTimeout adds a timeout to the context for API calls.
 func withTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(ctx, timeout)
 }
 
-// HTTPClient interface for flexibility and testing
+// HTTPClient interface for flexibility and testing.
 type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-// RetryableClient wraps HTTPClient with retry logic
+// RetryableClient wraps HTTPClient with retry logic.
 type RetryableClient struct {
 	client     HTTPClient
 	maxRetries int
 	backoff    BackoffStrategy
 }
 
-// NewRetryableClient creates a new RetryableClient with default backoff strategy
+// NewRetryableClient creates a new RetryableClient with default backoff strategy.
 func NewRetryableClient(baseClient *http.Client, maxRetries int) *RetryableClient {
 	return &RetryableClient{
 		client:     baseClient,
@@ -177,7 +177,7 @@ func NewRetryableClient(baseClient *http.Client, maxRetries int) *RetryableClien
 	}
 }
 
-// Do executes the HTTP request with retry logic
+// Do executes the HTTP request with retry logic.
 func (r *RetryableClient) Do(req *http.Request) (*http.Response, error) {
 	return executeWithRetry(req, r.maxRetries, r.backoff, r.client.Do)
 }

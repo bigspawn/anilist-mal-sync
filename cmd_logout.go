@@ -39,10 +39,12 @@ func runLogout(ctx context.Context, cmd *cli.Command) error {
 	case ServiceMyAnimeList:
 		return logoutMyAnimeList(ctx, config)
 	case ServiceAll:
-		if err := logoutMyAnimeList(ctx, config); err != nil {
+		err := logoutMyAnimeList(ctx, config)
+		if err != nil {
 			log.Printf("Warning: %v", err)
 		}
-		if err := logoutAnilist(ctx, config); err != nil {
+		err = logoutAnilist(ctx, config)
+		if err != nil {
 			log.Printf("Warning: %v", err)
 		}
 		return nil

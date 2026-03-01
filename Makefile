@@ -4,7 +4,7 @@
 -include .env
 
 BINARY_NAME=anilist-mal-sync
-LINT_VERSION=v2.2.2
+LINT_VERSION=v2.10.1
 DOCKER_LINT_CMD=docker run --rm -v $(PWD):/app -w /app golangci/golangci-lint:$(LINT_VERSION)
 
 .DEFAULT_GOAL := help

@@ -8,7 +8,7 @@ import (
 	"os"
 )
 
-// LogLevel represents logging verbosity
+// LogLevel represents logging verbosity.
 type LogLevel int
 
 const (
@@ -18,7 +18,7 @@ const (
 	LogLevelDebug                 // Verbose mode only
 )
 
-// Logger provides structured, leveled logging with color support
+// Logger provides structured, leveled logging with color support.
 type Logger struct {
 	level     LogLevel
 	useColors bool
@@ -28,7 +28,7 @@ type Logger struct {
 	debugLog  *log.Logger
 }
 
-// NewLogger creates a logger with specified level
+// NewLogger creates a logger with specified level.
 func NewLogger(verbose bool) *Logger {
 	level := LogLevelInfo
 	if verbose {
@@ -45,7 +45,7 @@ func NewLogger(verbose bool) *Logger {
 	}
 }
 
-// SetOutput sets the output for all loggers
+// SetOutput sets the output for all loggers.
 func (l *Logger) SetOutput(w io.Writer) {
 	l.errorLog.SetOutput(w)
 	l.warnLog.SetOutput(w)
@@ -53,7 +53,7 @@ func (l *Logger) SetOutput(w io.Writer) {
 	l.debugLog.SetOutput(w)
 }
 
-// colorize applies color formatting if colors are enabled
+// colorize applies color formatting if colors are enabled.
 func (l *Logger) colorize(color, text string) string {
 	if !l.useColors {
 		return text
@@ -61,16 +61,16 @@ func (l *Logger) colorize(color, text string) string {
 	return color + text + colorReset
 }
 
-// Info logs informational messages (always visible in normal mode)
-func (l *Logger) Info(format string, args ...interface{}) {
+// Info logs informational messages (always visible in normal mode).
+func (l *Logger) Info(format string, args ...any) {
 	if l.level >= LogLevelInfo {
 		msg := fmt.Sprintf(format, args...)
 		l.infoLog.Println(msg)
 	}
 }
 
-// InfoSuccess logs success with green checkmark
-func (l *Logger) InfoSuccess(format string, args ...interface{}) {
+// InfoSuccess logs success with green checkmark.
+func (l *Logger) InfoSuccess(format string, args ...any) {
 	if l.level >= LogLevelInfo {
 		icon := l.colorize(colorGreen, "✓")
 		msg := fmt.Sprintf(format, args...)
@@ -78,8 +78,8 @@ func (l *Logger) InfoSuccess(format string, args ...interface{}) {
 	}
 }
 
-// InfoDryRun logs dry run "updates" with cyan arrow
-func (l *Logger) InfoDryRun(format string, args ...interface{}) {
+// InfoDryRun logs dry run "updates" with cyan arrow.
+func (l *Logger) InfoDryRun(format string, args ...any) {
 	if l.level >= LogLevelInfo {
 		icon := l.colorize(colorCyan, "→")
 		msg := fmt.Sprintf(format, args...)
@@ -87,7 +87,7 @@ func (l *Logger) InfoDryRun(format string, args ...interface{}) {
 	}
 }
 
-// InfoUpdate logs an update operation
+// InfoUpdate logs an update operation.
 func (l *Logger) InfoUpdate(title, detail string) {
 	if l.level >= LogLevelInfo {
 		icon := l.colorize(colorGreen, "✓")
@@ -96,8 +96,8 @@ func (l *Logger) InfoUpdate(title, detail string) {
 	}
 }
 
-// Warn logs warnings (always visible)
-func (l *Logger) Warn(format string, args ...interface{}) {
+// Warn logs warnings (always visible).
+func (l *Logger) Warn(format string, args ...any) {
 	if l.level >= LogLevelWarn {
 		icon := l.colorize(colorYellow, "⚠")
 		msg := fmt.Sprintf(format, args...)
@@ -105,8 +105,8 @@ func (l *Logger) Warn(format string, args ...interface{}) {
 	}
 }
 
-// Error logs errors (always visible)
-func (l *Logger) Error(format string, args ...interface{}) {
+// Error logs errors (always visible).
+func (l *Logger) Error(format string, args ...any) {
 	if l.level >= LogLevelError {
 		icon := l.colorize(colorRed, "✗")
 		msg := fmt.Sprintf(format, args...)
@@ -114,32 +114,32 @@ func (l *Logger) Error(format string, args ...interface{}) {
 	}
 }
 
-// Debug logs debug information (verbose mode only)
-func (l *Logger) Debug(format string, args ...interface{}) {
+// Debug logs debug information (verbose mode only).
+func (l *Logger) Debug(format string, args ...any) {
 	if l.level >= LogLevelDebug {
 		msg := fmt.Sprintf(format, args...)
 		l.debugLog.Printf("[DEBUG] %s", msg)
 	}
 }
 
-// DebugDecision logs decision logic in branches (verbose mode only)
-func (l *Logger) DebugDecision(format string, args ...interface{}) {
+// DebugDecision logs decision logic in branches (verbose mode only).
+func (l *Logger) DebugDecision(format string, args ...any) {
 	if l.level >= LogLevelDebug {
 		msg := fmt.Sprintf(format, args...)
 		l.debugLog.Printf("[DECISION] %s", msg)
 	}
 }
 
-// DebugHTTP logs HTTP requests and responses (verbose mode only)
-func (l *Logger) DebugHTTP(format string, args ...interface{}) {
+// DebugHTTP logs HTTP requests and responses (verbose mode only).
+func (l *Logger) DebugHTTP(format string, args ...any) {
 	if l.level >= LogLevelDebug {
 		msg := fmt.Sprintf(format, args...)
 		l.debugLog.Printf("[HTTP] %s", msg)
 	}
 }
 
-// Stage logs a high-level stage (e.g., "Authenticating...")
-func (l *Logger) Stage(format string, args ...interface{}) {
+// Stage logs a high-level stage (e.g., "Authenticating...").
+func (l *Logger) Stage(format string, args ...any) {
 	if l.level >= LogLevelInfo {
 		msg := fmt.Sprintf(format, args...)
 		colored := l.colorize(colorBold+colorCyan, msg)
@@ -147,7 +147,7 @@ func (l *Logger) Stage(format string, args ...interface{}) {
 	}
 }
 
-// Progress logs sync progress (overwrites previous line in TTY, single line otherwise)
+// Progress logs sync progress (overwrites previous line in TTY, single line otherwise).
 func (l *Logger) Progress(current, total int, status, title string) {
 	if l.level < LogLevelInfo {
 		return
@@ -174,25 +174,25 @@ func (l *Logger) Progress(current, total int, status, title string) {
 	}
 }
 
-// isTerminal checks if output is a terminal (for color support)
+// isTerminal checks if output is a terminal (for color support).
 func isTerminal() bool {
 	// Simple check - if stdout is a terminal
 	fileInfo, _ := os.Stdout.Stat()
 	return (fileInfo.Mode() & os.ModeCharDevice) != 0
 }
 
-// contextKey is a custom type for context keys to avoid collisions
+// contextKey is a custom type for context keys to avoid collisions.
 type contextKey string
 
 const loggerKey contextKey = "logger"
 
-// WithContext returns a new context with the logger embedded
+// WithContext returns a new context with the logger embedded.
 func (l *Logger) WithContext(ctx context.Context) context.Context {
 	return context.WithValue(ctx, loggerKey, l)
 }
 
 // LoggerFromContext retrieves the logger from the context
-// Returns nil if no logger is set in the context
+// Returns nil if no logger is set in the context.
 func LoggerFromContext(ctx context.Context) *Logger {
 	if logger, ok := ctx.Value(loggerKey).(*Logger); ok {
 		return logger
@@ -200,84 +200,84 @@ func LoggerFromContext(ctx context.Context) *Logger {
 	return nil
 }
 
-// LogInfo logs an informational message using the logger from context
-func LogInfo(ctx context.Context, format string, args ...interface{}) {
+// LogInfo logs an informational message using the logger from context.
+func LogInfo(ctx context.Context, format string, args ...any) {
 	if logger := LoggerFromContext(ctx); logger != nil {
 		logger.Info(format, args...)
 	}
 }
 
-// LogInfoSuccess logs a success message using the logger from context
-func LogInfoSuccess(ctx context.Context, format string, args ...interface{}) {
+// LogInfoSuccess logs a success message using the logger from context.
+func LogInfoSuccess(ctx context.Context, format string, args ...any) {
 	if logger := LoggerFromContext(ctx); logger != nil {
 		logger.InfoSuccess(format, args...)
 	}
 }
 
-// LogInfoUpdate logs an update operation using the logger from context
+// LogInfoUpdate logs an update operation using the logger from context.
 func LogInfoUpdate(ctx context.Context, title, detail string) {
 	if logger := LoggerFromContext(ctx); logger != nil {
 		logger.InfoUpdate(title, detail)
 	}
 }
 
-// LogInfoDryRun logs a dry run message using the logger from context
-func LogInfoDryRun(ctx context.Context, format string, args ...interface{}) {
+// LogInfoDryRun logs a dry run message using the logger from context.
+func LogInfoDryRun(ctx context.Context, format string, args ...any) {
 	if logger := LoggerFromContext(ctx); logger != nil {
 		logger.InfoDryRun(format, args...)
 	}
 }
 
-// LogWarn logs a warning using the logger from context
-func LogWarn(ctx context.Context, format string, args ...interface{}) {
+// LogWarn logs a warning using the logger from context.
+func LogWarn(ctx context.Context, format string, args ...any) {
 	if logger := LoggerFromContext(ctx); logger != nil {
 		logger.Warn(format, args...)
 	}
 }
 
-// LogError logs an error using the logger from context
-func LogError(ctx context.Context, format string, args ...interface{}) {
+// LogError logs an error using the logger from context.
+func LogError(ctx context.Context, format string, args ...any) {
 	if logger := LoggerFromContext(ctx); logger != nil {
 		logger.Error(format, args...)
 	}
 }
 
-// LogDebug logs debug information using the logger from context
-func LogDebug(ctx context.Context, format string, args ...interface{}) {
+// LogDebug logs debug information using the logger from context.
+func LogDebug(ctx context.Context, format string, args ...any) {
 	if logger := LoggerFromContext(ctx); logger != nil {
 		logger.Debug(format, args...)
 	}
 }
 
-// LogDebugDecision logs decision logic using the logger from context
-func LogDebugDecision(ctx context.Context, format string, args ...interface{}) {
+// LogDebugDecision logs decision logic using the logger from context.
+func LogDebugDecision(ctx context.Context, format string, args ...any) {
 	if logger := LoggerFromContext(ctx); logger != nil {
 		logger.DebugDecision(format, args...)
 	}
 }
 
-// LogDebugHTTP logs HTTP requests/responses using the logger from context
-func LogDebugHTTP(ctx context.Context, format string, args ...interface{}) {
+// LogDebugHTTP logs HTTP requests/responses using the logger from context.
+func LogDebugHTTP(ctx context.Context, format string, args ...any) {
 	if logger := LoggerFromContext(ctx); logger != nil {
 		logger.DebugHTTP(format, args...)
 	}
 }
 
-// LogStage logs a high-level stage using the logger from context
-func LogStage(ctx context.Context, format string, args ...interface{}) {
+// LogStage logs a high-level stage using the logger from context.
+func LogStage(ctx context.Context, format string, args ...any) {
 	if logger := LoggerFromContext(ctx); logger != nil {
 		logger.Stage(format, args...)
 	}
 }
 
-// LogProgress logs sync progress using the logger from context
+// LogProgress logs sync progress using the logger from context.
 func LogProgress(ctx context.Context, current, total int, status, title string) {
 	if logger := LoggerFromContext(ctx); logger != nil {
 		logger.Progress(current, total, status, title)
 	}
 }
 
-// SyncDirection represents the sync direction
+// SyncDirection represents the sync direction.
 type SyncDirection bool
 
 const (
@@ -286,7 +286,7 @@ const (
 )
 
 // DirectionFromContext extracts sync direction from context
-// Returns SyncDirectionForward (default) if no value is set
+// Returns SyncDirectionForward (default) if no value is set.
 func DirectionFromContext(ctx context.Context) SyncDirection {
 	if dir, ok := ctx.Value(contextKey("direction")).(SyncDirection); ok {
 		return dir
@@ -294,12 +294,12 @@ func DirectionFromContext(ctx context.Context) SyncDirection {
 	return SyncDirectionForward
 }
 
-// WithDirection returns a new context with sync direction embedded
+// WithDirection returns a new context with sync direction embedded.
 func WithDirection(ctx context.Context, dir SyncDirection) context.Context {
 	return context.WithValue(ctx, contextKey("direction"), dir)
 }
 
-// String returns the string representation of SyncDirection for JSON serialization
+// String returns the string representation of SyncDirection for JSON serialization.
 func (d SyncDirection) String() string {
 	if d == SyncDirectionReverse {
 		return DirectionReverseStr

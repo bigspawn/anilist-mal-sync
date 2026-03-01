@@ -46,7 +46,8 @@ func NewHatoCache(cacheDir string) (*HatoCache, error) {
 
 	// Load existing cache if it exists
 	if fileExists(filePath) {
-		if err := cache.load(); err != nil {
+		err := cache.load()
+		if err != nil {
 			// Non-fatal: continue with empty cache
 			LogWarn(context.Background(), "Failed to load Hato cache: %v (starting fresh)", err)
 		}
@@ -140,7 +141,7 @@ func (c *HatoCache) Size() int {
 
 // buildCacheKey creates a unique cache key.
 // Format: "{service}_{media_type}_{id}"
-// Examples: "mal_anime_1", "anilist_manga_87471"
+// Examples: "mal_anime_1", "anilist_manga_87471".
 func buildCacheKey(service, mediaType string, id int) string {
 	return fmt.Sprintf("%s_%s_%d", service, mediaType, id)
 }

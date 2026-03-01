@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// UpdateResult tracks the outcome of an update attempt
+// UpdateResult tracks the outcome of an update attempt.
 type UpdateResult struct {
 	Title      string
 	Detail     string // What changed (e.g., "ep 10→15")
@@ -20,7 +20,7 @@ type UpdateResult struct {
 	IsDryRun   bool // True if this is a dry run "update"
 }
 
-// Statistics tracks sync operation metrics
+// Statistics tracks sync operation metrics.
 type Statistics struct {
 	StartTime time.Time
 	EndTime   time.Time
@@ -41,7 +41,7 @@ type Statistics struct {
 	StatusCounts map[string]int
 }
 
-// NewStatistics creates a new statistics tracker
+// NewStatistics creates a new statistics tracker.
 func NewStatistics() *Statistics {
 	return &Statistics{
 		StartTime:    time.Now(),
@@ -49,21 +49,21 @@ func NewStatistics() *Statistics {
 	}
 }
 
-// RecordUpdate records a successful update
+// RecordUpdate records a successful update.
 func (s *Statistics) RecordUpdate(result UpdateResult) {
 	s.UpdatedCount++
 	s.UpdatedItems = append(s.UpdatedItems, result)
 	s.StatusCounts[result.Status]++
 }
 
-// RecordSkip records a skipped item
+// RecordSkip records a skipped item.
 func (s *Statistics) RecordSkip(result UpdateResult) {
 	s.SkippedCount++
 	s.SkippedItems = append(s.SkippedItems, result)
 	s.StatusCounts[result.Status]++
 }
 
-// RecordDryRun records a dry run item
+// RecordDryRun records a dry run item.
 func (s *Statistics) RecordDryRun(result UpdateResult) {
 	result.IsDryRun = true
 	s.DryRunCount++
@@ -71,18 +71,18 @@ func (s *Statistics) RecordDryRun(result UpdateResult) {
 	s.StatusCounts[result.Status]++
 }
 
-// RecordError records an error
+// RecordError records an error.
 func (s *Statistics) RecordError(result UpdateResult) {
 	s.ErrorCount++
 	s.ErrorItems = append(s.ErrorItems, result)
 }
 
-// IncrementTotal increments total count
+// IncrementTotal increments total count.
 func (s *Statistics) IncrementTotal() {
 	s.TotalCount++
 }
 
-// Reset resets statistics
+// Reset resets statistics.
 func (s *Statistics) Reset() {
 	s.StartTime = time.Now()
 	s.EndTime = time.Time{}
@@ -98,7 +98,7 @@ func (s *Statistics) Reset() {
 	s.StatusCounts = make(map[string]int)
 }
 
-// Print outputs comprehensive statistics
+// Print outputs comprehensive statistics.
 func (s *Statistics) Print(ctx context.Context, prefix string) {
 	s.EndTime = time.Now()
 	duration := s.EndTime.Sub(s.StartTime)
@@ -211,7 +211,7 @@ func groupSkipReasons(items []UpdateResult) map[string]int {
 	return byReason
 }
 
-// PrintGlobalSummary prints combined statistics for multiple sync operations
+// PrintGlobalSummary prints combined statistics for multiple sync operations.
 func PrintGlobalSummary(ctx context.Context, stats []*Statistics, report *SyncReport, totalDuration time.Duration, reverse bool) {
 	logger := LoggerFromContext(ctx)
 	if logger == nil {
@@ -374,7 +374,7 @@ func printGlobalErrors(logger *Logger, errorItems []UpdateResult) {
 	}
 }
 
-// sortedKeys returns sorted keys from a map
+// sortedKeys returns sorted keys from a map.
 func sortedKeys(m map[string]int) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {

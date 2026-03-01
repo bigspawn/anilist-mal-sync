@@ -2,7 +2,7 @@ package main
 
 import "sync"
 
-// SyncReport accumulates warnings and unmapped entries for deferred printing
+// SyncReport accumulates warnings and unmapped entries for deferred printing.
 type SyncReport struct {
 	Warnings            []Warning
 	UnmappedItems       []UnmappedEntry
@@ -22,7 +22,7 @@ type DuplicateConflict struct {
 	MediaType   string
 }
 
-// Warning represents a warning about a potentially problematic match
+// Warning represents a warning about a potentially problematic match.
 type Warning struct {
 	Title     string
 	Reason    string
@@ -30,7 +30,7 @@ type Warning struct {
 	MediaType string // "Anime" or "Manga"
 }
 
-// NewSyncReport creates a new sync report
+// NewSyncReport creates a new sync report.
 func NewSyncReport() *SyncReport {
 	return &SyncReport{
 		Warnings:            []Warning{},
@@ -40,7 +40,7 @@ func NewSyncReport() *SyncReport {
 	}
 }
 
-// AddWarning adds a warning to the report (thread-safe)
+// AddWarning adds a warning to the report (thread-safe).
 func (r *SyncReport) AddWarning(title, reason, detail, mediaType string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -52,14 +52,14 @@ func (r *SyncReport) AddWarning(title, reason, detail, mediaType string) {
 	})
 }
 
-// HasWarnings returns true if there are warnings (thread-safe)
+// HasWarnings returns true if there are warnings (thread-safe).
 func (r *SyncReport) HasWarnings() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return len(r.Warnings) > 0
 }
 
-// AddUnmappedItems adds unmapped entries to the report (thread-safe)
+// AddUnmappedItems adds unmapped entries to the report (thread-safe).
 func (r *SyncReport) AddUnmappedItems(items []UnmappedEntry) {
 	if len(items) == 0 {
 		return
@@ -69,14 +69,14 @@ func (r *SyncReport) AddUnmappedItems(items []UnmappedEntry) {
 	r.UnmappedItems = append(r.UnmappedItems, items...)
 }
 
-// HasUnmappedItems returns true if there are unmapped entries (thread-safe)
+// HasUnmappedItems returns true if there are unmapped entries (thread-safe).
 func (r *SyncReport) HasUnmappedItems() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return len(r.UnmappedItems) > 0
 }
 
-// AddDuplicateConflict adds a duplicate conflict to the report (thread-safe)
+// AddDuplicateConflict adds a duplicate conflict to the report (thread-safe).
 func (r *SyncReport) AddDuplicateConflict(
 	loserTitle, winnerTitle, targetTitle, loserStrat, winnerStrat, mediaType string,
 ) {
@@ -92,14 +92,14 @@ func (r *SyncReport) AddDuplicateConflict(
 	})
 }
 
-// HasDuplicateConflicts returns true if there are duplicate conflicts (thread-safe)
+// HasDuplicateConflicts returns true if there are duplicate conflicts (thread-safe).
 func (r *SyncReport) HasDuplicateConflicts() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return len(r.DuplicateConflicts) > 0
 }
 
-// AddFavoritesResult adds favorites sync result to the report (thread-safe)
+// AddFavoritesResult adds favorites sync result to the report (thread-safe).
 func (r *SyncReport) AddFavoritesResult(result FavoritesResult) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -107,7 +107,7 @@ func (r *SyncReport) AddFavoritesResult(result FavoritesResult) {
 	r.FavoritesMismatches = append(r.FavoritesMismatches, result.Mismatches...)
 }
 
-// HasFavoritesMismatches returns true if there are favorites mismatches (thread-safe)
+// HasFavoritesMismatches returns true if there are favorites mismatches (thread-safe).
 func (r *SyncReport) HasFavoritesMismatches() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
