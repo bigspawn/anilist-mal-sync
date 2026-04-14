@@ -58,6 +58,9 @@ func isRetryable(err error, resp *http.Response) bool {
 			strings.Contains(errStr, "connection reset") ||
 			strings.Contains(errStr, "broken pipe")
 	}
+	if resp == nil {
+		return false
+	}
 	return shouldRetryStatus(resp.StatusCode)
 }
 
@@ -140,7 +143,10 @@ func executeWithRetry(
 
 		// Compute the wait for the next retry before closing the response
 		// so we can read the Retry-After header if present.
-		nextWait, rateLimited = retryAfterOrBackoff(resp, attempt+1, backoff)
+		// Skip on the last iteration — the value will never be used.
+		if attempt < maxRetries {
+			nextWait, rateLimited = retryAfterOrBackoff(resp, attempt+1, backoff)
+		}
 
 		if resp != nil {
 			_ = resp.Body.Close()
@@ -164,6 +170,21 @@ func executeWithRetry(
 	return nil, fmt.Errorf("max retries (%d) exhausted", maxRetries)
 }
 
+// parseRetryAfter parses the value of a Retry-After header per RFC 7231 §7.1.3.
+// Supports both delay-seconds (integer) and HTTP-date formats.
+// Returns the duration to wait and true if the value is valid and in the future.
+func parseRetryAfter(v string) (time.Duration, bool) {
+	if seconds, err := strconv.Atoi(v); err == nil && seconds > 0 {
+		return time.Duration(seconds) * time.Second, true
+	}
+	if t, err := http.ParseTime(v); err == nil {
+		if d := time.Until(t); d > 0 {
+			return d, true
+		}
+	}
+	return 0, false
+}
+
 // retryAfterOrBackoff returns the wait duration before the next retry and
 // whether the duration came from a Retry-After header (true) or backoff (false).
 // For 429 Too Many Requests responses with a Retry-After header, it uses
@@ -172,8 +193,8 @@ func executeWithRetry(
 func retryAfterOrBackoff(resp *http.Response, attempt int, backoff BackoffStrategy) (time.Duration, bool) {
 	if resp != nil && resp.StatusCode == http.StatusTooManyRequests {
 		if v := resp.Header.Get("Retry-After"); v != "" {
-			if seconds, err := strconv.Atoi(v); err == nil && seconds > 0 {
-				return time.Duration(seconds) * time.Second, true
+			if d, ok := parseRetryAfter(v); ok {
+				return d, true
 			}
 		}
 	}

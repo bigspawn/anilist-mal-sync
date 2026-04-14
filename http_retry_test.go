@@ -473,6 +473,12 @@ func TestIsRetryable(t *testing.T) {
 			resp:     &http.Response{StatusCode: http.StatusBadRequest},
 			expected: false,
 		},
+		{
+			name:     "nil error and nil response returns false without panic",
+			err:      nil,
+			resp:     nil,
+			expected: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -598,5 +604,140 @@ func TestNewRetryableTransport_DefaultTransport(t *testing.T) {
 
 	if rt.underlying == nil {
 		t.Fatal("expected underlying transport to be set to http.DefaultTransport")
+	}
+}
+
+// =============================================================================
+// parseRetryAfter
+// =============================================================================
+
+func TestParseRetryAfter(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		value     string
+		wantOk    bool
+		wantExact time.Duration // only checked when wantOk && >= 0
+		wantMin   time.Duration // for approximate checks (HTTP-date)
+		wantMax   time.Duration
+	}{
+		{
+			name:      "integer seconds",
+			value:     "30",
+			wantOk:    true,
+			wantExact: 30 * time.Second,
+		},
+		{
+			name:   "zero seconds",
+			value:  "0",
+			wantOk: false,
+		},
+		{
+			name:   "negative seconds",
+			value:  "-10",
+			wantOk: false,
+		},
+		{
+			name:   "invalid string",
+			value:  "not-a-number",
+			wantOk: false,
+		},
+		{
+			name:   "empty string",
+			value:  "",
+			wantOk: false,
+		},
+		{
+			name:   "past HTTP-date",
+			value:  "Mon, 02 Jan 2006 15:04:05 GMT",
+			wantOk: false,
+		},
+		{
+			name:    "future HTTP-date",
+			value:   time.Now().Add(60 * time.Second).UTC().Format(http.TimeFormat),
+			wantOk:  true,
+			wantMin: 50 * time.Second,
+			wantMax: 65 * time.Second,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d, ok := parseRetryAfter(tt.value)
+			if ok != tt.wantOk {
+				t.Fatalf("ok: expected %v, got %v (duration=%v)", tt.wantOk, ok, d)
+			}
+			if !tt.wantOk {
+				return
+			}
+			if tt.wantExact > 0 {
+				if d != tt.wantExact {
+					t.Fatalf("duration: expected %v, got %v", tt.wantExact, d)
+				}
+			} else {
+				if d < tt.wantMin || d > tt.wantMax {
+					t.Fatalf("duration %v not in expected range [%v, %v]", d, tt.wantMin, tt.wantMax)
+				}
+			}
+		})
+	}
+}
+
+func TestRetryAfterOrBackoff_HTTPDate(t *testing.T) {
+	t.Parallel()
+	backoff := &ExponentialBackoff{
+		InitialInterval: 1 * time.Second,
+		MaxInterval:     30 * time.Second,
+		Multiplier:      2.0,
+	}
+
+	futureDate := time.Now().Add(60 * time.Second).UTC().Format(http.TimeFormat)
+	resp := &http.Response{
+		StatusCode: http.StatusTooManyRequests,
+		Header:     http.Header{"Retry-After": []string{futureDate}},
+	}
+
+	got, fromHeader := retryAfterOrBackoff(resp, 1, backoff)
+	if !fromHeader {
+		t.Fatal("expected fromHeader=true for HTTP-date Retry-After")
+	}
+	// HTTP-date is truncated to seconds, so allow ±5s tolerance.
+	if got < 55*time.Second || got > 65*time.Second {
+		t.Fatalf("expected duration ~60s, got %v", got)
+	}
+}
+
+// =============================================================================
+// executeWithRetry — backoff skipped on last attempt
+// =============================================================================
+
+// countingBackoff records how many times Duration is called.
+type countingBackoff struct {
+	calls int
+}
+
+func (c *countingBackoff) Duration(_ int) time.Duration {
+	c.calls++
+	return 0 // zero so tests run instantly
+}
+
+func TestExecuteWithRetry_SkipsBackoffOnLastAttempt(t *testing.T) {
+	t.Parallel()
+	const maxRetries = 3
+
+	cb := &countingBackoff{}
+
+	// All requests fail with a retryable error.
+	doRequest := func(_ *http.Request) (*http.Response, error) {
+		return nil, errors.New("connection refused")
+	}
+
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://localhost:1", nil)
+	_, _ = executeWithRetry(req, maxRetries, cb, doRequest)
+
+	// Attempts: 0, 1, 2, 3 — backoff computed before attempts 1,2,3 only.
+	// The last attempt (3 == maxRetries) must NOT trigger a backoff call.
+	if cb.calls != maxRetries {
+		t.Fatalf("expected %d backoff calls, got %d", maxRetries, cb.calls)
 	}
 }
