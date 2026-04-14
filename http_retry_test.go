@@ -299,6 +299,7 @@ func TestRetryableRoundTripper_MaxRetriesExhausted(t *testing.T) {
 }
 
 func TestRetryAfterOrBackoff(t *testing.T) {
+	t.Parallel()
 	backoff := &ExponentialBackoff{
 		InitialInterval: 1 * time.Second,
 		MaxInterval:     30 * time.Second,
@@ -405,6 +406,7 @@ func TestRetryAfterOrBackoff(t *testing.T) {
 }
 
 func TestIsRetryable(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		err      error
@@ -484,6 +486,7 @@ func TestIsRetryable(t *testing.T) {
 }
 
 func TestCloneRequest_NilBody(t *testing.T) {
+	t.Parallel()
 	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://example.com", nil)
 	cloned := cloneRequest(req)
 

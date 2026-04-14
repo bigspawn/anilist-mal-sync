@@ -320,3 +320,36 @@ func TestSyncReport_HasFavoritesMismatches(t *testing.T) {
 		})
 	}
 }
+
+// =============================================================================
+// Thread-safety: SyncReport mutex protection
+// =============================================================================
+
+func TestSyncReport_ConcurrentAccess(t *testing.T) {
+	// Run with -race to verify mutex protection on all Add/Has methods.
+	report := NewSyncReport()
+
+	const goroutines = 20
+	done := make(chan struct{})
+
+	for range goroutines {
+		go func() {
+			report.AddWarning("T", "r", "d", "anime")
+			report.AddDuplicateConflict("L", "W", "T", "s1", "s2", "anime")
+			report.AddUnmappedItems([]UnmappedEntry{{Title: "X"}})
+			report.AddFavoritesResult(FavoritesResult{Added: 1})
+			_ = report.HasWarnings()
+			_ = report.HasDuplicateConflicts()
+			_ = report.HasUnmappedItems()
+			_ = report.HasFavoritesMismatches()
+			done <- struct{}{}
+		}()
+	}
+
+	for range goroutines {
+		<-done
+	}
+
+	assert.Equal(t, goroutines, len(report.Warnings))
+	assert.Equal(t, goroutines, report.FavoritesAdded)
+}

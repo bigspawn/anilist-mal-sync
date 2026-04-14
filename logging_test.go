@@ -30,8 +30,8 @@ func TestLoggingRoundTripper_NonVerbose_DoesNotLog(t *testing.T) {
 	assert.NoError(t, err)
 	_ = resp.Body.Close()
 
-	// Non-verbose mode: no debug HTTP logs
-	assert.NotContains(t, buf.String(), "GET")
+	// Non-verbose mode produces no log output at all.
+	assert.Empty(t, buf.String(), "non-verbose mode should produce no log output")
 }
 
 func TestLoggingRoundTripper_Verbose_LogsRequest(t *testing.T) {

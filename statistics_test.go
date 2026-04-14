@@ -598,38 +598,33 @@ func TestStatistics_RecordSkip_TracksReason(t *testing.T) {
 
 func TestAggregateStats(t *testing.T) {
 	t.Parallel()
+
+	// Build s1 via the public API so counts and item slices stay consistent.
 	s1 := NewStatistics()
-	s1.TotalCount = 10
-	s1.UpdatedCount = 3
-	s1.SkippedCount = 5
-	s1.ErrorCount = 2
-	s1.DryRunCount = 1
-	s1.SkippedItems = []UpdateResult{
-		{SkipReason: "no changes"},
-		{SkipReason: "no changes"},
-		{SkipReason: "unmapped"},
-	}
-	s1.UpdatedItems = []UpdateResult{{Title: "A"}}
-	s1.ErrorItems = []UpdateResult{{Title: "Err1"}}
-	s1.DryRunItems = []UpdateResult{{Title: "Dry1"}}
+	s1.IncrementTotal()
+	s1.IncrementTotal()
+	s1.IncrementTotal()
+	s1.RecordUpdate(UpdateResult{Title: "A", Status: "watching"})
+	s1.RecordSkip(UpdateResult{SkipReason: "no changes", Status: "completed"})
+	s1.RecordSkip(UpdateResult{SkipReason: "no changes", Status: "completed"})
+	s1.RecordSkip(UpdateResult{SkipReason: "unmapped", Status: "completed"})
+	s1.RecordError(UpdateResult{Title: "Err1"})
+	s1.RecordDryRun(UpdateResult{Title: "Dry1", Status: "watching"})
 
 	s2 := NewStatistics()
-	s2.TotalCount = 5
-	s2.UpdatedCount = 2
-	s2.SkippedCount = 2
-	s2.ErrorCount = 1
-	s2.DryRunCount = 0
-	s2.SkippedItems = []UpdateResult{{SkipReason: "no changes"}}
-	s2.UpdatedItems = []UpdateResult{{Title: "B"}}
-	s2.ErrorItems = []UpdateResult{{Title: "Err2"}}
+	s2.IncrementTotal()
+	s2.IncrementTotal()
+	s2.RecordUpdate(UpdateResult{Title: "B", Status: "watching"})
+	s2.RecordSkip(UpdateResult{SkipReason: "no changes", Status: "watching"})
+	s2.RecordError(UpdateResult{Title: "Err2"})
 
 	result := aggregateStats([]*Statistics{s1, s2})
 
-	assert.Equal(t, 15, result.items)
-	assert.Equal(t, 5, result.updated)
-	assert.Equal(t, 7, result.skipped)
-	assert.Equal(t, 3, result.errors)
-	assert.Equal(t, 1, result.dryRun)
+	assert.Equal(t, 5, result.items)   // 3 + 2 IncrementTotal calls
+	assert.Equal(t, 2, result.updated) // 1 + 1
+	assert.Equal(t, 4, result.skipped) // 3 + 1
+	assert.Equal(t, 2, result.errors)  // 1 + 1
+	assert.Equal(t, 1, result.dryRun)  // 1 + 0
 	assert.Equal(t, 3, result.skipReasons["no changes"])
 	assert.Equal(t, 1, result.skipReasons["unmapped"])
 	assert.Len(t, result.updatedItems, 2)
@@ -714,18 +709,19 @@ func TestSortedKeys_SingleEntry(t *testing.T) {
 func TestCapitalizeFirst(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
+		name     string
 		input    string
 		expected string
 	}{
-		{"anime", "Anime"},
-		{"manga", "Manga"},
-		{"ALREADY", "ALREADY"},
-		{"", ""},
-		{"a", "A"},
-		{"already Capitalized", "Already Capitalized"},
+		{"lowercase word", "anime", "Anime"},
+		{"another word", "manga", "Manga"},
+		{"already upper", "ALREADY", "ALREADY"},
+		{"empty string", "", ""},
+		{"single char", "a", "A"},
+		{"mixed case", "already Capitalized", "Already Capitalized"},
 	}
 	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.expected, capitalizeFirst(tt.input))
 		})
 	}

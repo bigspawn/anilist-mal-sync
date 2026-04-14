@@ -122,9 +122,11 @@ func executeWithRetry(
 					attempt, maxRetries, req.URL, nextWait)
 			}
 
+			timer := time.NewTimer(nextWait)
 			select {
-			case <-time.After(nextWait):
+			case <-timer.C:
 			case <-req.Context().Done():
+				timer.Stop()
 				return nil, req.Context().Err()
 			}
 		}
