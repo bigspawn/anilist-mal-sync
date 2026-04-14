@@ -110,11 +110,17 @@ func executeWithRetry(
 ) (*http.Response, error) {
 	var lastErr error
 	var nextWait time.Duration
+	var rateLimited bool
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
-			LogWarn(req.Context(), "[HTTP RETRY] Attempt %d/%d for %s (waiting %v)",
-				attempt, maxRetries, req.URL, nextWait)
+			if rateLimited {
+				LogWarn(req.Context(), "[HTTP RETRY] Attempt %d/%d for %s (rate limited, waiting %v)",
+					attempt, maxRetries, req.URL, nextWait)
+			} else {
+				LogWarn(req.Context(), "[HTTP RETRY] Attempt %d/%d for %s (waiting %v)",
+					attempt, maxRetries, req.URL, nextWait)
+			}
 
 			select {
 			case <-time.After(nextWait):
@@ -132,7 +138,7 @@ func executeWithRetry(
 
 		// Compute the wait for the next retry before closing the response
 		// so we can read the Retry-After header if present.
-		nextWait = retryAfterOrBackoff(resp, attempt+1, backoff)
+		nextWait, rateLimited = retryAfterOrBackoff(resp, attempt+1, backoff)
 
 		if resp != nil {
 			_ = resp.Body.Close()
@@ -156,19 +162,20 @@ func executeWithRetry(
 	return nil, fmt.Errorf("max retries (%d) exhausted", maxRetries)
 }
 
-// retryAfterOrBackoff returns the wait duration before the next retry.
+// retryAfterOrBackoff returns the wait duration before the next retry and
+// whether the duration came from a Retry-After header (true) or backoff (false).
 // For 429 Too Many Requests responses with a Retry-After header, it uses
 // that value to wait precisely until the rate limit window resets.
 // Falls back to exponential backoff otherwise.
-func retryAfterOrBackoff(resp *http.Response, attempt int, backoff BackoffStrategy) time.Duration {
+func retryAfterOrBackoff(resp *http.Response, attempt int, backoff BackoffStrategy) (time.Duration, bool) {
 	if resp != nil && resp.StatusCode == http.StatusTooManyRequests {
 		if v := resp.Header.Get("Retry-After"); v != "" {
 			if seconds, err := strconv.Atoi(v); err == nil && seconds > 0 {
-				return time.Duration(seconds) * time.Second
+				return time.Duration(seconds) * time.Second, true
 			}
 		}
 	}
-	return backoff.Duration(attempt)
+	return backoff.Duration(attempt), false
 }
 
 // withTimeout adds a timeout to the context for API calls.

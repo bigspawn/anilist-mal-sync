@@ -148,3 +148,175 @@ func TestSyncReport_WarningStruct(t *testing.T) {
 	assert.Equal(t, "Test Detail", warning.Detail)
 	assert.Equal(t, "Test Media", warning.MediaType)
 }
+
+// =============================================================================
+// AddUnmappedItems / HasUnmappedItems
+// =============================================================================
+
+func TestSyncReport_AddUnmappedItems(t *testing.T) {
+	t.Parallel()
+	report := NewSyncReport()
+
+	items := []UnmappedEntry{
+		{Title: "Anime A", AniListID: 1, MediaType: "anime"},
+		{Title: "Manga B", MALID: 2, MediaType: "manga"},
+	}
+	report.AddUnmappedItems(items)
+
+	assert.Len(t, report.UnmappedItems, 2)
+	assert.Equal(t, "Anime A", report.UnmappedItems[0].Title)
+	assert.Equal(t, "Manga B", report.UnmappedItems[1].Title)
+}
+
+func TestSyncReport_AddUnmappedItems_Empty(t *testing.T) {
+	t.Parallel()
+	report := NewSyncReport()
+	report.AddUnmappedItems(nil)
+	report.AddUnmappedItems([]UnmappedEntry{})
+
+	assert.Empty(t, report.UnmappedItems)
+}
+
+func TestSyncReport_AddUnmappedItems_Accumulates(t *testing.T) {
+	t.Parallel()
+	report := NewSyncReport()
+	report.AddUnmappedItems([]UnmappedEntry{{Title: "A"}})
+	report.AddUnmappedItems([]UnmappedEntry{{Title: "B"}, {Title: "C"}})
+
+	assert.Len(t, report.UnmappedItems, 3)
+}
+
+func TestSyncReport_HasUnmappedItems(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		setup    func(*SyncReport)
+		expected bool
+	}{
+		{"empty report", func(_ *SyncReport) {}, false},
+		{"one item", func(r *SyncReport) {
+			r.AddUnmappedItems([]UnmappedEntry{{Title: "X"}})
+		}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := NewSyncReport()
+			tt.setup(r)
+			assert.Equal(t, tt.expected, r.HasUnmappedItems())
+		})
+	}
+}
+
+// =============================================================================
+// AddDuplicateConflict / HasDuplicateConflicts
+// =============================================================================
+
+func TestSyncReport_AddDuplicateConflict(t *testing.T) {
+	t.Parallel()
+	report := NewSyncReport()
+
+	report.AddDuplicateConflict("Loser", "Winner", "Target", "stratA", "stratB", "anime")
+
+	assert.Len(t, report.DuplicateConflicts, 1)
+	c := report.DuplicateConflicts[0]
+	assert.Equal(t, "Loser", c.LoserTitle)
+	assert.Equal(t, "Winner", c.WinnerTitle)
+	assert.Equal(t, "Target", c.TargetTitle)
+	assert.Equal(t, "stratA", c.LoserStrat)
+	assert.Equal(t, "stratB", c.WinnerStrat)
+	assert.Equal(t, "anime", c.MediaType)
+}
+
+func TestSyncReport_AddDuplicateConflict_Multiple(t *testing.T) {
+	t.Parallel()
+	report := NewSyncReport()
+
+	report.AddDuplicateConflict("L1", "W1", "T1", "s1", "s2", "anime")
+	report.AddDuplicateConflict("L2", "W2", "T2", "s3", "s4", "manga")
+
+	assert.Len(t, report.DuplicateConflicts, 2)
+	assert.Equal(t, "L2", report.DuplicateConflicts[1].LoserTitle)
+}
+
+func TestSyncReport_HasDuplicateConflicts(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		setup    func(*SyncReport)
+		expected bool
+	}{
+		{"empty", func(_ *SyncReport) {}, false},
+		{"one conflict", func(r *SyncReport) {
+			r.AddDuplicateConflict("L", "W", "T", "s1", "s2", "anime")
+		}, true},
+		{"two conflicts", func(r *SyncReport) {
+			r.AddDuplicateConflict("L1", "W1", "T1", "s1", "s2", "anime")
+			r.AddDuplicateConflict("L2", "W2", "T2", "s3", "s4", "manga")
+		}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := NewSyncReport()
+			tt.setup(r)
+			assert.Equal(t, tt.expected, r.HasDuplicateConflicts())
+		})
+	}
+}
+
+// =============================================================================
+// AddFavoritesResult / HasFavoritesMismatches
+// =============================================================================
+
+func TestSyncReport_AddFavoritesResult(t *testing.T) {
+	t.Parallel()
+	report := NewSyncReport()
+
+	result := FavoritesResult{
+		Added: 3,
+		Mismatches: []FavoriteMismatch{
+			{Title: "Anime X", AniListID: 1, MALID: 10, MediaType: "anime", OnAniList: true, OnMAL: false},
+		},
+	}
+	report.AddFavoritesResult(result)
+
+	assert.Equal(t, 3, report.FavoritesAdded)
+	assert.Len(t, report.FavoritesMismatches, 1)
+	assert.Equal(t, "Anime X", report.FavoritesMismatches[0].Title)
+}
+
+func TestSyncReport_AddFavoritesResult_Accumulates(t *testing.T) {
+	t.Parallel()
+	report := NewSyncReport()
+
+	report.AddFavoritesResult(FavoritesResult{Added: 2, Mismatches: []FavoriteMismatch{{Title: "A"}}})
+	report.AddFavoritesResult(FavoritesResult{Added: 5, Mismatches: []FavoriteMismatch{{Title: "B"}, {Title: "C"}}})
+
+	assert.Equal(t, 7, report.FavoritesAdded)
+	assert.Len(t, report.FavoritesMismatches, 3)
+}
+
+func TestSyncReport_HasFavoritesMismatches(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		setup    func(*SyncReport)
+		expected bool
+	}{
+		{"empty", func(_ *SyncReport) {}, false},
+		{"only added, no mismatches", func(r *SyncReport) {
+			r.AddFavoritesResult(FavoritesResult{Added: 5})
+		}, false},
+		{"with mismatches", func(r *SyncReport) {
+			r.AddFavoritesResult(FavoritesResult{
+				Mismatches: []FavoriteMismatch{{Title: "X"}},
+			})
+		}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := NewSyncReport()
+			tt.setup(r)
+			assert.Equal(t, tt.expected, r.HasFavoritesMismatches())
+		})
+	}
+}

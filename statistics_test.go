@@ -547,3 +547,238 @@ func TestPrintGlobalSummary_WithDryRunItems(t *testing.T) {
 	output := buf.String()
 	assert.Contains(t, output, "Would update (2)")
 }
+
+// =============================================================================
+// RecordUpdate / RecordSkip / RecordError / IncrementTotal — extra coverage
+// =============================================================================
+
+func TestStatistics_RecordError_DoesNotUpdateStatusCounts(t *testing.T) {
+	t.Parallel()
+	stats := NewStatistics()
+
+	stats.RecordError(UpdateResult{Title: "Err1", Status: "watching", Error: errors.New("oops")})
+	stats.RecordError(UpdateResult{Title: "Err2", Status: "completed", Error: errors.New("fail")})
+
+	assert.Equal(t, 2, stats.ErrorCount)
+	assert.Len(t, stats.ErrorItems, 2)
+	// RecordError does NOT touch StatusCounts
+	assert.Empty(t, stats.StatusCounts)
+}
+
+func TestStatistics_RecordUpdate_TracksStatus(t *testing.T) {
+	t.Parallel()
+	stats := NewStatistics()
+
+	stats.RecordUpdate(UpdateResult{Title: "A", Status: "watching"})
+	stats.RecordUpdate(UpdateResult{Title: "B", Status: "watching"})
+	stats.RecordUpdate(UpdateResult{Title: "C", Status: "completed"})
+
+	assert.Equal(t, 3, stats.UpdatedCount)
+	assert.Len(t, stats.UpdatedItems, 3)
+	assert.Equal(t, 2, stats.StatusCounts["watching"])
+	assert.Equal(t, 1, stats.StatusCounts["completed"])
+}
+
+func TestStatistics_RecordSkip_TracksReason(t *testing.T) {
+	t.Parallel()
+	stats := NewStatistics()
+
+	stats.RecordSkip(UpdateResult{Title: "X", Status: "on_hold", SkipReason: "no changes"})
+	stats.RecordSkip(UpdateResult{Title: "Y", Status: "completed", SkipReason: "in ignore list"})
+
+	assert.Equal(t, 2, stats.SkippedCount)
+	assert.Len(t, stats.SkippedItems, 2)
+	assert.Equal(t, 1, stats.StatusCounts["on_hold"])
+	assert.Equal(t, 1, stats.StatusCounts["completed"])
+}
+
+// =============================================================================
+// aggregateStats
+// =============================================================================
+
+func TestAggregateStats(t *testing.T) {
+	t.Parallel()
+	s1 := NewStatistics()
+	s1.TotalCount = 10
+	s1.UpdatedCount = 3
+	s1.SkippedCount = 5
+	s1.ErrorCount = 2
+	s1.DryRunCount = 1
+	s1.SkippedItems = []UpdateResult{
+		{SkipReason: "no changes"},
+		{SkipReason: "no changes"},
+		{SkipReason: "unmapped"},
+	}
+	s1.UpdatedItems = []UpdateResult{{Title: "A"}}
+	s1.ErrorItems = []UpdateResult{{Title: "Err1"}}
+	s1.DryRunItems = []UpdateResult{{Title: "Dry1"}}
+
+	s2 := NewStatistics()
+	s2.TotalCount = 5
+	s2.UpdatedCount = 2
+	s2.SkippedCount = 2
+	s2.ErrorCount = 1
+	s2.DryRunCount = 0
+	s2.SkippedItems = []UpdateResult{{SkipReason: "no changes"}}
+	s2.UpdatedItems = []UpdateResult{{Title: "B"}}
+	s2.ErrorItems = []UpdateResult{{Title: "Err2"}}
+
+	result := aggregateStats([]*Statistics{s1, s2})
+
+	assert.Equal(t, 15, result.items)
+	assert.Equal(t, 5, result.updated)
+	assert.Equal(t, 7, result.skipped)
+	assert.Equal(t, 3, result.errors)
+	assert.Equal(t, 1, result.dryRun)
+	assert.Equal(t, 3, result.skipReasons["no changes"])
+	assert.Equal(t, 1, result.skipReasons["unmapped"])
+	assert.Len(t, result.updatedItems, 2)
+	assert.Len(t, result.errorItems, 2)
+	assert.Len(t, result.dryRunItems, 1)
+}
+
+func TestAggregateStats_NilEntries(t *testing.T) {
+	t.Parallel()
+	s := NewStatistics()
+	s.TotalCount = 7
+	s.UpdatedCount = 7
+
+	result := aggregateStats([]*Statistics{nil, s, nil})
+
+	assert.Equal(t, 7, result.items)
+	assert.Equal(t, 7, result.updated)
+}
+
+func TestAggregateStats_Empty(t *testing.T) {
+	t.Parallel()
+	result := aggregateStats([]*Statistics{})
+
+	assert.Equal(t, 0, result.items)
+	assert.Equal(t, 0, result.updated)
+	assert.Empty(t, result.skipReasons)
+}
+
+// =============================================================================
+// groupSkipReasons
+// =============================================================================
+
+func TestGroupSkipReasons(t *testing.T) {
+	t.Parallel()
+	items := []UpdateResult{
+		{SkipReason: "no changes"},
+		{SkipReason: "no changes"},
+		{SkipReason: "unmapped"},
+		{SkipReason: ""},
+	}
+
+	result := groupSkipReasons(items)
+
+	assert.Equal(t, 2, result["no changes"])
+	assert.Equal(t, 1, result["unmapped"])
+	assert.Equal(t, 1, result["unspecified"])
+	assert.Equal(t, 3, len(result))
+}
+
+func TestGroupSkipReasons_Empty(t *testing.T) {
+	t.Parallel()
+	result := groupSkipReasons(nil)
+	assert.Empty(t, result)
+}
+
+// =============================================================================
+// sortedKeys
+// =============================================================================
+
+func TestSortedKeys(t *testing.T) {
+	t.Parallel()
+	m := map[string]int{"banana": 1, "apple": 2, "cherry": 3}
+	keys := sortedKeys(m)
+	assert.Equal(t, []string{"apple", "banana", "cherry"}, keys)
+}
+
+func TestSortedKeys_Empty(t *testing.T) {
+	t.Parallel()
+	assert.Empty(t, sortedKeys(map[string]int{}))
+}
+
+func TestSortedKeys_SingleEntry(t *testing.T) {
+	t.Parallel()
+	keys := sortedKeys(map[string]int{"only": 1})
+	assert.Equal(t, []string{"only"}, keys)
+}
+
+// =============================================================================
+// capitalizeFirst
+// =============================================================================
+
+func TestCapitalizeFirst(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"anime", "Anime"},
+		{"manga", "Manga"},
+		{"ALREADY", "ALREADY"},
+		{"", ""},
+		{"a", "A"},
+		{"already Capitalized", "Already Capitalized"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			assert.Equal(t, tt.expected, capitalizeFirst(tt.input))
+		})
+	}
+}
+
+// =============================================================================
+// formatUnmappedLine
+// =============================================================================
+
+func TestFormatUnmappedLine(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		num      int
+		item     UnmappedEntry
+		media    string
+		contains []string
+	}{
+		{
+			name:     "with AniList ID",
+			num:      1,
+			item:     UnmappedEntry{Title: "Naruto", AniListID: 100, Reason: "no match"},
+			media:    "Anime",
+			contains: []string{"1.", `"Naruto"`, "AniList: 100", "[Anime]", "no match"},
+		},
+		{
+			name:     "with MAL ID",
+			num:      2,
+			item:     UnmappedEntry{Title: "Bleach", MALID: 200},
+			media:    "Anime",
+			contains: []string{"2.", `"Bleach"`, "MAL: 200"},
+		},
+		{
+			name:     "with neither ID",
+			num:      3,
+			item:     UnmappedEntry{Title: "Unknown", Reason: "missing"},
+			media:    "Manga",
+			contains: []string{"3.", `"Unknown"`, "[Manga]", "missing"},
+		},
+		{
+			name:     "no reason",
+			num:      4,
+			item:     UnmappedEntry{Title: "X", AniListID: 5},
+			media:    "Anime",
+			contains: []string{`"X"`, "AniList: 5"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := formatUnmappedLine(tt.num, tt.item, tt.media)
+			for _, want := range tt.contains {
+				assert.Contains(t, got, want)
+			}
+		})
+	}
+}
