@@ -298,6 +298,135 @@ func TestRetryableRoundTripper_MaxRetriesExhausted(t *testing.T) {
 	}
 }
 
+func TestRetryAfterOrBackoff(t *testing.T) {
+	backoff := &ExponentialBackoff{
+		InitialInterval: 1 * time.Second,
+		MaxInterval:     30 * time.Second,
+		Multiplier:      2.0,
+	}
+
+	tests := []struct {
+		name     string
+		resp     *http.Response
+		attempt  int
+		expected time.Duration
+	}{
+		{
+			name: "uses Retry-After header on 429",
+			resp: &http.Response{
+				StatusCode: http.StatusTooManyRequests,
+				Header:     http.Header{"Retry-After": []string{"30"}},
+			},
+			attempt:  1,
+			expected: 30 * time.Second,
+		},
+		{
+			name: "falls back to backoff when no Retry-After header",
+			resp: &http.Response{
+				StatusCode: http.StatusTooManyRequests,
+				Header:     http.Header{},
+			},
+			attempt:  1,
+			expected: 1 * time.Second,
+		},
+		{
+			name: "ignores Retry-After for non-429 status",
+			resp: &http.Response{
+				StatusCode: http.StatusInternalServerError,
+				Header:     http.Header{"Retry-After": []string{"30"}},
+			},
+			attempt:  1,
+			expected: 1 * time.Second,
+		},
+		{
+			name: "falls back to backoff when Retry-After is not a number",
+			resp: &http.Response{
+				StatusCode: http.StatusTooManyRequests,
+				Header:     http.Header{"Retry-After": []string{"not-a-number"}},
+			},
+			attempt:  1,
+			expected: 1 * time.Second,
+		},
+		{
+			name:     "falls back to backoff when resp is nil",
+			resp:     nil,
+			attempt:  1,
+			expected: 1 * time.Second,
+		},
+		{
+			name: "falls back to backoff when Retry-After is zero",
+			resp: &http.Response{
+				StatusCode: http.StatusTooManyRequests,
+				Header:     http.Header{"Retry-After": []string{"0"}},
+			},
+			attempt:  1,
+			expected: 1 * time.Second,
+		},
+		{
+			name: "uses Retry-After regardless of backoff attempt number",
+			resp: &http.Response{
+				StatusCode: http.StatusTooManyRequests,
+				Header:     http.Header{"Retry-After": []string{"60"}},
+			},
+			attempt:  3,
+			expected: 60 * time.Second,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := retryAfterOrBackoff(tt.resp, tt.attempt, backoff)
+			if got != tt.expected {
+				t.Fatalf("expected %v, got %v", tt.expected, got)
+			}
+		})
+	}
+}
+
+func TestRetryableRoundTripper_RetryAfterHeaderIsUsed(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		attempts++
+		if attempts == 1 {
+			w.Header().Set("Retry-After", "1")
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	// Use a backoff much longer than Retry-After to confirm Retry-After wins.
+	transport := &retryableRoundTripper{
+		underlying: http.DefaultTransport,
+		maxRetries: 3,
+		backoff: &ExponentialBackoff{
+			InitialInterval: 30 * time.Second,
+			MaxInterval:     60 * time.Second,
+			Multiplier:      2.0,
+		},
+	}
+	client := &http.Client{Transport: transport}
+
+	start := time.Now()
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL, nil)
+	resp, err := client.Do(req)
+	elapsed := time.Since(start)
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	_ = resp.Body.Close()
+
+	if attempts != 2 {
+		t.Fatalf("expected 2 attempts, got %d", attempts)
+	}
+	// Should have waited ~1s (Retry-After), not 30s (backoff).
+	if elapsed >= 10*time.Second {
+		t.Fatalf("waited too long (%v): Retry-After header was not used", elapsed)
+	}
+}
+
 func TestNewRetryableTransport_DefaultTransport(t *testing.T) {
 	client := &http.Client{} // Transport is nil
 	transport := NewRetryableTransport(client, 3)

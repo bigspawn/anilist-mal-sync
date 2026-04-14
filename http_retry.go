@@ -6,6 +6,7 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -108,15 +109,15 @@ func executeWithRetry(
 	doRequest func(*http.Request) (*http.Response, error),
 ) (*http.Response, error) {
 	var lastErr error
+	var nextWait time.Duration
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
-			wait := backoff.Duration(attempt)
 			LogWarn(req.Context(), "[HTTP RETRY] Attempt %d/%d for %s (waiting %v)",
-				attempt, maxRetries, req.URL, wait)
+				attempt, maxRetries, req.URL, nextWait)
 
 			select {
-			case <-time.After(wait):
+			case <-time.After(nextWait):
 			case <-req.Context().Done():
 				return nil, req.Context().Err()
 			}
@@ -128,6 +129,10 @@ func executeWithRetry(
 		if err == nil && !shouldRetryStatus(resp.StatusCode) {
 			return resp, nil
 		}
+
+		// Compute the wait for the next retry before closing the response
+		// so we can read the Retry-After header if present.
+		nextWait = retryAfterOrBackoff(resp, attempt+1, backoff)
 
 		if resp != nil {
 			_ = resp.Body.Close()
@@ -149,6 +154,21 @@ func executeWithRetry(
 		return nil, lastErr
 	}
 	return nil, fmt.Errorf("max retries (%d) exhausted", maxRetries)
+}
+
+// retryAfterOrBackoff returns the wait duration before the next retry.
+// For 429 Too Many Requests responses with a Retry-After header, it uses
+// that value to wait precisely until the rate limit window resets.
+// Falls back to exponential backoff otherwise.
+func retryAfterOrBackoff(resp *http.Response, attempt int, backoff BackoffStrategy) time.Duration {
+	if resp != nil && resp.StatusCode == http.StatusTooManyRequests {
+		if v := resp.Header.Get("Retry-After"); v != "" {
+			if seconds, err := strconv.Atoi(v); err == nil && seconds > 0 {
+				return time.Duration(seconds) * time.Second
+			}
+		}
+	}
+	return backoff.Duration(attempt)
 }
 
 // withTimeout adds a timeout to the context for API calls.
