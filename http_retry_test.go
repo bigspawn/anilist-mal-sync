@@ -307,11 +307,11 @@ func TestRetryAfterOrBackoff(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		resp        *http.Response
-		attempt     int
-		expected    time.Duration
-		fromHeader  bool
+		name       string
+		resp       *http.Response
+		attempt    int
+		expected   time.Duration
+		fromHeader bool
 	}{
 		{
 			name: "uses Retry-After header on 429",

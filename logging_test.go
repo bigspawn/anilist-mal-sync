@@ -121,4 +121,3 @@ type errorTransport struct {
 func (e *errorTransport) RoundTrip(_ *http.Request) (*http.Response, error) {
 	return nil, e.err
 }
-
