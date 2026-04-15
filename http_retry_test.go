@@ -733,7 +733,10 @@ func TestExecuteWithRetry_SkipsBackoffOnLastAttempt(t *testing.T) {
 	}
 
 	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://localhost:1", nil)
-	_, _ = executeWithRetry(req, maxRetries, cb, doRequest)
+	resp, _ := executeWithRetry(req, maxRetries, cb, doRequest)
+	if resp != nil {
+		_ = resp.Body.Close()
+	}
 
 	// Attempts: 0, 1, 2, 3 — backoff computed before attempts 1,2,3 only.
 	// The last attempt (3 == maxRetries) must NOT trigger a backoff call.
