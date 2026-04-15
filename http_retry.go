@@ -174,10 +174,12 @@ func executeWithRetry(
 // Supports both delay-seconds (integer) and HTTP-date formats.
 // Returns the duration to wait and true if the value is valid and in the future.
 func parseRetryAfter(v string) (time.Duration, bool) {
-	if seconds, err := strconv.Atoi(v); err == nil && seconds > 0 {
+	seconds, err := strconv.Atoi(v)
+	if err == nil && seconds > 0 {
 		return time.Duration(seconds) * time.Second, true
 	}
-	if t, err := http.ParseTime(v); err == nil {
+	t, err := http.ParseTime(v)
+	if err == nil {
 		if d := time.Until(t); d > 0 {
 			return d, true
 		}

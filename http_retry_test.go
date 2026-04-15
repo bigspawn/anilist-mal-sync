@@ -531,7 +531,7 @@ func TestRetryableRoundTripper_RateLimitedLogMessage(t *testing.T) {
 	client := &http.Client{Transport: transport}
 
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, server.URL, nil)
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:gosec
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -572,7 +572,7 @@ func TestRetryableRoundTripper_RetryAfterHeaderIsUsed(t *testing.T) {
 
 	start := time.Now()
 	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL, nil)
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:gosec
 	elapsed := time.Since(start)
 
 	if err != nil {

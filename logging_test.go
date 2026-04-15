@@ -26,7 +26,7 @@ func TestLoggingRoundTripper_NonVerbose_DoesNotLog(t *testing.T) {
 
 	ctx := logger.WithContext(t.Context())
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, server.URL, nil)
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:gosec
 	assert.NoError(t, err)
 	_ = resp.Body.Close()
 
@@ -51,7 +51,7 @@ func TestLoggingRoundTripper_Verbose_LogsRequest(t *testing.T) {
 
 	ctx := logger.WithContext(t.Context())
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, server.URL, nil)
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:gosec
 	assert.NoError(t, err)
 	_ = resp.Body.Close()
 
@@ -74,7 +74,10 @@ func TestLoggingRoundTripper_Verbose_LogsError(t *testing.T) {
 
 	ctx := logger.WithContext(t.Context())
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost:1", nil)
-	_, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:gosec
+	if resp != nil {
+		_ = resp.Body.Close()
+	}
 	assert.Error(t, err)
 
 	output := buf.String()
@@ -92,7 +95,7 @@ func TestLoggingRoundTripper_NonVerbose_PassesThrough(t *testing.T) {
 	client := &http.Client{Transport: rt}
 
 	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL, nil)
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:gosec
 	assert.NoError(t, err)
 	_ = resp.Body.Close()
 
@@ -109,7 +112,10 @@ func TestLoggingRoundTripper_NonVerbose_PropagatesError(t *testing.T) {
 	client := &http.Client{Transport: rt}
 
 	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://localhost:1", nil)
-	_, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:gosec
+	if resp != nil {
+		_ = resp.Body.Close()
+	}
 	assert.ErrorIs(t, err, wantErr)
 }
 
