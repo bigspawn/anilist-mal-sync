@@ -6,6 +6,7 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -56,6 +57,9 @@ func isRetryable(err error, resp *http.Response) bool {
 		return strings.Contains(errStr, "connection refused") ||
 			strings.Contains(errStr, "connection reset") ||
 			strings.Contains(errStr, "broken pipe")
+	}
+	if resp == nil {
+		return false
 	}
 	return shouldRetryStatus(resp.StatusCode)
 }
@@ -108,16 +112,24 @@ func executeWithRetry(
 	doRequest func(*http.Request) (*http.Response, error),
 ) (*http.Response, error) {
 	var lastErr error
+	var nextWait time.Duration
+	var rateLimited bool
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
-			wait := backoff.Duration(attempt)
-			LogWarn(req.Context(), "[HTTP RETRY] Attempt %d/%d for %s (waiting %v)",
-				attempt, maxRetries, req.URL, wait)
+			if rateLimited {
+				LogWarn(req.Context(), "[HTTP RETRY] Attempt %d/%d for %s (rate limited, waiting %v)",
+					attempt, maxRetries, req.URL, nextWait)
+			} else {
+				LogWarn(req.Context(), "[HTTP RETRY] Attempt %d/%d for %s (waiting %v)",
+					attempt, maxRetries, req.URL, nextWait)
+			}
 
+			timer := time.NewTimer(nextWait)
 			select {
-			case <-time.After(wait):
+			case <-timer.C:
 			case <-req.Context().Done():
+				timer.Stop()
 				return nil, req.Context().Err()
 			}
 		}
@@ -127,6 +139,13 @@ func executeWithRetry(
 
 		if err == nil && !shouldRetryStatus(resp.StatusCode) {
 			return resp, nil
+		}
+
+		// Compute the wait for the next retry before closing the response
+		// so we can read the Retry-After header if present.
+		// Skip on the last iteration — the value will never be used.
+		if attempt < maxRetries {
+			nextWait, rateLimited = retryAfterOrBackoff(resp, attempt+1, backoff)
 		}
 
 		if resp != nil {
@@ -149,6 +168,39 @@ func executeWithRetry(
 		return nil, lastErr
 	}
 	return nil, fmt.Errorf("max retries (%d) exhausted", maxRetries)
+}
+
+// parseRetryAfter parses the value of a Retry-After header per RFC 7231 §7.1.3.
+// Supports both delay-seconds (integer) and HTTP-date formats.
+// Returns the duration to wait and true if the value is valid and in the future.
+func parseRetryAfter(v string) (time.Duration, bool) {
+	seconds, err := strconv.Atoi(v)
+	if err == nil && seconds > 0 {
+		return time.Duration(seconds) * time.Second, true
+	}
+	t, err := http.ParseTime(v)
+	if err == nil {
+		if d := time.Until(t); d > 0 {
+			return d, true
+		}
+	}
+	return 0, false
+}
+
+// retryAfterOrBackoff returns the wait duration before the next retry and
+// whether the duration came from a Retry-After header (true) or backoff (false).
+// For 429 Too Many Requests responses with a Retry-After header, it uses
+// that value to wait precisely until the rate limit window resets.
+// Falls back to exponential backoff otherwise.
+func retryAfterOrBackoff(resp *http.Response, attempt int, backoff BackoffStrategy) (time.Duration, bool) {
+	if resp != nil && resp.StatusCode == http.StatusTooManyRequests {
+		if v := resp.Header.Get("Retry-After"); v != "" {
+			if d, ok := parseRetryAfter(v); ok {
+				return d, true
+			}
+		}
+	}
+	return backoff.Duration(attempt), false
 }
 
 // withTimeout adds a timeout to the context for API calls.
