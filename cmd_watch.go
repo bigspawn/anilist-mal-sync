@@ -9,8 +9,6 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-const defaultInterval = 24 * time.Hour
-
 // cronSchedule mirrors cron.Schedule for testability without importing the library in tests.
 type cronSchedule interface {
 	Next(time.Time) time.Time
@@ -70,25 +68,19 @@ func resolveWatchConfig(cmd *cli.Command, cfg WatchConfig) (WatchConfig, error) 
 }
 
 func runWatch(ctx context.Context, cmd *cli.Command) error {
-	verboseVal, reverseVal := getSyncFlagsFromCmd(cmd)
-
 	configPath := cmd.String("config")
 	config, err := loadConfigFromFile(configPath)
 	if err != nil {
 		return fmt.Errorf("error loading config: %w", err)
 	}
 
-	applySyncFlagsToConfig(cmd, &config)
-
-	logger := NewLogger(verboseVal)
-	ctx = logger.WithContext(ctx)
-
-	app, err := NewApp(ctx, config, reverseVal)
+	// Validate watch config early — fail fast before touching OAuth/credentials.
+	resolved, err := resolveWatchConfig(cmd, config.Watch)
 	if err != nil {
-		return fmt.Errorf("create app: %w", err)
+		return err
 	}
 
-	resolved, err := resolveWatchConfig(cmd, config.Watch)
+	ctx, app, _, err := buildWatchApp(ctx, cmd, config)
 	if err != nil {
 		return err
 	}
@@ -102,6 +94,23 @@ func runWatch(ctx context.Context, cmd *cli.Command) error {
 	interval, _ := resolved.GetInterval()
 
 	return watchWithInterval(ctx, app, interval, once)
+}
+
+// buildWatchApp initializes logger and App from the loaded config.
+func buildWatchApp(ctx context.Context, cmd *cli.Command, config Config) (context.Context, *App, Config, error) {
+	verboseVal, reverseVal := getSyncFlagsFromCmd(cmd)
+
+	applySyncFlagsToConfig(cmd, &config)
+
+	logger := NewLogger(verboseVal)
+	ctx = logger.WithContext(ctx)
+
+	app, err := NewApp(ctx, config, reverseVal)
+	if err != nil {
+		return ctx, nil, Config{}, fmt.Errorf("create app: %w", err)
+	}
+
+	return ctx, app, config, nil
 }
 
 func watchWithInterval(ctx context.Context, runner syncRunner, interval time.Duration, once bool) error {

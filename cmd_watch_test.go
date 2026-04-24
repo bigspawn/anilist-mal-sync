@@ -165,7 +165,7 @@ func TestValidateInterval_ValidIntervals(t *testing.T) {
 	}{
 		{"Minimum valid", minInterval, true},
 		{"Maximum valid", maxInterval, true},
-		{"Default interval", defaultInterval, true},
+		{"Default interval", 24 * time.Hour, true},
 		{"12 hours", 12 * time.Hour, true},
 		{"48 hours", 48 * time.Hour, true},
 		{"Too small", 30 * time.Minute, false},
