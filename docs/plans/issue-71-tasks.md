@@ -106,7 +106,7 @@ Each task is self-contained and ends with a green quality gate (`make fmt && mak
 
 ## Phase 2 — CLI resolution logic
 
-### Task 2.1 — Extract `resolveWatchConfig` from `runWatch`
+### Task 2.1 — Extract `resolveWatchConfig` from `runWatch` ~~DONE~~
 
 Pure function that merges CLI + already-loaded config into final `interval` /
 `schedule` values. Makes the resolution testable without spinning up an app.
@@ -143,7 +143,7 @@ func resolveWatchConfig(cmd *cli.Command, cfg WatchConfig) (WatchConfig, error)
 
 ---
 
-### Task 2.2 — Add `--schedule` CLI flag
+### Task 2.2 — Add `--schedule` CLI flag ~~DONE~~
 
 **Files:** `cmd_watch.go`, `cmd_watch_test.go`
 
@@ -167,7 +167,7 @@ func resolveWatchConfig(cmd *cli.Command, cfg WatchConfig) (WatchConfig, error)
 
 ## Phase 3 — Runtime refactor
 
-### Task 3.1 — Extract `buildWatchApp` helper
+### Task 3.1 — Extract `buildWatchApp` helper ~~DONE~~
 
 **Files:** `cmd_watch.go`, `cmd_watch_test.go`
 
@@ -189,7 +189,7 @@ catch regressions.
 
 ---
 
-### Task 3.2 — Extract `runSyncOnce` helper
+### Task 3.2 — Extract `runSyncOnce` helper ~~DONE~~
 
 **Files:** `cmd_watch.go`, `cmd_watch_test.go`
 
@@ -207,7 +207,7 @@ func runSyncOnce(ctx context.Context, app *App, label string) error
 
 ---
 
-### Task 3.3 — Extract `watchWithInterval`
+### Task 3.3 — Extract `watchWithInterval` ~~DONE~~
 
 **Files:** `cmd_watch.go`
 
@@ -223,7 +223,7 @@ func watchWithInterval(ctx context.Context, app *App, interval time.Duration, on
 
 ---
 
-### Task 3.4 — Implement `watchWithCron`
+### Task 3.4 — Implement `watchWithCron` ~~DONE~~
 
 **Files:** `cmd_watch.go`, `cmd_watch_test.go`
 
@@ -273,7 +273,7 @@ ticks fast.
 
 ---
 
-### Task 3.5 — Wire mode dispatch in `runWatch`
+### Task 3.5 — Wire mode dispatch in `runWatch` ~~DONE~~
 
 **Files:** `cmd_watch.go`
 

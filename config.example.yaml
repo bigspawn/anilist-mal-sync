@@ -17,6 +17,11 @@ token_file_path: "" # Absolute path to token file, empty string use default path
 mappings_file_path: "" # Path to manual mappings YAML file, empty string use default path (~/.config/anilist-mal-sync/mappings.yaml).
 watch:
   interval: "24h" # Sync interval for watch mode (1h-168h). Can be overridden with --interval flag.
+  schedule: ""    # Cron expression for watch mode (5 fields). Mutually exclusive with interval.
+                  # Examples:
+                  #   "0 3 * * *"    — every day at 03:00
+                  #   "*/30 * * * *" — every 30 minutes
+                  #   "0 */6 * * *"  — every 6 hours
 # HTTP client timeout for API requests (default: 30s).
 # Can be overridden with HTTP_TIMEOUT environment variable.
 # Examples: "10s", "30s", "1m", "5m"

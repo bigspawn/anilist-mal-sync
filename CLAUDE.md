@@ -62,7 +62,7 @@ The codebase uses a **strategy pattern** for matching entries between services:
 | `favorites.go` | Favorites synchronization logic (MAL→AniList sync, AniList→MAL report only) |
 | `mappings.go` | Manual AniList↔MAL mappings and ignore rules (YAML) |
 | `unmapped.go` | Unmapped entries state persistence (JSON) |
-| `cmd_sync.go` / `cmd_watch.go` | Sync and watch command implementations |
+| `cmd_sync.go` / `cmd_watch.go` | Sync and watch command implementations (watch supports both interval and cron schedule modes) |
 | `cmd_login.go` / `cmd_logout.go` / `cmd_status.go` | Auth and status commands |
 | `cmd_unmapped.go` | CLI command for managing unmapped entries |
 | `report.go` | Sync report: warnings, unmapped items, duplicate conflicts, favorites mismatches |
@@ -71,6 +71,17 @@ The codebase uses a **strategy pattern** for matching entries between services:
 | `logging.go` | HTTP round-tripper debug logging |
 | `http_retry.go` | Exponential backoff retry logic |
 | `docs/date-sync.md` | Documentation: date synchronization logic and behavior tables |
+
+### Watch Modes
+
+The `watch` command supports two mutually exclusive scheduling modes:
+
+- **Interval mode**: fixed duration between syncs (`--interval` / `WATCH_INTERVAL` / `watch.interval`, range 1h–168h)
+- **Cron mode**: sync at specific times via cron expression (`--schedule` / `WATCH_SCHEDULE` / `watch.schedule`, standard 5-field syntax)
+
+Priority: CLI flag > env var > config YAML. Setting both modes is a validation error.
+
+Both modes support `--once` for an immediate first sync. Cron mode uses `time.Local` timezone.
 
 ### Sync Flow
 
@@ -147,6 +158,7 @@ LogDebug(ctx, "Processing item %d", id)
 - `gopkg.in/yaml.v2` - Config file parsing (`config.go`)
 - `gopkg.in/yaml.v3` - Mappings file parsing with comments (`mappings.go`)
 - `go.uber.org/mock` - Mock generation for tests
+- `github.com/robfig/cron/v3` - Cron expression parsing for watch schedule
 - `anime-offline-database` - Offline ID mapping (downloaded from GitHub releases)
 
 ## Testing Notes
