@@ -696,6 +696,11 @@ func (a *App) buildMangaFavoritesListFromMappings(
 func (a *App) syncFavorites(ctx context.Context) {
 	LogStage(ctx, "Syncing favorites...")
 
+	if a.jikanClient == nil {
+		LogWarn(ctx, "★ [Favorites] Jikan API is not enabled — cannot fetch MAL favorites (skipping favorites sync)")
+		return
+	}
+
 	malAnimeFavs, malMangaFavs, err := a.jikanClient.GetUserFavorites(ctx, a.config.MyAnimeList.Username)
 	if err != nil {
 		LogWarn(ctx, "★ [Favorites] Failed to fetch MAL favorites: %v (skipping favorites sync)", err)

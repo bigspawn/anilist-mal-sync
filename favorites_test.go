@@ -70,6 +70,22 @@ func favSet(ids ...int) map[int]struct{} {
 }
 
 // =============================================================================
+// syncFavorites integration tests
+// =============================================================================
+
+func TestSyncFavorites_NilJikanClient_DoesNotPanic(t *testing.T) {
+	app := &App{
+		jikanClient: nil,
+		favSync:     NewFavoritesSync(nil, false),
+		config:      Config{MyAnimeList: SiteConfig{Username: "testuser"}},
+	}
+
+	assert.NotPanics(t, func() {
+		app.syncFavorites(testCtx())
+	})
+}
+
+// =============================================================================
 // isFavorite tests
 // =============================================================================
 
