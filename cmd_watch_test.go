@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -11,7 +12,8 @@ import (
 )
 
 const (
-	watchCommandName = "watch"
+	watchCommandName       = "watch"
+	testCronScheduleDaily3 = "0 3 * * *"
 )
 
 // =============================================================================
@@ -34,7 +36,7 @@ func TestWatchCommand_Exists(t *testing.T) {
 		t.Fatal("watch command not found")
 	}
 
-	if watchCmd.Usage != "Run sync on interval (Docker-friendly)" {
+	if watchCmd.Usage != "Run sync on interval or cron schedule (Docker-friendly)" {
 		t.Errorf("unexpected usage: %s", watchCmd.Usage)
 	}
 }
@@ -55,9 +57,9 @@ func TestWatchCommand_HasFlags(t *testing.T) {
 		t.Fatal("watch command not found")
 	}
 
-	// watch has 2 own flags + 12 sync flags = 14 total
-	if len(watchCmd.Flags) != 14 {
-		t.Errorf("expected 14 flags (2 watch + 12 sync), got %d", len(watchCmd.Flags))
+	// watch has 3 own flags + 12 sync flags = 15 total
+	if len(watchCmd.Flags) != 15 {
+		t.Errorf("expected 15 flags (3 watch + 12 sync), got %d", len(watchCmd.Flags))
 	}
 
 	// Check flags by name
@@ -67,7 +69,7 @@ func TestWatchCommand_HasFlags(t *testing.T) {
 	}
 
 	expectedFlags := []string{
-		"interval", "once", "force", "dry-run", "manga", "all", "verbose", "reverse-direction",
+		"interval", "schedule", "once", "force", "dry-run", "manga", "all", "verbose", "reverse-direction",
 		"offline-db", "offline-db-force-refresh", "arm-api", "arm-api-url", "jikan-api",
 	}
 	for _, name := range expectedFlags {
@@ -154,7 +156,7 @@ func TestWatchCommand_OnceFlag_IsBool(t *testing.T) {
 // Interval Validation Tests
 // =============================================================================
 
-func TestValidateInterval_ValidIntervals(t *testing.T) {
+func TestWatchConfig_Validate_IntervalTable(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name     string
@@ -163,7 +165,7 @@ func TestValidateInterval_ValidIntervals(t *testing.T) {
 	}{
 		{"Minimum valid", minInterval, true},
 		{"Maximum valid", maxInterval, true},
-		{"Default interval", defaultInterval, true},
+		{"Default interval", 24 * time.Hour, true},
 		{"12 hours", 12 * time.Hour, true},
 		{"48 hours", 48 * time.Hour, true},
 		{"Too small", 30 * time.Minute, false},
@@ -173,7 +175,7 @@ func TestValidateInterval_ValidIntervals(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateInterval(tt.interval)
+			err := (&WatchConfig{Interval: tt.interval.String()}).Validate()
 			if tt.valid && err != nil {
 				t.Errorf("expected valid, got error: %v", err)
 			}
@@ -182,17 +184,6 @@ func TestValidateInterval_ValidIntervals(t *testing.T) {
 			}
 		})
 	}
-}
-
-// validateInterval is a helper function extracted from runWatch for testing.
-func validateInterval(interval time.Duration) error {
-	if interval < minInterval {
-		return errors.New("interval must be at least 1h")
-	}
-	if interval > maxInterval {
-		return errors.New("interval must be at most 168h")
-	}
-	return nil
 }
 
 // =============================================================================
@@ -369,5 +360,457 @@ func TestWatch_IntervalValidation_Config_TooLarge(t *testing.T) {
 	}
 	if got > maxInterval {
 		t.Logf("interval %v exceeds max %v (validation will catch this)", got, maxInterval)
+	}
+}
+
+// =============================================================================
+// Schedule Flag Tests
+// =============================================================================
+
+func TestWatchCommand_ScheduleFlag_Exists(t *testing.T) {
+	t.Parallel()
+	rootCmd := NewCLI()
+
+	var watchCmd *cli.Command
+	for _, c := range rootCmd.Commands {
+		if c.Name == watchCommandName {
+			watchCmd = c
+			break
+		}
+	}
+	if watchCmd == nil {
+		t.Fatal("watch command not found")
+	}
+
+	var scheduleFlag *cli.StringFlag
+	for _, f := range watchCmd.Flags {
+		if f.Names()[0] == "schedule" {
+			if sf, ok := f.(*cli.StringFlag); ok {
+				scheduleFlag = sf
+			}
+			break
+		}
+	}
+
+	if scheduleFlag == nil {
+		t.Fatal("schedule flag not found or not a StringFlag")
+	}
+
+	if scheduleFlag.Value != "" {
+		t.Errorf("expected no default (empty), got %q", scheduleFlag.Value)
+	}
+
+	aliases := scheduleFlag.Aliases
+	if len(aliases) != 1 || aliases[0] != "s" {
+		t.Errorf("expected alias 's', got %v", aliases)
+	}
+
+	if scheduleFlag.Usage == "" {
+		t.Error("schedule flag should have a non-empty usage string")
+	}
+}
+
+// =============================================================================
+// resolveWatchConfig Tests
+// =============================================================================
+
+func TestResolveWatchConfig_CLIIntervalOverridesYAMLInterval(t *testing.T) {
+	t.Parallel()
+	cmd := &cli.Command{
+		Flags: []cli.Flag{
+			&cli.DurationFlag{Name: "interval", Value: 12 * time.Hour},
+			&cli.StringFlag{Name: "schedule", Value: ""},
+		},
+	}
+	cfg := WatchConfig{Interval: "24h"}
+
+	resolved, err := resolveWatchConfig(cmd, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resolved.Interval != (12 * time.Hour).String() {
+		t.Errorf("Interval = %v, want %v", resolved.Interval, (12 * time.Hour).String())
+	}
+}
+
+func TestResolveWatchConfig_CLIScheduleOverridesYAMLSchedule(t *testing.T) {
+	t.Parallel()
+	cmd := &cli.Command{
+		Flags: []cli.Flag{
+			&cli.DurationFlag{Name: "interval", Value: 0},
+			&cli.StringFlag{Name: "schedule", Value: testCronScheduleDaily3},
+		},
+	}
+	cfg := WatchConfig{Schedule: "0 5 * * *"}
+
+	resolved, err := resolveWatchConfig(cmd, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resolved.Schedule != testCronScheduleDaily3 {
+		t.Errorf("Schedule = %v, want 0 3 * * *", resolved.Schedule)
+	}
+}
+
+func TestResolveWatchConfig_CLIIntervalAndYAMLSchedule_ReturnsError(t *testing.T) {
+	t.Parallel()
+	cmd := &cli.Command{
+		Flags: []cli.Flag{
+			&cli.DurationFlag{Name: "interval", Value: 12 * time.Hour},
+			&cli.StringFlag{Name: "schedule", Value: ""},
+		},
+	}
+	cfg := WatchConfig{Schedule: testCronScheduleDaily3}
+
+	_, err := resolveWatchConfig(cmd, cfg)
+	if err == nil {
+		t.Fatal("expected error when CLI interval + YAML schedule both effective")
+	}
+}
+
+func TestResolveWatchConfig_CLIScheduleAndYAMLInterval_ReturnsError(t *testing.T) {
+	t.Parallel()
+	cmd := &cli.Command{
+		Flags: []cli.Flag{
+			&cli.DurationFlag{Name: "interval", Value: 0},
+			&cli.StringFlag{Name: "schedule", Value: testCronScheduleDaily3},
+		},
+	}
+	cfg := WatchConfig{Interval: "24h"}
+
+	_, err := resolveWatchConfig(cmd, cfg)
+	if err == nil {
+		t.Fatal("expected error when CLI schedule + YAML interval both effective")
+	}
+}
+
+func TestResolveWatchConfig_Neither_ReturnsMissingSentinel(t *testing.T) {
+	t.Parallel()
+	cmd := &cli.Command{
+		Flags: []cli.Flag{
+			&cli.DurationFlag{Name: "interval", Value: 0},
+			&cli.StringFlag{Name: "schedule", Value: ""},
+		},
+	}
+	cfg := WatchConfig{}
+
+	_, err := resolveWatchConfig(cmd, cfg)
+	if err == nil {
+		t.Fatal("expected error when neither set")
+	}
+	if !errors.Is(err, ErrWatchConfigMissing) {
+		t.Errorf("expected ErrWatchConfigMissing, got: %v", err)
+	}
+}
+
+func TestResolveWatchConfig_OnlyInterval_OK(t *testing.T) {
+	t.Parallel()
+	cmd := &cli.Command{
+		Flags: []cli.Flag{
+			&cli.DurationFlag{Name: "interval", Value: 0},
+			&cli.StringFlag{Name: "schedule", Value: ""},
+		},
+	}
+	cfg := WatchConfig{Interval: "12h"}
+
+	resolved, err := resolveWatchConfig(cmd, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resolved.Interval != "12h" {
+		t.Errorf("Interval = %v, want 12h", resolved.Interval)
+	}
+}
+
+func TestResolveWatchConfig_OnlySchedule_OK(t *testing.T) {
+	t.Parallel()
+	cmd := &cli.Command{
+		Flags: []cli.Flag{
+			&cli.DurationFlag{Name: "interval", Value: 0},
+			&cli.StringFlag{Name: "schedule", Value: ""},
+		},
+	}
+	cfg := WatchConfig{Schedule: testCronScheduleDaily3}
+
+	resolved, err := resolveWatchConfig(cmd, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resolved.Schedule != testCronScheduleDaily3 {
+		t.Errorf("Schedule = %v, want 0 3 * * *", resolved.Schedule)
+	}
+}
+
+// =============================================================================
+// watchWithCronSchedule Tests
+// =============================================================================
+
+type mockCronSchedule struct {
+	nexts []time.Time
+	idx   int
+}
+
+func (m *mockCronSchedule) Next(now time.Time) time.Time {
+	if m.idx < len(m.nexts) {
+		t := m.nexts[m.idx]
+		m.idx++
+		return t
+	}
+	return now.Add(1 * time.Hour)
+}
+
+type mockApp struct {
+	runCount     int
+	refreshCount int
+	runErr       error
+}
+
+func (m *mockApp) Run(_ context.Context) error {
+	m.runCount++
+	return m.runErr
+}
+
+func (m *mockApp) Refresh(_ context.Context) {
+	m.refreshCount++
+}
+
+func TestWatchWithCronSchedule_ContextCancelStopsImmediately(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(t.Context())
+
+	farFuture := time.Now().Add(1 * time.Hour)
+	sched := &mockCronSchedule{nexts: []time.Time{farFuture}}
+	app := &mockApp{}
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- watchWithCronSchedule(ctx, app, sched, "0 0 1 1 *", false)
+	}()
+
+	cancel()
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Errorf("expected nil error, got: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("watchWithCronSchedule did not stop after context cancellation")
+	}
+}
+
+func TestWatchWithCronSchedule_OnceTriggersImmediateSync(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	farFuture := time.Now().Add(1 * time.Hour)
+	sched := &mockCronSchedule{nexts: []time.Time{farFuture}}
+	app := &mockApp{}
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- watchWithCronSchedule(ctx, app, sched, "0 0 1 1 *", true)
+	}()
+
+	// Give time for the initial sync
+	time.Sleep(100 * time.Millisecond)
+	cancel()
+
+	err := <-errCh
+	if err != nil {
+		t.Errorf("expected nil error, got: %v", err)
+	}
+
+	if app.runCount < 1 {
+		t.Errorf("expected at least 1 Run call, got %d", app.runCount)
+	}
+}
+
+func TestWatchWithCronSchedule_FiresOnSchedule(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	now := time.Now()
+	soon := now.Add(200 * time.Millisecond)
+	farFuture := soon.Add(1 * time.Hour)
+	sched := &mockCronSchedule{nexts: []time.Time{soon, farFuture}}
+	app := &mockApp{}
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- watchWithCronSchedule(ctx, app, sched, "test", false)
+	}()
+
+	// Wait for the first scheduled tick (200ms)
+	time.Sleep(500 * time.Millisecond)
+	cancel()
+
+	err := <-errCh
+	if err != nil {
+		t.Errorf("expected nil error, got: %v", err)
+	}
+
+	if app.runCount < 1 {
+		t.Errorf("expected at least 1 scheduled Run call, got %d", app.runCount)
+	}
+}
+
+func TestWatchWithCron_InvalidScheduleReturnsError(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	app := &mockApp{}
+
+	err := watchWithCron(ctx, app, "bad cron expr", false)
+	if err == nil {
+		t.Fatal("expected error for invalid schedule")
+	}
+}
+
+// =============================================================================
+// runSyncOnce Tests
+// =============================================================================
+
+func TestRunSyncOnce_CallsRunWithoutRefresh(t *testing.T) {
+	t.Parallel()
+	app := &mockApp{}
+
+	err := runSyncOnce(t.Context(), app, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if app.runCount != 1 {
+		t.Errorf("expected Run called once, got %d", app.runCount)
+	}
+	if app.refreshCount != 0 {
+		t.Errorf("expected Refresh not called, got %d", app.refreshCount)
+	}
+}
+
+func TestRunSyncOnce_CallsRefreshAndRun(t *testing.T) {
+	t.Parallel()
+	app := &mockApp{}
+
+	err := runSyncOnce(t.Context(), app, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if app.refreshCount != 1 {
+		t.Errorf("expected Refresh called once, got %d", app.refreshCount)
+	}
+	if app.runCount != 1 {
+		t.Errorf("expected Run called once, got %d", app.runCount)
+	}
+}
+
+func TestRunSyncOnce_ReturnsRunError(t *testing.T) {
+	t.Parallel()
+	want := errors.New("sync failed")
+	app := &mockApp{runErr: want}
+
+	err := runSyncOnce(t.Context(), app, false)
+	if !errors.Is(err, want) {
+		t.Errorf("expected error %v, got %v", want, err)
+	}
+}
+
+// =============================================================================
+// runWatch dispatch-level tests (validation before OAuth/NewApp)
+// =============================================================================
+
+// makeWatchValidationConfig writes a minimal config YAML without interval or schedule.
+func makeWatchValidationConfig(t *testing.T) string {
+	t.Helper()
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+	content := `
+oauth:
+  port: "18080"
+anilist:
+  client_id: "test"
+  client_secret: "test"
+  username: "ani_user"
+myanimelist:
+  client_id: "test"
+  client_secret: "test"
+  username: "mal_user"
+`
+	err := os.WriteFile(configPath, []byte(content), 0o600)
+	if err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	return configPath
+}
+
+func makeWatchValidationCmd(configPath string, interval time.Duration, schedule string) *cli.Command {
+	return &cli.Command{
+		Flags: []cli.Flag{
+			&cli.StringFlag{Name: "config", Value: configPath},
+			&cli.DurationFlag{Name: "interval", Value: interval},
+			&cli.StringFlag{Name: "schedule", Value: schedule},
+			&cli.BoolFlag{Name: "once"},
+		},
+	}
+}
+
+func TestRunWatch_BothFlagsSet_ReturnsMutualExclusionError(t *testing.T) {
+	t.Parallel()
+	configPath := makeWatchValidationConfig(t)
+	cmd := makeWatchValidationCmd(configPath, 2*time.Hour, testCronScheduleDaily3)
+
+	err := runWatch(t.Context(), cmd)
+	if err == nil {
+		t.Fatal("expected mutual exclusion error, got nil")
+	}
+	if errors.Is(err, ErrWatchConfigMissing) {
+		t.Errorf("expected mutual exclusion error, got ErrWatchConfigMissing")
+	}
+}
+
+func TestRunWatch_CLIIntervalAndYAMLSchedule_ReturnsError(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+	content := `
+oauth:
+  port: "18080"
+anilist:
+  client_id: "test"
+  client_secret: "test"
+  username: "ani_user"
+myanimelist:
+  client_id: "test"
+  client_secret: "test"
+  username: "mal_user"
+watch:
+  schedule: "0 3 * * *"
+`
+	err := os.WriteFile(configPath, []byte(content), 0o600)
+	if err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	// CLI interval conflicts with YAML schedule
+	cmd := makeWatchValidationCmd(configPath, 2*time.Hour, "")
+
+	err = runWatch(t.Context(), cmd)
+	if err == nil {
+		t.Fatal("expected mutual exclusion error, got nil")
+	}
+	if errors.Is(err, ErrWatchConfigMissing) {
+		t.Errorf("expected mutual exclusion error, got ErrWatchConfigMissing")
+	}
+}
+
+func TestRunWatch_NeitherSet_ReturnsMissingError(t *testing.T) {
+	t.Parallel()
+	configPath := makeWatchValidationConfig(t)
+	cmd := makeWatchValidationCmd(configPath, 0, "")
+
+	err := runWatch(t.Context(), cmd)
+	if err == nil {
+		t.Fatal("expected ErrWatchConfigMissing, got nil")
+	}
+	if !errors.Is(err, ErrWatchConfigMissing) {
+		t.Errorf("expected ErrWatchConfigMissing, got: %v", err)
 	}
 }

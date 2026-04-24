@@ -165,7 +165,7 @@ docker-compose logs -f sync
 | `logout` | Remove authentication tokens |
 | `status` | Check authentication status |
 | `sync` | Synchronize anime/manga lists |
-| `watch` | Run sync on interval |
+| `watch` | Run sync on interval or cron schedule |
 | `unmapped` | Show and manage unmapped entries from last sync |
 
 **Global options** (available for all commands):
@@ -197,10 +197,19 @@ docker-compose logs -f sync
 **Watch options:**
 | Short | Long | Description |
 |-------|------|-------------|
-| `-i` | `--interval` | Sync interval: 1h-168h (overrides config) |
-| | `--once` | Run one sync immediately, then start the interval loop. **Without this flag the first sync is delayed by the full interval.** |
+| `-i` | `--interval` | Sync interval: 1h-168h (overrides config). Mutually exclusive with `--schedule` |
+| `-s` | `--schedule` | Cron expression (e.g. `0 3 * * *` for daily at 03:00). Mutually exclusive with `--interval` |
+| | `--once` | Run one sync immediately, then start the interval/cron loop. **Without this flag the first sync is delayed by the full interval or until the next cron tick.** |
 
-Interval can be set via `--interval` flag or in `config.yaml` under `watch.interval`.
+Watch mode requires either `--interval` or `--schedule` (or the corresponding config/env var). Setting both is an error.
+
+**Priority:** CLI flag > environment variable > `config.yaml`.
+
+| Source | Interval | Schedule |
+|--------|----------|----------|
+| CLI flag | `--interval 12h` | `--schedule "0 3 * * *"` |
+| Environment | `WATCH_INTERVAL=12h` | `WATCH_SCHEDULE=0 3 * * *` |
+| Config YAML | `watch.interval: "12h"` | `watch.schedule: "0 3 * * *"` |
 
 **Unmapped options:**
 | Short | Long | Description |
@@ -236,6 +245,7 @@ token_file_path: ""  # Leave empty for default: ~/.config/anilist-mal-sync/token
 mappings_file_path: ""  # Leave empty for default: ~/.config/anilist-mal-sync/mappings.yaml
 watch:
   interval: "24h"  # Sync interval for watch mode (1h-168h), can be overridden with --interval flag
+  # schedule: "0 3 * * *"  # Cron expression (mutually exclusive with interval)
 http_timeout: "30s"  # HTTP client timeout for API requests (default: 30s)
 offline_database:
   enabled: true
@@ -348,7 +358,10 @@ Configuration can be provided entirely via environment variables (recommended fo
 - `MAL_USERNAME` - MyAnimeList username
 
 **Required for `watch` mode:**
-- `WATCH_INTERVAL` - Sync interval (e.g., `12h`, `24h`); range `1h`–`168h`. Without this (or `--interval` flag) the watch command fails.
+- `WATCH_INTERVAL` - Sync interval (e.g., `12h`, `24h`); range `1h`–`168h`. Mutually exclusive with `WATCH_SCHEDULE`.
+- `WATCH_SCHEDULE` - Cron expression for scheduled sync (e.g., `0 3 * * *` for daily at 03:00). Mutually exclusive with `WATCH_INTERVAL`.
+
+One of `WATCH_INTERVAL` or `WATCH_SCHEDULE` (or their CLI flag equivalents) is required for watch mode. Setting both is an error.
 
 **Optional:**
 - `HTTP_TIMEOUT` - HTTP client timeout for API requests (default: `30s`, e.g., `10s`, `1m`)
@@ -496,7 +509,9 @@ docker run --rm -p 18080:18080 \
 
 ### Watch mode
 
-Enable continuous sync by setting `WATCH_INTERVAL` environment variable:
+Enable continuous sync using either a fixed interval or a cron schedule.
+
+**Interval mode** (fixed interval between syncs):
 
 ```yaml
 environment:
@@ -508,11 +523,46 @@ Or run watch command manually:
 docker-compose run --rm sync watch --interval=12h
 ```
 
-**Interval limits:** 1h - 168h (7 days). `WATCH_INTERVAL` (or `--interval`) is **required** for watch mode — without it the command exits with an error.
+**Cron mode** (sync at specific times):
+
+```yaml
+environment:
+  - WATCH_SCHEDULE=0 3 * * *  # Sync daily at 03:00
+```
+
+Or run watch command manually:
+```bash
+docker-compose run --rm sync watch --schedule "0 3 * * *"
+```
+
+**Cron expression examples:**
+
+| Expression | Meaning |
+|------------|---------|
+| `0 3 * * *` | Every day at 03:00 |
+| `*/30 * * * *` | Every 30 minutes |
+| `0 */6 * * *` | Every 6 hours |
+| `0 0 * * 1` | Every Monday at midnight |
+
+**Interval limits (interval mode only):** 1h - 168h (7 days). `WATCH_INTERVAL` (or `--interval`) is **required** for watch mode when not using `--schedule`. Setting both `--interval` and `--schedule` (or their env/config equivalents) is an error.
 
 ### Scheduling (non-Docker)
 
-Use your system's scheduler for periodic sync:
+Use the built-in cron schedule to sync at specific times:
+
+```bash
+# Sync daily at 3 AM using built-in cron support
+anilist-mal-sync watch --schedule "0 3 * * *"
+
+# With immediate first sync
+anilist-mal-sync watch --schedule "0 3 * * *" --once
+```
+
+Cron expressions use standard 5-field syntax (`minute hour dom month dow`).
+Expressions are evaluated in the **host/container local timezone** (`time.Local`).
+Set the `TZ` environment variable on the container to change it (e.g. `TZ=Europe/Berlin`).
+
+Or use your system's scheduler for one-off syncs:
 
 ```bash
 # Linux/macOS cron (daily at 2 AM)

@@ -15,8 +15,9 @@ services:
       - MAL_CLIENT_ID=your_mal_client_id
       - MAL_CLIENT_SECRET=your_mal_secret
       - MAL_USERNAME=your_mal_username
-      # Watch mode interval (min: 1h, max: 168h / 7 days)
+      # Watch mode: use either interval OR schedule (not both)
       - WATCH_INTERVAL=12h
+      # - WATCH_SCHEDULE=0 3 * * *  # Cron expression (e.g. daily at 03:00). Mutually exclusive with WATCH_INTERVAL.
       # Optional: Manual mappings file path
       # - MAPPINGS_FILE_PATH=/home/appuser/.config/anilist-mal-sync/mappings.yaml
       # Optional: ID Mapping settings

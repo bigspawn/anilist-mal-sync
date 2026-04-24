@@ -292,9 +292,9 @@ func TestCLI_WatchCommand_HasSyncFlags(t *testing.T) {
 		t.Fatal("watch command not found")
 	}
 
-	// watch has 2 own flags (interval, once) + 12 sync flags = 14 total
-	if len(watchCmd.Flags) != 14 {
-		t.Errorf("expected 14 flags on watch command (2 watch + 12 sync), got %d", len(watchCmd.Flags))
+	// watch has 3 own flags (interval, schedule, once) + 12 sync flags = 15 total
+	if len(watchCmd.Flags) != 15 {
+		t.Errorf("expected 15 flags on watch command (3 watch + 12 sync), got %d", len(watchCmd.Flags))
 	}
 
 	// Check that sync flags are present
