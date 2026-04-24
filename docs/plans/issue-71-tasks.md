@@ -13,7 +13,7 @@ Each task is self-contained and ends with a green quality gate (`make fmt && mak
 
 ## Phase 1 — Foundation
 
-### Task 1.1 — Add `robfig/cron/v3` dependency
+### Task 1.1 — Add `robfig/cron/v3` dependency ~~DONE~~
 
 **Files:** `go.mod`, `go.sum`, `vendor/`
 
@@ -32,7 +32,7 @@ Each task is self-contained and ends with a green quality gate (`make fmt && mak
 
 ---
 
-### Task 1.2 — Extend `WatchConfig` struct with `Schedule`
+### Task 1.2 — Extend `WatchConfig` struct with `Schedule` ~~DONE~~
 
 **Files:** `config.go`, `config_test.go`
 
@@ -57,7 +57,7 @@ Each task is self-contained and ends with a green quality gate (`make fmt && mak
 
 ---
 
-### Task 1.3 — Add `WatchConfig.Validate()` method
+### Task 1.3 — Add `WatchConfig.Validate()` method ~~DONE~~
 
 **Files:** `config.go`, `config_test.go`
 
@@ -86,7 +86,7 @@ Each task is self-contained and ends with a green quality gate (`make fmt && mak
 
 ---
 
-### Task 1.4 — Add `WatchConfig.ParseSchedule()` helper
+### Task 1.4 — Add `WatchConfig.ParseSchedule()` helper ~~DONE~~
 
 **Files:** `config.go`, `config_test.go`
 
