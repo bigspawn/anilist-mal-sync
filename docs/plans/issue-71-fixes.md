@@ -9,7 +9,7 @@ gaps. 🟡 are cleanup, 🟢 are docs/plan alignment.
 
 ---
 
-## 🔴 F1 — Extract `buildWatchApp` helper
+## 🔴 F1 — Extract `buildWatchApp` helper ~~DONE~~
 
 **Why:** Task 3.1 of `issue-71-tasks.md` is marked DONE, but `runWatch`
 (`cmd_watch.go:72-105`) still inlines config load + logger init + `NewApp`.
@@ -36,7 +36,7 @@ keep working). No new unit tests — the helper touches OAuth/network via
 
 ---
 
-## 🔴 F2 — Extract `runSyncOnce` helper and deduplicate sync bodies
+## 🔴 F2 — Extract `runSyncOnce` helper and deduplicate sync bodies ~~DONE~~
 
 **Why:** Task 3.2 is marked DONE, but the helper does not exist.
 `--once` logic and "scheduled tick" logic are duplicated across
@@ -152,7 +152,7 @@ lands, nothing will reference it.
 
 ---
 
-## 🟡 F6 — Decide on the stray vendor diff
+## 🟡 F6 — Decide on the stray vendor diff ~~DONE~~
 
 **Why:** `git status` shows ~23 modified files in `vendor/gopkg.in/yaml.v{2,3}`,
 `vendor/github.com/davecgh/go-spew`, `vendor/github.com/pmezard/go-difflib`
@@ -179,7 +179,7 @@ The feature PR's vendor diff contains **only** `vendor/github.com/robfig/cron/v3
 
 ---
 
-## 🟢 F7 — Finish `config.example.yaml` comment
+## 🟢 F7 — Finish `config.example.yaml` comment ~~DONE~~
 
 **Why:** Plan (Task 4.1) asked for three cron examples in the comment.
 Current file (`config.example.yaml:20`) has only one short comment.

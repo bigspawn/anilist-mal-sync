@@ -571,15 +571,19 @@ func (m *mockCronSchedule) Next(now time.Time) time.Time {
 }
 
 type mockApp struct {
-	runCount int
+	runCount     int
+	refreshCount int
+	runErr       error
 }
 
 func (m *mockApp) Run(_ context.Context) error {
 	m.runCount++
-	return nil
+	return m.runErr
 }
 
-func (m *mockApp) Refresh(_ context.Context) {}
+func (m *mockApp) Refresh(_ context.Context) {
+	m.refreshCount++
+}
 
 func TestWatchWithCronSchedule_ContextCancelStopsImmediately(t *testing.T) {
 	t.Parallel()
@@ -670,5 +674,52 @@ func TestWatchWithCron_InvalidScheduleReturnsError(t *testing.T) {
 	err := watchWithCron(ctx, app, "bad cron expr", false)
 	if err == nil {
 		t.Fatal("expected error for invalid schedule")
+	}
+}
+
+// =============================================================================
+// runSyncOnce Tests
+// =============================================================================
+
+func TestRunSyncOnce_CallsRunWithoutRefresh(t *testing.T) {
+	t.Parallel()
+	app := &mockApp{}
+
+	err := runSyncOnce(t.Context(), app, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if app.runCount != 1 {
+		t.Errorf("expected Run called once, got %d", app.runCount)
+	}
+	if app.refreshCount != 0 {
+		t.Errorf("expected Refresh not called, got %d", app.refreshCount)
+	}
+}
+
+func TestRunSyncOnce_CallsRefreshAndRun(t *testing.T) {
+	t.Parallel()
+	app := &mockApp{}
+
+	err := runSyncOnce(t.Context(), app, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if app.refreshCount != 1 {
+		t.Errorf("expected Refresh called once, got %d", app.refreshCount)
+	}
+	if app.runCount != 1 {
+		t.Errorf("expected Run called once, got %d", app.runCount)
+	}
+}
+
+func TestRunSyncOnce_ReturnsRunError(t *testing.T) {
+	t.Parallel()
+	want := errors.New("sync failed")
+	app := &mockApp{runErr: want}
+
+	err := runSyncOnce(t.Context(), app, false)
+	if !errors.Is(err, want) {
+		t.Errorf("expected error %v, got %v", want, err)
 	}
 }

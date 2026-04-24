@@ -20,6 +20,17 @@ type syncRunner interface {
 	Refresh(context.Context)
 }
 
+// runSyncOnce executes one sync cycle. When refresh is true, Refresh is called
+// first (used for scheduled ticks that need fresh data). When false, only Run
+// is called (used for the --once initial sync where the app was just created).
+func runSyncOnce(ctx context.Context, runner syncRunner, refresh bool) error {
+	if refresh {
+		runner.Refresh(ctx)
+	}
+
+	return runner.Run(ctx)
+}
+
 func newWatchCommand() *cli.Command {
 	watchFlags := append([]cli.Flag{
 		&cli.DurationFlag{
@@ -116,15 +127,14 @@ func buildWatchApp(ctx context.Context, cmd *cli.Command, config Config) (contex
 func watchWithInterval(ctx context.Context, runner syncRunner, interval time.Duration, once bool) error {
 	if once {
 		log.Printf("Running initial sync (--once flag set)...")
-		err := runner.Run(ctx)
+		err := runSyncOnce(ctx, runner, false)
 		if err != nil {
 			return fmt.Errorf("initial sync failed: %w", err)
 		}
-		nextTime := time.Now().Add(interval)
-		log.Printf("Initial sync completed, starting watch mode - next sync in %v at %s", interval, nextTime.Format("2006-01-02 15:04:05"))
+		nextStr := time.Now().Add(interval).Format("2006-01-02 15:04:05")
+		log.Printf("Initial sync completed, starting watch mode - next sync in %v at %s", interval, nextStr)
 	} else {
-		nextTime := time.Now().Add(interval)
-		log.Printf("Starting watch mode: next sync in %v at %s", interval, nextTime.Format("2006-01-02 15:04:05"))
+		log.Printf("Starting watch mode: next sync in %v at %s", interval, time.Now().Add(interval).Format("2006-01-02 15:04:05"))
 	}
 
 	ticker := time.NewTicker(interval)
@@ -134,13 +144,11 @@ func watchWithInterval(ctx context.Context, runner syncRunner, interval time.Dur
 		select {
 		case <-ticker.C:
 			log.Printf("Running scheduled sync...")
-			runner.Refresh(ctx)
-			err := runner.Run(ctx)
+			err := runSyncOnce(ctx, runner, true)
 			if err != nil {
 				log.Printf("Sync error: %v", err)
 			} else {
-				nextTime := time.Now().Add(interval)
-				log.Printf("Sync completed - next sync in %v at %s", interval, nextTime.Format("2006-01-02 15:04:05"))
+				log.Printf("Sync completed - next sync in %v at %s", interval, time.Now().Add(interval).Format("2006-01-02 15:04:05"))
 			}
 		case <-ctx.Done():
 			log.Printf("Watch mode stopped")
@@ -161,7 +169,7 @@ func watchWithCron(ctx context.Context, runner syncRunner, scheduleExpr string, 
 func watchWithCronSchedule(ctx context.Context, runner syncRunner, sched cronSchedule, scheduleExpr string, once bool) error {
 	if once {
 		log.Printf("Running initial sync (--once flag set)...")
-		err := runner.Run(ctx)
+		err := runSyncOnce(ctx, runner, false)
 		if err != nil {
 			return fmt.Errorf("initial sync failed: %w", err)
 		}
@@ -177,8 +185,7 @@ func watchWithCronSchedule(ctx context.Context, runner syncRunner, sched cronSch
 		select {
 		case <-timer.C:
 			log.Printf("Running scheduled sync...")
-			runner.Refresh(ctx)
-			err := runner.Run(ctx)
+			err := runSyncOnce(ctx, runner, true)
 			if err != nil {
 				log.Printf("Sync error: %v", err)
 			}
