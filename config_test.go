@@ -1064,6 +1064,82 @@ func TestLoadConfigFromEnv_NewSecretPrecedence(t *testing.T) {
 	}
 }
 
+// =============================================================================
+// Suite: WatchConfig.Schedule
+// =============================================================================
+
+func TestLoadConfigFromEnv_ReadsWatchSchedule(t *testing.T) {
+	t.Setenv("ANILIST_CLIENT_ID", "test_id")
+	t.Setenv("ANILIST_USERNAME", "test_user")
+	t.Setenv("MAL_CLIENT_ID", "mal_id")
+	t.Setenv("MAL_USERNAME", "mal_user")
+	t.Setenv("WATCH_SCHEDULE", "0 3 * * *")
+
+	cfg, err := loadConfigFromEnv()
+	if err != nil {
+		t.Fatalf("loadConfigFromEnv() failed: %v", err)
+	}
+
+	if cfg.Watch.Schedule != "0 3 * * *" {
+		t.Errorf("Watch.Schedule = %v, want 0 3 * * *", cfg.Watch.Schedule)
+	}
+}
+
+func TestOverrideWatchFromEnv_SetsSchedule(t *testing.T) {
+	watch := WatchConfig{Schedule: ""}
+	t.Setenv("WATCH_SCHEDULE", "*/30 * * * *")
+
+	overrideWatchFromEnv(&watch)
+
+	if watch.Schedule != "*/30 * * * *" {
+		t.Errorf("Schedule = %v, want */30 * * * *", watch.Schedule)
+	}
+}
+
+func TestOverrideWatchFromEnv_ScheduleEmptyEnvKeepsYAMLValue(t *testing.T) {
+	watch := WatchConfig{Schedule: "0 5 * * *"}
+	t.Setenv("WATCH_SCHEDULE", "")
+
+	overrideWatchFromEnv(&watch)
+
+	if watch.Schedule != "0 5 * * *" {
+		t.Errorf("Schedule = %v, want 0 5 * * * (unchanged)", watch.Schedule)
+	}
+}
+
+func TestLoadConfigFromFile_ParsesSchedule(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	configContent := `
+oauth:
+  port: "18080"
+anilist:
+  client_id: "test_id"
+  client_secret: "test_secret"
+  username: "test_user"
+myanimelist:
+  client_id: "mal_id"
+  client_secret: "mal_secret"
+  username: "test_user"
+watch:
+  schedule: "0 */6 * * *"
+`
+	err := os.WriteFile(configPath, []byte(configContent), 0o600)
+	if err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	config, err := loadConfigFromFile(configPath)
+	if err != nil {
+		t.Fatalf("loadConfigFromFile() error = %v", err)
+	}
+
+	if config.Watch.Schedule != "0 */6 * * *" {
+		t.Errorf("Watch.Schedule = %v, want 0 */6 * * *", config.Watch.Schedule)
+	}
+}
+
 func TestFavoritesSyncEnabled_FromEnv(t *testing.T) {
 	t.Setenv("ANILIST_CLIENT_ID", "test_id")
 	t.Setenv("ANILIST_USERNAME", "test_user")

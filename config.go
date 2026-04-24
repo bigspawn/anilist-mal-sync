@@ -27,6 +27,7 @@ type SiteConfig struct {
 
 type WatchConfig struct {
 	Interval string `yaml:"interval"`
+	Schedule string `yaml:"schedule"`
 }
 
 // GetInterval parses the interval string into a duration.
@@ -125,6 +126,7 @@ func loadConfigFromEnv() (Config, error) {
 		TokenFilePath: getEnvOrDefault("TOKEN_FILE_PATH", tokenPath),
 		Watch: WatchConfig{
 			Interval: os.Getenv("WATCH_INTERVAL"),
+			Schedule: os.Getenv("WATCH_SCHEDULE"),
 		},
 		HTTPTimeout: getEnvOrDefault("HTTP_TIMEOUT", "30s"),
 		OfflineDatabase: OfflineDatabaseConfig{
@@ -226,6 +228,7 @@ func overrideMyAnimeListFromEnv(mal *SiteConfig) {
 
 func overrideWatchFromEnv(watch *WatchConfig) {
 	overrideStringFromEnv(&watch.Interval, "WATCH_INTERVAL")
+	overrideStringFromEnv(&watch.Schedule, "WATCH_SCHEDULE")
 }
 
 func overrideTokenPathFromEnv(cfg *Config) {
