@@ -312,7 +312,7 @@ func runWatch(ctx context.Context, cmd *cli.Command) error {
 
 ## Phase 4 — Documentation & examples
 
-### Task 4.1 — Update `config.example.yaml`
+### Task 4.1 — Update `config.example.yaml` ~~DONE~~
 
 Add under the `watch:` section:
 ```yaml
@@ -330,7 +330,7 @@ the example).
 
 ---
 
-### Task 4.2 — Update `docker-compose.example.yaml`
+### Task 4.2 — Update `docker-compose.example.yaml` ~~DONE~~
 
 Add a commented `WATCH_SCHEDULE=` env alongside `WATCH_INTERVAL=`, with a note
 that only one may be set.
@@ -339,7 +339,7 @@ that only one may be set.
 
 ---
 
-### Task 4.3 — Update `README.md`
+### Task 4.3 — Update `README.md` ~~DONE~~
 
 1. In the "Watch mode" section (around line 203 / line 350):
    - Document `--schedule` / `WATCH_SCHEDULE`.
@@ -354,7 +354,7 @@ that only one may be set.
 
 ---
 
-### Task 4.4 — Update `CLAUDE.md`
+### Task 4.4 — Update `CLAUDE.md` ~~DONE~~
 
 - In the component table, note `cmd_watch.go` handles both interval and cron.
 - In the "Sync Flow" / environment variable list, mention `WATCH_SCHEDULE`.
@@ -365,7 +365,7 @@ that only one may be set.
 
 ## Phase 5 — Quality gates & release
 
-### Task 5.1 — Full quality gate
+### Task 5.1 — Full quality gate ~~DONE~~
 
 ```bash
 make fmt
