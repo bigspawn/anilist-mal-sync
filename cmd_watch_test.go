@@ -156,7 +156,7 @@ func TestWatchCommand_OnceFlag_IsBool(t *testing.T) {
 // Interval Validation Tests
 // =============================================================================
 
-func TestValidateInterval_ValidIntervals(t *testing.T) {
+func TestWatchConfig_Validate_IntervalTable(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name     string
@@ -175,7 +175,7 @@ func TestValidateInterval_ValidIntervals(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateInterval(tt.interval)
+			err := (&WatchConfig{Interval: tt.interval.String()}).Validate()
 			if tt.valid && err != nil {
 				t.Errorf("expected valid, got error: %v", err)
 			}
@@ -184,17 +184,6 @@ func TestValidateInterval_ValidIntervals(t *testing.T) {
 			}
 		})
 	}
-}
-
-// validateInterval is a helper function extracted from runWatch for testing.
-func validateInterval(interval time.Duration) error {
-	if interval < minInterval {
-		return errors.New("interval must be at least 1h")
-	}
-	if interval > maxInterval {
-		return errors.New("interval must be at most 168h")
-	}
-	return nil
 }
 
 // =============================================================================

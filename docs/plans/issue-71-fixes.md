@@ -111,7 +111,7 @@ an OAuth flow in tests.
 
 ---
 
-## 🟡 F4 — Remove dead `validateInterval` test helper
+## 🟡 F4 — Remove dead `validateInterval` test helper ~~DONE~~
 
 **Why:** `cmd_watch_test.go:190-198` defines `validateInterval` that
 duplicates the bounds check now living in `WatchConfig.Validate()`. The plan
@@ -134,7 +134,7 @@ by one table-driven test.
 
 ---
 
-## 🟡 F5 — Remove unused `defaultInterval` constant
+## 🟡 F5 — Remove unused `defaultInterval` constant ~~DONE~~
 
 **Why:** `cmd_watch.go:12` — `defaultInterval = 24 * time.Hour` is unused in
 production; only `TestValidateInterval_ValidIntervals` references it. Once F4
