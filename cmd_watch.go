@@ -10,11 +10,7 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-const (
-	minInterval     = 1 * time.Hour
-	maxInterval     = 168 * time.Hour // 7 days
-	defaultInterval = 24 * time.Hour
-)
+const defaultInterval = 24 * time.Hour
 
 func newWatchCommand() *cli.Command {
 	watchFlags := append([]cli.Flag{

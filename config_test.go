@@ -1,10 +1,12 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestLoadConfigFromFile_Success(t *testing.T) {
@@ -1173,5 +1175,141 @@ func TestFavoritesSyncEnabled_FromEnv(t *testing.T) {
 				t.Errorf("Favorites.Enabled = %v, want %v", cfg.Favorites.Enabled, tt.want)
 			}
 		})
+	}
+}
+
+// =============================================================================
+// Suite: WatchConfig.Validate
+// =============================================================================
+
+func TestWatchConfig_Validate_BothSet_ReturnsError(t *testing.T) {
+	t.Parallel()
+	w := WatchConfig{Interval: "24h", Schedule: "0 3 * * *"}
+	err := w.Validate()
+	if err == nil {
+		t.Fatal("expected error when both interval and schedule are set")
+	}
+	if !strings.Contains(err.Error(), "not both") {
+		t.Errorf("error should mention mutual exclusion, got: %v", err)
+	}
+}
+
+func TestWatchConfig_Validate_IntervalOnly_Valid(t *testing.T) {
+	t.Parallel()
+	w := WatchConfig{Interval: "24h"}
+	err := w.Validate()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestWatchConfig_Validate_IntervalBelowMin_ReturnsError(t *testing.T) {
+	t.Parallel()
+	w := WatchConfig{Interval: "30m"}
+	err := w.Validate()
+	if err == nil {
+		t.Fatal("expected error for interval below minimum")
+	}
+	if !strings.Contains(err.Error(), "at least") {
+		t.Errorf("error should mention minimum, got: %v", err)
+	}
+}
+
+func TestWatchConfig_Validate_IntervalAboveMax_ReturnsError(t *testing.T) {
+	t.Parallel()
+	w := WatchConfig{Interval: "200h"}
+	err := w.Validate()
+	if err == nil {
+		t.Fatal("expected error for interval above maximum")
+	}
+	if !strings.Contains(err.Error(), "at most") {
+		t.Errorf("error should mention maximum, got: %v", err)
+	}
+}
+
+func TestWatchConfig_Validate_IntervalMalformed_ReturnsError(t *testing.T) {
+	t.Parallel()
+	w := WatchConfig{Interval: "xyz"}
+	err := w.Validate()
+	if err == nil {
+		t.Fatal("expected error for malformed interval")
+	}
+}
+
+func TestWatchConfig_Validate_ScheduleOnly_Valid(t *testing.T) {
+	t.Parallel()
+	w := WatchConfig{Schedule: "0 3 * * *"}
+	err := w.Validate()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestWatchConfig_Validate_ScheduleMalformed_ReturnsError(t *testing.T) {
+	t.Parallel()
+	w := WatchConfig{Schedule: "not a cron"}
+	err := w.Validate()
+	if err == nil {
+		t.Fatal("expected error for malformed schedule")
+	}
+}
+
+func TestWatchConfig_Validate_ScheduleFieldCount_ReturnsError(t *testing.T) {
+	t.Parallel()
+	w := WatchConfig{Schedule: "* * *"}
+	err := w.Validate()
+	if err == nil {
+		t.Fatal("expected error for schedule with wrong field count")
+	}
+}
+
+func TestWatchConfig_Validate_BothEmpty_ReturnsMissingSentinel(t *testing.T) {
+	t.Parallel()
+	w := WatchConfig{}
+	err := w.Validate()
+	if err == nil {
+		t.Fatal("expected error when neither interval nor schedule is set")
+	}
+	if !errors.Is(err, ErrWatchConfigMissing) {
+		t.Errorf("expected ErrWatchConfigMissing, got: %v", err)
+	}
+}
+
+// =============================================================================
+// Suite: WatchConfig.ParseSchedule
+// =============================================================================
+
+func TestWatchConfig_ParseSchedule_ValidReturnsSchedule(t *testing.T) {
+	t.Parallel()
+	w := WatchConfig{Schedule: "0 3 * * *"}
+	sched, err := w.ParseSchedule()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if sched == nil {
+		t.Fatal("expected non-nil schedule")
+	}
+	now := time.Now()
+	next := sched.Next(now)
+	if !next.After(now) {
+		t.Error("expected Next() to return a future time")
+	}
+}
+
+func TestWatchConfig_ParseSchedule_InvalidReturnsError(t *testing.T) {
+	t.Parallel()
+	w := WatchConfig{Schedule: "bad cron"}
+	_, err := w.ParseSchedule()
+	if err == nil {
+		t.Fatal("expected error for invalid schedule")
+	}
+}
+
+func TestWatchConfig_ParseSchedule_EmptyReturnsError(t *testing.T) {
+	t.Parallel()
+	w := WatchConfig{Schedule: ""}
+	_, err := w.ParseSchedule()
+	if err == nil {
+		t.Fatal("expected error for empty schedule")
 	}
 }

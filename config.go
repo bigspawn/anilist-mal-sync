@@ -9,8 +9,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/robfig/cron/v3"
 	yaml "gopkg.in/yaml.v2"
 )
+
+const (
+	minInterval = 1 * time.Hour
+	maxInterval = 168 * time.Hour // 7 days
+)
+
+var ErrWatchConfigMissing = errors.New("watch mode requires either interval or schedule")
 
 type OAuthConfig struct {
 	Port        string `yaml:"port"`
@@ -37,6 +45,45 @@ func (w *WatchConfig) GetInterval() (time.Duration, error) {
 		return 0, nil
 	}
 	return time.ParseDuration(w.Interval)
+}
+
+// Validate checks that exactly one of Interval or Schedule is set and valid.
+func (w *WatchConfig) Validate() error {
+	if w.Interval != "" && w.Schedule != "" {
+		return fmt.Errorf(
+			"watch mode accepts either interval or schedule, not both (interval=%s, schedule=%q)",
+			w.Interval, w.Schedule,
+		)
+	}
+	if w.Interval != "" {
+		d, err := time.ParseDuration(w.Interval)
+		if err != nil {
+			return fmt.Errorf("invalid watch interval %q: %w", w.Interval, err)
+		}
+		if d < minInterval {
+			return fmt.Errorf("interval must be at least 1h (got %v)", d)
+		}
+		if d > maxInterval {
+			return fmt.Errorf("interval must be at most 168h/7days (got %v)", d)
+		}
+		return nil
+	}
+	if w.Schedule != "" {
+		_, err := cron.ParseStandard(w.Schedule)
+		if err != nil {
+			return fmt.Errorf("invalid watch schedule %q: %w", w.Schedule, err)
+		}
+		return nil
+	}
+	return ErrWatchConfigMissing
+}
+
+// ParseSchedule parses the schedule string and returns a cron.Schedule.
+func (w *WatchConfig) ParseSchedule() (cron.Schedule, error) {
+	if w.Schedule == "" {
+		return nil, errors.New("schedule is empty")
+	}
+	return cron.ParseStandard(w.Schedule)
 }
 
 // GetHTTPTimeout parses the http_timeout string into a duration.
