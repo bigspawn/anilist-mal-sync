@@ -203,7 +203,7 @@ doesn't exist).
 
 ---
 
-## 🟢 F8 — Remove phantom test from plan matrix
+## 🟢 F8 — Remove phantom test from plan matrix ~~DONE~~
 
 **Why:** Plan lists `TestResolveWatchConfig_CLIIntervalClearsYAMLSchedule_ReturnsError`
 as a distinct case, but it's semantically identical to
@@ -221,7 +221,7 @@ without a matching function in the codebase.
 
 ---
 
-## 🟢 F9 — Align plan description with actual cron runtime
+## 🟢 F9 — Align plan description with actual cron runtime ~~DONE~~
 
 **Why:** Plan (Task 3.4) described `cron.New(cron.WithLocation(time.Local))`
 + `AddFunc` + `c.Start` + drain via `c.Stop`. Actual implementation
@@ -243,7 +243,7 @@ structure without confusion.
 
 ---
 
-## 🟢 F10 — Document timezone choice explicitly
+## 🟢 F10 — Document timezone choice explicitly ~~DONE~~
 
 **Why:** We committed to `time.Local`, but the current code relies on the
 parser/`time.Now()` defaults rather than setting a location explicitly.
@@ -266,7 +266,7 @@ There's no test asserting the contract.
 
 ---
 
-## 🟢 F11 — Update task checkboxes in `issue-71-tasks.md`
+## 🟢 F11 — Update task checkboxes in `issue-71-tasks.md` ~~DONE~~
 
 **Why:** Tasks 3.1, 3.2 are marked `~~DONE~~` but F1 and F2 above prove they
 aren't done. Task 3.5 is marked DONE but is missing two tests (F3).

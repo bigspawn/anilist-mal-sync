@@ -1,5 +1,7 @@
 # Tasks: Cron schedule support for `watch` command
 
+> See [issue-71-fixes.md](./issue-71-fixes.md) for post-review corrections applied after the initial implementation.
+
 Detailed, sequential implementation tasks for [issue-71-cron-schedule.md](./issue-71-cron-schedule.md).
 Each task is self-contained and ends with a green quality gate (`make fmt && make lint && make test`).
 
@@ -132,9 +134,6 @@ func resolveWatchConfig(cmd *cli.Command, cfg WatchConfig) (WatchConfig, error)
 - `TestResolveWatchConfig_Neither_ReturnsMissingSentinel`.
 - `TestResolveWatchConfig_OnlyInterval_OK`.
 - `TestResolveWatchConfig_OnlySchedule_OK`.
-- `TestResolveWatchConfig_CLIIntervalClearsYAMLSchedule_ReturnsError` — even if
-  user passed `--interval` while YAML has `schedule`, we still conflict. Document
-  this in Validate() error.
 
 **Acceptance:**
 - Tests green.
@@ -232,40 +231,24 @@ func watchWithInterval(ctx context.Context, app *App, interval time.Duration, on
 func watchWithCron(ctx context.Context, app *App, schedule string, once bool) error
 ```
 
-**Behavior:**
-1. If `once` → `runSyncOnce(ctx, app, "Initial sync")` first.
-2. `c := cron.New(cron.WithLocation(time.Local))`.
-3. `id, err := c.AddFunc(schedule, func() { _ = runSyncOnce(ctx, app, "Scheduled sync") })`.
-4. Log next fire time via `c.Entry(id).Next`.
-5. `c.Start()`.
-6. Block on `<-ctx.Done()`.
-7. On shutdown: `stopCtx := c.Stop()`; `<-stopCtx.Done()` to drain in-flight
-   run, then return.
+**Actual behavior (differs from original plan):**
+1. `watchWithCron` calls `cron.ParseStandard(schedule)` to produce a `cron.Schedule` value.
+2. Delegates to `watchWithCronSchedule(ctx, runner, sched, scheduleExpr, once)`.
+3. `watchWithCronSchedule` drives ticks with a `time.Timer` loop:
+   - Computes `next := sched.Next(time.Now())`, sets `time.NewTimer(time.Until(next))`.
+   - On each tick: calls `runSyncOnce(ctx, runner, true)`, resets timer to next tick.
+   - `<-ctx.Done()` → return nil.
+4. `cron.New` / `c.Start` / `c.Stop` are **not** used — only `cron.ParseStandard` for schedule parsing.
 
-**Tests (write first):**
-- `TestWatchWithCron_InvalidScheduleReturnsError` — pass garbage, expect error
-  before the loop even starts.
-- `TestWatchWithCron_ContextCancelStopsImmediately` — launch in goroutine with
-  a far-future schedule (`0 0 1 1 0`), cancel context, assert returns within
-  a small budget (e.g. 2s).
-- `TestWatchWithCron_OnceTriggersImmediateSync` — use a stub App recording
-  invocations; confirm at least one `Run` call before the scheduled tick.
-- `TestWatchWithCron_FiresOnSchedule` — use a schedule that fires within the
-  test window (`* * * * *` every minute is too slow for unit tests → guard
-  with `testing.Short()` skip, or inject a custom `cron.Schedule` via a
-  seam: optional parameter accepting `cron.Schedule` directly for tests).
+**Testability seam:** `watchWithCronSchedule` accepts a `cronSchedule` interface
+(`Next(time.Time) time.Time`), so tests inject a `mockCronSchedule` with
+pre-computed fire times instead of waiting real minutes.
 
-**Note on testability:** to avoid waiting real minutes, introduce a small
-internal seam:
-
-```go
-func watchWithCronSchedule(ctx context.Context, app syncRunner, sched cron.Schedule, once bool) error
-```
-
-where `syncRunner` is an interface (`Run(ctx) error`, `Refresh(ctx)`) the real
-`*App` already satisfies. `watchWithCron` parses the string and calls this
-helper. Tests pass a `cron.ConstantDelaySchedule` (e.g. every 100ms) to drive
-ticks fast.
+**Tests:**
+- `TestWatchWithCron_InvalidScheduleReturnsError`
+- `TestWatchWithCronSchedule_ContextCancelStopsImmediately`
+- `TestWatchWithCronSchedule_OnceTriggersImmediateSync`
+- `TestWatchWithCronSchedule_FiresOnSchedule`
 
 **Acceptance:**
 - New tests green without sleeping for >2s total.
@@ -298,10 +281,9 @@ func runWatch(ctx context.Context, cmd *cli.Command) error {
 
 **Tests:**
 - Existing watch tests must stay green.
-- Add `TestRunWatch_BothConfigured_ReturnsError` (integration-style: synthesize
-  a `cli.Command` with both flags, expect the validation error).
-- Add `TestRunWatch_NeitherConfigured_ReturnsHelpError` — current behavior but
-  message updated.
+- `TestRunWatch_BothFlagsSet_ReturnsMutualExclusionError` — both CLI flags set.
+- `TestRunWatch_CLIIntervalAndYAMLSchedule_ReturnsError` — CLI interval + YAML schedule.
+- `TestRunWatch_NeitherSet_ReturnsMissingError` — neither set, expects `ErrWatchConfigMissing`.
 
 **Acceptance:**
 - All tests green.
@@ -414,14 +396,14 @@ Run locally (document findings in PR):
 | ParseSchedule                     | `..._ValidReturnsSchedule`, `..._Invalid`, `..._Empty`          | 1.4        |
 | CLI flag presence & shape         | Updated `TestWatchCommand_HasFlags`, `TestWatchCommand_ScheduleFlag_Exists`, `..._NoDefault` | 2.2 |
 | Resolution precedence             | `TestResolveWatchConfig_CLIIntervalOverridesYAMLInterval`, `..._CLIScheduleOverridesYAMLSchedule`, `..._OnlyInterval_OK`, `..._OnlySchedule_OK` | 2.1 |
-| Resolution conflict               | `..._CLIIntervalAndYAMLSchedule_ReturnsError`, `..._CLIScheduleAndYAMLInterval_ReturnsError`, `..._CLIIntervalClearsYAMLSchedule_ReturnsError` | 2.1 |
+| Resolution conflict               | `..._CLIIntervalAndYAMLSchedule_ReturnsError`, `..._CLIScheduleAndYAMLInterval_ReturnsError` | 2.1 |
 | Resolution missing                | `..._Neither_ReturnsMissingSentinel`                            | 2.1        |
 | Cron runtime: invalid expr        | `TestWatchWithCron_InvalidScheduleReturnsError`                 | 3.4        |
 | Cron runtime: cancellation        | `TestWatchWithCron_ContextCancelStopsImmediately`               | 3.4        |
 | Cron runtime: --once              | `TestWatchWithCron_OnceTriggersImmediateSync`                   | 3.4        |
 | Cron runtime: fires on schedule   | `TestWatchWithCron_FiresOnSchedule` (using `ConstantDelaySchedule` seam) | 3.4 |
-| Run dispatch: both set            | `TestRunWatch_BothConfigured_ReturnsError`                      | 3.5        |
-| Run dispatch: neither             | `TestRunWatch_NeitherConfigured_ReturnsHelpError`               | 3.5        |
+| Run dispatch: both set            | `TestRunWatch_BothFlagsSet_ReturnsMutualExclusionError`, `TestRunWatch_CLIIntervalAndYAMLSchedule_ReturnsError` | 3.5 |
+| Run dispatch: neither             | `TestRunWatch_NeitherSet_ReturnsMissingError`                   | 3.5        |
 | Backward-compat interval mode     | all existing `cmd_watch_test.go` tests kept green               | 3.3, 3.5   |
 | End-to-end manual                 | Scenarios 1–7 in 5.2                                            | 5.2        |
 

@@ -89,14 +89,21 @@ go mod vendor   # project uses vendor/
 
 ### 4. Cron runtime
 
-- `cron.New(cron.WithLocation(time.Local))`.
-- `c.AddFunc(expr, func() { runScheduledSync(ctx, app) })`.
-- `c.Start()`; on first tick / after each run log the next fire time via
-  `c.Entry(id).Next`.
-- Wait on `<-ctx.Done()` then `c.Stop()` (returns a context we await to let the
-  in-flight sync finish).
-- `--once` flag must still work in cron mode: sync immediately, then hand off to
-  the cron scheduler.
+> **Note (post-implementation):** The actual implementation differs from the
+> original design. `cron.New` / `c.Start` / `c.Stop` are **not** used.
+> Instead:
+
+- `cron.ParseStandard(expr)` produces a `cron.Schedule` value.
+- A manual `time.Timer` loop drives ticks: `next := sched.Next(time.Now())`,
+  `timer.Reset(time.Until(next))`.
+- On each tick: call `runSyncOnce(ctx, runner, true)` (Refresh + Run), compute
+  next tick, reset timer.
+- `<-ctx.Done()` → return nil.
+- `--once` flag: call `runSyncOnce(ctx, runner, false)` (Run only, no Refresh)
+  before entering the timer loop.
+- The internal `watchWithCronSchedule` helper accepts a `cronSchedule` interface
+  (only `Next(time.Time) time.Time` needed), enabling tests to inject
+  mock schedules with pre-computed fire times.
 
 ### 5. Refactor
 

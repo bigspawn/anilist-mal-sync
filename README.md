@@ -558,6 +558,10 @@ anilist-mal-sync watch --schedule "0 3 * * *"
 anilist-mal-sync watch --schedule "0 3 * * *" --once
 ```
 
+Cron expressions use standard 5-field syntax (`minute hour dom month dow`).
+Expressions are evaluated in the **host/container local timezone** (`time.Local`).
+Set the `TZ` environment variable on the container to change it (e.g. `TZ=Europe/Berlin`).
+
 Or use your system's scheduler for one-off syncs:
 
 ```bash
