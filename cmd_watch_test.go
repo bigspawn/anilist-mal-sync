@@ -723,3 +723,105 @@ func TestRunSyncOnce_ReturnsRunError(t *testing.T) {
 		t.Errorf("expected error %v, got %v", want, err)
 	}
 }
+
+// =============================================================================
+// runWatch dispatch-level tests (validation before OAuth/NewApp)
+// =============================================================================
+
+// makeWatchValidationConfig writes a minimal config YAML without interval or schedule.
+func makeWatchValidationConfig(t *testing.T) string {
+	t.Helper()
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+	content := `
+oauth:
+  port: "18080"
+anilist:
+  client_id: "test"
+  client_secret: "test"
+  username: "ani_user"
+myanimelist:
+  client_id: "test"
+  client_secret: "test"
+  username: "mal_user"
+`
+	err := os.WriteFile(configPath, []byte(content), 0o600)
+	if err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	return configPath
+}
+
+func makeWatchValidationCmd(configPath string, interval time.Duration, schedule string) *cli.Command {
+	return &cli.Command{
+		Flags: []cli.Flag{
+			&cli.StringFlag{Name: "config", Value: configPath},
+			&cli.DurationFlag{Name: "interval", Value: interval},
+			&cli.StringFlag{Name: "schedule", Value: schedule},
+			&cli.BoolFlag{Name: "once"},
+		},
+	}
+}
+
+func TestRunWatch_BothFlagsSet_ReturnsMutualExclusionError(t *testing.T) {
+	t.Parallel()
+	configPath := makeWatchValidationConfig(t)
+	cmd := makeWatchValidationCmd(configPath, 2*time.Hour, testCronScheduleDaily3)
+
+	err := runWatch(t.Context(), cmd)
+	if err == nil {
+		t.Fatal("expected mutual exclusion error, got nil")
+	}
+	if errors.Is(err, ErrWatchConfigMissing) {
+		t.Errorf("expected mutual exclusion error, got ErrWatchConfigMissing")
+	}
+}
+
+func TestRunWatch_CLIIntervalAndYAMLSchedule_ReturnsError(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+	content := `
+oauth:
+  port: "18080"
+anilist:
+  client_id: "test"
+  client_secret: "test"
+  username: "ani_user"
+myanimelist:
+  client_id: "test"
+  client_secret: "test"
+  username: "mal_user"
+watch:
+  schedule: "0 3 * * *"
+`
+	err := os.WriteFile(configPath, []byte(content), 0o600)
+	if err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	// CLI interval conflicts with YAML schedule
+	cmd := makeWatchValidationCmd(configPath, 2*time.Hour, "")
+
+	err = runWatch(t.Context(), cmd)
+	if err == nil {
+		t.Fatal("expected mutual exclusion error, got nil")
+	}
+	if errors.Is(err, ErrWatchConfigMissing) {
+		t.Errorf("expected mutual exclusion error, got ErrWatchConfigMissing")
+	}
+}
+
+func TestRunWatch_NeitherSet_ReturnsMissingError(t *testing.T) {
+	t.Parallel()
+	configPath := makeWatchValidationConfig(t)
+	cmd := makeWatchValidationCmd(configPath, 0, "")
+
+	err := runWatch(t.Context(), cmd)
+	if err == nil {
+		t.Fatal("expected ErrWatchConfigMissing, got nil")
+	}
+	if !errors.Is(err, ErrWatchConfigMissing) {
+		t.Errorf("expected ErrWatchConfigMissing, got: %v", err)
+	}
+}

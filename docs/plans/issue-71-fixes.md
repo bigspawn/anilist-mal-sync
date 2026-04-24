@@ -74,7 +74,7 @@ Existing `TestWatchWithCronSchedule_*` and interval tests must stay green.
 
 ---
 
-## 🔴 F3 — Add missing dispatch-level tests
+## 🔴 F3 — Add missing dispatch-level tests ~~DONE~~
 
 **Why:** Task 3.5 listed `TestRunWatch_BothConfigured_ReturnsError` and
 `TestRunWatch_NeitherConfigured_ReturnsHelpError`. Neither exists. Current
