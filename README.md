@@ -138,13 +138,13 @@ docker-compose run --rm sync sync --dry-run --all
 #### Step 4.2: Start the sync daemon
 
 `docker-compose up -d` starts the container in **watch mode** (`--once` flag causes an
-immediate first sync, then it repeats every `WATCH_INTERVAL` hours in the background).
+immediate first sync, then it repeats on the configured schedule in the background).
 
 ```bash
 docker-compose up -d
 ```
 
-Done! The service will sync your lists every 12 hours (or whatever you set in `WATCH_INTERVAL`).
+Done! The service will sync your lists according to your `WATCH_INTERVAL` or `WATCH_SCHEDULE` setting.
 
 To check that the service started correctly and view sync output:
 
@@ -152,7 +152,12 @@ To check that the service started correctly and view sync output:
 docker-compose logs -f sync
 ```
 
-> **Note:** `WATCH_INTERVAL` accepts values between `1h` and `168h` (7 days).
+> **Note:** You must set exactly one of:
+> - `WATCH_INTERVAL` — fixed interval between syncs (e.g. `12h`); accepts `1h`–`168h` (7 days).
+> - `WATCH_SCHEDULE` — cron expression for syncing at specific times (e.g. `0 3 * * *` for daily at 03:00).
+>
+> Setting both is an error. See the [Watch mode](#watch-mode) section for details.
+>
 > To run a one-off sync instead of the daemon use:
 > ```bash
 > docker-compose run --rm sync sync
