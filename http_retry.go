@@ -187,11 +187,10 @@ func executeWithRetry(
 			lastErr = err
 		}
 
+		// A retryable status never reaches here, so only a transport
+		// error can be permanent at this point.
 		if !isRetryable(err, resp) {
-			if err != nil {
-				return nil, err
-			}
-			return resp, nil
+			return nil, err
 		}
 	}
 
@@ -200,11 +199,8 @@ func executeWithRetry(
 	}
 	// Keep the status: callers must be able to tell rate limiting (429)
 	// from an upstream outage (5xx) after the response body is gone.
-	if lastStatus != 0 {
-		return nil, fmt.Errorf("max retries (%d) exhausted, last status: %d %s",
-			maxRetries, lastStatus, http.StatusText(lastStatus))
-	}
-	return nil, fmt.Errorf("max retries (%d) exhausted", maxRetries)
+	return nil, fmt.Errorf("max retries (%d) exhausted, last status: %d %s",
+		maxRetries, lastStatus, http.StatusText(lastStatus))
 }
 
 // parseRetryAfter parses the value of a Retry-After header per RFC 7231 §7.1.3.
