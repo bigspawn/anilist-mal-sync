@@ -441,7 +441,7 @@ func TestUpdater_DryRunRecordsInDryRunItems(t *testing.T) {
 
 func TestDeduplicateMappings_NoDuplicates(t *testing.T) {
 	// Cannot use t.Parallel() due to global reverseDirection variable access
-	ctx := setTestDirection(t, SyncDirectionForward)
+	ctx := t.Context()
 
 	updater := &Updater{
 		Prefix:     "[Test]",
