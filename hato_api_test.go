@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -530,4 +531,108 @@ func TestNewHatoClient_PassesCacheMaxAgeToTheCache(t *testing.T) {
 	// An unparsable value falls back to the documented default.
 	client = NewHatoClient(t.Context(), "", 5*time.Second, t.TempDir(), "nonsense")
 	assert.Equal(t, defaultHatoCacheMaxAge, client.cache.maxAge)
+}
+
+func TestHatoClient_GetMALID_ApiThenCache(t *testing.T) {
+	t.Parallel()
+	requests := 0
+	malID := 13
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		if r.URL.Path == "/api/mappings/anilist/anime/21" {
+			response := HatoResponse{}
+			response.Data.MalID = &malID
+			writeJSON(t, w, response)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	cache, err := NewHatoCache(t.TempDir(), 720*time.Hour)
+	assert.NoError(t, err)
+
+	client := newUnretryingHatoClient(t, server.URL, cache)
+	ctx := NewLogger(false).WithContext(t.Context())
+
+	id, found, err := client.GetMALID(ctx, 21, mediaTypeAnime)
+	assert.NoError(t, err)
+	assert.True(t, found)
+	assert.Equal(t, malID, id)
+
+	id, found, err = client.GetMALID(ctx, 21, mediaTypeAnime)
+	assert.NoError(t, err)
+	assert.True(t, found)
+	assert.Equal(t, malID, id)
+	assert.Equal(t, 1, requests, "the second lookup must come from the cache")
+
+	// An unmapped title is cached as a negative and not asked for twice.
+	_, found, err = client.GetMALID(ctx, 999, mediaTypeAnime)
+	assert.NoError(t, err)
+	assert.False(t, found)
+
+	_, found, err = client.GetMALID(ctx, 999, mediaTypeAnime)
+	assert.NoError(t, err)
+	assert.False(t, found)
+	assert.Equal(t, 2, requests, "the negative result must be cached too")
+}
+
+func TestHatoClient_GetMALID_PropagatesFailures(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	client := newUnretryingHatoClient(t, server.URL, nil)
+	ctx := NewLogger(false).WithContext(t.Context())
+
+	id, found, err := client.GetMALID(ctx, 21, mediaTypeAnime)
+	assert.ErrorContains(t, err, "unexpected status")
+	assert.False(t, found)
+	assert.Zero(t, id)
+}
+
+func TestHatoClient_MalformedPayloadIsAFailure(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("{not json"))
+	}))
+	defer server.Close()
+
+	client := newUnretryingHatoClient(t, server.URL, nil)
+	ctx := NewLogger(false).WithContext(t.Context())
+
+	_, _, err := client.GetAniListID(ctx, 1, mediaTypeAnime)
+	assert.ErrorContains(t, err, "decode response")
+	assert.Equal(t, 1, client.failureStreak, "a broken payload counts as a failure")
+}
+
+func TestHatoClient_DoRequest_InvalidURL(t *testing.T) {
+	t.Parallel()
+	client := newUnretryingHatoClient(t, "http://exa mple.test", nil)
+
+	resp, err := client.doRequest(t.Context(), "http://exa mple.test/api/mappings/mal/anime/1")
+
+	assert.Nil(t, resp)
+	assert.ErrorContains(t, err, "create request")
+	assert.Zero(t, client.failureStreak, "a malformed URL is our bug, not an outage")
+}
+
+func TestHatoClient_SaveCache(t *testing.T) {
+	t.Parallel()
+	ctx := NewLogger(false).WithContext(t.Context())
+
+	assert.NoError(t, newUnretryingHatoClient(t, "http://example.test", nil).SaveCache(ctx))
+
+	tmpDir := t.TempDir()
+	cache, err := NewHatoCache(tmpDir, 720*time.Hour)
+	assert.NoError(t, err)
+
+	malID := 13
+	cache.Set("anilist", mediaTypeAnime, 21, HatoResponseData{MalID: &malID})
+
+	client := newUnretryingHatoClient(t, "http://example.test", cache)
+	assert.NoError(t, client.SaveCache(ctx))
+	assert.FileExists(t, filepath.Join(tmpDir, hatoCacheFile))
 }

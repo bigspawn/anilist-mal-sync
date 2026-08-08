@@ -217,3 +217,38 @@ func TestHatoCache_ZeroMaxAgeKeepsEntriesForever(t *testing.T) {
 	assert.True(t, found)
 	assert.Equal(t, malID, *data.MalID)
 }
+
+func TestNewHatoCache_FallsBackToTheDefaultDir(t *testing.T) {
+	t.Parallel()
+	cache, err := NewHatoCache("", 720*time.Hour)
+
+	assert.NoError(t, err)
+	assert.Equal(t, getDefaultHatoCacheDir(), filepath.Dir(cache.filePath))
+	assert.Equal(t, hatoCacheFile, filepath.Base(cache.filePath))
+}
+
+func TestNewHatoCache_CorruptFileStartsFresh(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+	assert.NoError(t, os.WriteFile(filepath.Join(tmpDir, hatoCacheFile), []byte("{not json"), 0o600))
+
+	cache, err := NewHatoCache(tmpDir, 720*time.Hour)
+
+	assert.NoError(t, err, "an unreadable cache must not break the run")
+	assert.Equal(t, 0, cache.Size())
+}
+
+func TestHatoCache_SaveReportsAnUnusableDirectory(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+	blocker := filepath.Join(tmpDir, "blocker")
+	assert.NoError(t, os.WriteFile(blocker, []byte("not a directory"), 0o600))
+
+	cache, err := NewHatoCache(blocker, 720*time.Hour)
+	assert.NoError(t, err)
+
+	malID := 13
+	cache.Set("anilist", mediaTypeAnime, 21, HatoResponseData{MalID: &malID})
+
+	assert.ErrorContains(t, cache.Save(t.Context()), "create cache directory")
+}
