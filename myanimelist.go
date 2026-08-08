@@ -79,6 +79,8 @@ func (c *MyAnimeListClient) UpdateAnimeByIDAndOptions(ctx context.Context, id in
 	// Log update details for debugging
 	LogDebug(ctx, "[MAL] Updating MAL ID %d with opts: %+v", id, opts)
 
+	ctx, cancel := withTimeout(ctx, c.httpTimeout)
+	defer cancel()
 	_, _, err := c.c.Anime.UpdateMyListStatus(ctx, id, opts...)
 	if err != nil {
 		return fmt.Errorf("failed to update anime %d: %w", id, err)
@@ -119,6 +121,8 @@ func (c *MyAnimeListClient) UpdateMangaByIDAndOptions(ctx context.Context, id in
 		return nil
 	}
 
+	ctx, cancel := withTimeout(ctx, c.httpTimeout)
+	defer cancel()
 	_, _, err := c.c.Manga.UpdateMyListStatus(ctx, id, opts...)
 	if err != nil {
 		return fmt.Errorf("failed to update manga %d: %w", id, err)
