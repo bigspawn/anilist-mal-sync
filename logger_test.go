@@ -50,3 +50,17 @@ func TestLogger_InfoDryRunBelowLevel(t *testing.T) {
 	assert.NotContains(t, output, "Should not appear", "Should not log when below level")
 	assert.NotContains(t, output, "→", "Should not contain arrow when below level")
 }
+
+func TestSyncDirection_Label(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "AniList → MyAnimeList", SyncDirectionForward.Label())
+	assert.Equal(t, "MyAnimeList → AniList", SyncDirectionReverse.Label())
+}
+
+func TestDirectionOf(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, SyncDirectionForward, DirectionOf(false))
+	assert.Equal(t, SyncDirectionReverse, DirectionOf(true))
+}

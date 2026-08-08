@@ -222,7 +222,7 @@ func PrintGlobalSummary(ctx context.Context, stats []*Statistics, report *SyncRe
 
 	// Header
 	logger.Info("")
-	logger.Stage("=== Sync Complete ===")
+	logger.Stage("=== Sync Complete: %s ===", DirectionOf(reverse).Label())
 	logger.Info("Duration: %v", totalDuration.Round(time.Millisecond))
 	logger.Info("")
 	logger.Info("Total: %d | Updated: %d | Skipped: %d | Errors: %d",

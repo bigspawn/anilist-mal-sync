@@ -778,3 +778,28 @@ func TestFormatUnmappedLine(t *testing.T) {
 		})
 	}
 }
+
+func TestPrintGlobalSummary_ShowsDirection(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name    string
+		reverse bool
+		want    string
+	}{
+		{name: "forward", reverse: false, want: "AniList → MyAnimeList"},
+		{name: "reverse", reverse: true, want: "MyAnimeList → AniList"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var buf bytes.Buffer
+			logger := NewLogger(false)
+			logger.SetOutput(&buf)
+			ctx := logger.WithContext(t.Context())
+
+			PrintGlobalSummary(ctx, []*Statistics{}, NewSyncReport(), time.Second, tc.reverse)
+
+			assert.Contains(t, buf.String(), "Sync Complete: "+tc.want)
+		})
+	}
+}
