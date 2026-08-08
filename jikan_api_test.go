@@ -474,3 +474,45 @@ func TestJikanClient_ServerError(t *testing.T) {
 	assert.False(t, found)
 	assert.Nil(t, data)
 }
+
+// =============================================================================
+// Rate limiter — both documented Jikan quotas
+// =============================================================================
+
+func TestJikanRateLimiter_SpacesConsecutiveRequests(t *testing.T) {
+	t.Parallel()
+	limiter := &jikanRateLimiter{}
+	now := time.Now()
+
+	assert.Equal(t, time.Duration(0), limiter.reserve(now))
+	assert.Equal(t, jikanMinRequestInterval, limiter.reserve(now))
+	assert.Equal(t, 2*jikanMinRequestInterval, limiter.reserve(now))
+}
+
+func TestJikanRateLimiter_HonoursMinuteQuota(t *testing.T) {
+	t.Parallel()
+	limiter := &jikanRateLimiter{}
+	now := time.Now()
+
+	var last time.Duration
+	for range jikanRequestsPerMinute {
+		last = limiter.reserve(now)
+	}
+	// The per-second gap alone would let all 60 through in ~20s.
+	assert.Less(t, last, jikanMinuteWindow)
+
+	// One past the quota must wait for the oldest send to leave the window.
+	assert.Equal(t, jikanMinuteWindow, limiter.reserve(now))
+}
+
+func TestJikanRateLimiter_NoWaitAfterIdlePeriod(t *testing.T) {
+	t.Parallel()
+	limiter := &jikanRateLimiter{}
+	now := time.Now()
+
+	for range jikanRequestsPerMinute {
+		limiter.reserve(now)
+	}
+
+	assert.Equal(t, time.Duration(0), limiter.reserve(now.Add(2*jikanMinuteWindow)))
+}

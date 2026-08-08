@@ -13,8 +13,19 @@ import (
 
 const (
 	defaultJikanBaseURL     = "https://api.jikan.moe/v4"
-	defaultJikanCacheMaxAge = 168 * time.Hour        // 7 days
-	jikanMinRequestInterval = 500 * time.Millisecond // ~2 req/s (conservative, Jikan limit is 3 req/s)
+	defaultJikanCacheMaxAge = 168 * time.Hour // 7 days
+
+	// Documented Jikan v4 limits: 3 requests/second AND 60 requests/minute.
+	// The per-minute cap binds first — honouring only the per-second one
+	// exceeds the quota after ~30 seconds of steady traffic.
+	jikanMinRequestInterval = 340 * time.Millisecond
+	jikanRequestsPerMinute  = 60
+	jikanMinuteWindow       = time.Minute
+
+	// Rate-limit windows reset in tens of seconds, so a 429 needs more
+	// than the two attempts the other clients get.
+	jikanMaxRetries            = 4
+	jikanResponseHeaderTimeout = 20 * time.Second
 )
 
 // JikanMangaData contains the manga data we extract from Jikan API responses.
@@ -60,10 +71,6 @@ type JikanClient struct {
 	baseURL    string
 	httpClient HTTPClient
 	cache      *JikanCache
-
-	// Rate limiting
-	rateMu      sync.Mutex
-	lastRequest time.Time
 }
 
 // NewJikanClient creates a new Jikan API client with caching.
@@ -77,24 +84,85 @@ func NewJikanClient(ctx context.Context, cacheDir string, cacheMaxAgeStr string)
 	LogInfoSuccess(ctx, "Jikan cache loaded (%d entries)", cache.Size())
 
 	return &JikanClient{
-		baseURL: defaultJikanBaseURL,
-		httpClient: NewRetryableClient(&http.Client{
-			Timeout: 15 * time.Second,
-		}, 2),
-		cache: cache,
+		baseURL:    defaultJikanBaseURL,
+		httpClient: newJikanHTTPClient(),
+		cache:      cache,
 	}
 }
 
-// rateLimit waits if needed to respect rate limits.
-func (c *JikanClient) rateLimit() {
-	c.rateMu.Lock()
-	defer c.rateMu.Unlock()
+// newJikanHTTPClient stacks the retry logic ON TOP of the rate limiter, so
+// every attempt — retries included — consumes a quota slot. A client-wide
+// timeout is deliberately absent: it would cover the whole retry sequence,
+// including backoff sleeps. Each attempt is bounded by the transport instead.
+func newJikanHTTPClient() *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone() //nolint:forcetypeassert // stdlib guarantees the concrete type
+	transport.ResponseHeaderTimeout = jikanResponseHeaderTimeout
 
-	elapsed := time.Since(c.lastRequest)
-	if elapsed < jikanMinRequestInterval {
-		time.Sleep(jikanMinRequestInterval - elapsed)
+	limited := &http.Client{Transport: &jikanRateLimiter{underlying: transport}}
+
+	return &http.Client{Transport: NewRetryableTransport(limited, jikanMaxRetries)}
+}
+
+// jikanRateLimiter paces outgoing requests to stay inside both documented
+// Jikan quotas at once: a minimum gap between requests and a rolling minute.
+type jikanRateLimiter struct {
+	underlying http.RoundTripper
+
+	mu   sync.Mutex
+	sent []time.Time // send times inside the trailing minute, oldest first
+}
+
+func (l *jikanRateLimiter) RoundTrip(req *http.Request) (*http.Response, error) {
+	wait := l.reserve(time.Now())
+	if wait <= 0 {
+		return l.underlying.RoundTrip(req)
 	}
-	c.lastRequest = time.Now()
+
+	LogDebug(req.Context(), "[JIKAN RATE] waiting %v before %s", wait, req.URL)
+
+	timer := time.NewTimer(wait)
+	defer timer.Stop()
+
+	select {
+	case <-timer.C:
+	case <-req.Context().Done():
+		return nil, req.Context().Err()
+	}
+
+	return l.underlying.RoundTrip(req)
+}
+
+// reserve claims the next send slot and reports how long to wait for it.
+func (l *jikanRateLimiter) reserve(now time.Time) time.Duration {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	sendAt := now
+	if len(l.sent) > 0 {
+		if next := l.sent[len(l.sent)-1].Add(jikanMinRequestInterval); next.After(sendAt) {
+			sendAt = next
+		}
+	}
+	if len(l.sent) >= jikanRequestsPerMinute {
+		// Wait for the oldest of the last N sends to leave the window.
+		if freed := l.sent[len(l.sent)-jikanRequestsPerMinute].Add(jikanMinuteWindow); freed.After(sendAt) {
+			sendAt = freed
+		}
+	}
+
+	l.sent = append(l.sent, sendAt)
+	l.sent = droppedBefore(l.sent, sendAt.Add(-jikanMinuteWindow))
+
+	return sendAt.Sub(now)
+}
+
+// droppedBefore returns the tail of times that is newer than cutoff.
+func droppedBefore(times []time.Time, cutoff time.Time) []time.Time {
+	i := 0
+	for i < len(times) && !times[i].After(cutoff) {
+		i++
+	}
+	return times[i:]
 }
 
 // GetMangaByMALID retrieves manga data by MAL ID, checking cache first.
@@ -122,11 +190,11 @@ func (c *JikanClient) GetMangaByMALID(ctx context.Context, malID int) (*JikanMan
 	apiURL := fmt.Sprintf("%s/manga/%d", c.baseURL, malID)
 	LogDebug(ctx, "[JIKAN API] GET %s", apiURL)
 
-	c.rateLimit()
-
 	resp, err := c.doRequest(ctx, apiURL)
 	if err != nil {
-		LogDebug(ctx, "[JIKAN API] manga %d: error: %v", malID, err)
+		// A failed lookup is indistinguishable from "no such manga" downstream,
+		// so surface it — silent rate limiting degrades matching quality.
+		LogWarn(ctx, "[JIKAN API] manga %d: %v", malID, err)
 		return nil, false
 	}
 	if resp == nil {
@@ -175,11 +243,9 @@ func (c *JikanClient) SearchManga(ctx context.Context, query string) []JikanMang
 	apiURL := fmt.Sprintf("%s/manga?%s", c.baseURL, params.Encode())
 	LogDebug(ctx, "[JIKAN API] GET %s", apiURL)
 
-	c.rateLimit()
-
 	resp, err := c.doRequest(ctx, apiURL)
 	if err != nil {
-		LogDebug(ctx, "[JIKAN API] search %q: error: %v", query, err)
+		LogWarn(ctx, "[JIKAN API] search %q: %v", query, err)
 		return nil
 	}
 	if resp == nil {
@@ -215,15 +281,13 @@ func (c *JikanClient) GetUserFavorites(ctx context.Context, username string) (
 	apiURL := fmt.Sprintf("%s/users/%s/favorites", c.baseURL, url.PathEscape(username))
 	LogDebug(ctx, "[JIKAN API] GET %s", apiURL)
 
-	c.rateLimit()
-
 	resp, err := c.doRequest(ctx, apiURL)
 	if err != nil {
-		LogDebug(ctx, "[JIKAN API] user %s favorites: error: %v", username, err)
 		return nil, nil, fmt.Errorf("failed to fetch user favorites: %w", err)
 	}
 	if resp == nil {
-		return nil, nil, fmt.Errorf("user %s not found or profile is private", username)
+		// Jikan answers 404 both for an unknown user and for a MyAnimeList error.
+		return nil, nil, fmt.Errorf("user %s not found, profile is private, or MyAnimeList rejected the lookup", username)
 	}
 	defer resp.Body.Close() //nolint:errcheck // best effort close
 
