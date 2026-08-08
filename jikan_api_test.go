@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -515,4 +518,266 @@ func TestJikanRateLimiter_NoWaitAfterIdlePeriod(t *testing.T) {
 	}
 
 	assert.Equal(t, time.Duration(0), limiter.reserve(now.Add(2*jikanMinuteWindow)))
+}
+
+func closeBody(t *testing.T, resp *http.Response) {
+	t.Helper()
+	if resp != nil {
+		assert.NoError(t, resp.Body.Close())
+	}
+}
+
+// stubRoundTripper counts the requests it serves and answers each with a fresh 200.
+type stubRoundTripper struct {
+	calls int
+}
+
+func (s *stubRoundTripper) RoundTrip(_ *http.Request) (*http.Response, error) {
+	s.calls++
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader("{}")),
+	}, nil
+}
+
+func TestJikanRateLimiter_RoundTripPassesFirstRequestThrough(t *testing.T) {
+	t.Parallel()
+	stub := &stubRoundTripper{}
+	limiter := &jikanRateLimiter{underlying: stub}
+
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://example.test/manga/1", nil)
+	resp, err := limiter.RoundTrip(req)
+	defer closeBody(t, resp)
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, 1, stub.calls)
+}
+
+func TestJikanRateLimiter_RoundTripWaitsBetweenRequests(t *testing.T) {
+	t.Parallel()
+	stub := &stubRoundTripper{}
+	limiter := &jikanRateLimiter{underlying: stub}
+
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://example.test/manga/1", nil)
+	first, err := limiter.RoundTrip(req)
+	defer closeBody(t, first)
+	assert.NoError(t, err)
+
+	start := time.Now()
+	second, err := limiter.RoundTrip(req)
+	elapsed := time.Since(start)
+	defer closeBody(t, second)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 2, stub.calls)
+	// Timer granularity keeps this slightly under the nominal interval.
+	assert.GreaterOrEqual(t, elapsed, jikanMinRequestInterval-20*time.Millisecond)
+}
+
+func TestJikanRateLimiter_RoundTripAbortsOnCanceledContext(t *testing.T) {
+	t.Parallel()
+	stub := &stubRoundTripper{}
+	limiter := &jikanRateLimiter{underlying: stub}
+
+	// Exhaust the minute quota so the next request faces a minute-long wait.
+	now := time.Now()
+	for range jikanRequestsPerMinute {
+		limiter.reserve(now)
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "http://example.test/manga/1", nil)
+
+	resp, err := limiter.RoundTrip(req) //nolint:bodyclose // no response on a canceled request
+
+	assert.Nil(t, resp)
+	assert.ErrorIs(t, err, context.Canceled)
+	assert.Equal(t, 0, stub.calls, "the request must not reach the network")
+}
+
+func TestNewJikanHTTPClient_RetriesAboveRateLimiter(t *testing.T) {
+	t.Parallel()
+	client := newJikanHTTPClient()
+
+	retryable, ok := client.Transport.(*retryableRoundTripper)
+	assert.True(t, ok, "the outer transport must apply retries")
+	assert.Equal(t, jikanMaxRetries, retryable.maxRetries)
+	assert.Zero(t, client.Timeout, "a client-wide timeout would also cap the backoff sleeps")
+
+	// Retries must pass through the limiter, otherwise they escape the quota.
+	_, ok = retryable.underlying.(*jikanRateLimiter)
+	assert.True(t, ok, "the retry transport must wrap the rate limiter")
+}
+
+func TestNewJikanClient_UsesDefaultEndpointAndSavesCache(t *testing.T) {
+	t.Parallel()
+	client := NewJikanClient(t.Context(), t.TempDir(), "1h")
+
+	assert.Equal(t, defaultJikanBaseURL, client.baseURL)
+	assert.NotNil(t, client.httpClient)
+	assert.NoError(t, client.SaveCache(t.Context()))
+}
+
+func TestJikanClient_GetUserFavorites(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/users/tester/favorites", r.URL.Path)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"data": map[string]any{
+				mediaTypeAnime: []map[string]any{{"mal_id": 1, "title": "Anime One"}},
+				mediaTypeManga: []map[string]any{{"mal_id": 7, "title": "Manga Seven"}, {"mal_id": 9, "title": "Manga Nine"}},
+			},
+		})
+	}))
+	defer server.Close()
+
+	client := newTestJikanClient(t, server.URL, t.TempDir())
+	animeIDs, mangaIDs, err := client.GetUserFavorites(t.Context(), "tester")
+
+	assert.NoError(t, err)
+	assert.Equal(t, map[int]struct{}{1: {}}, animeIDs)
+	assert.Equal(t, map[int]struct{}{7: {}, 9: {}}, mangaIDs)
+}
+
+func TestJikanClient_GetUserFavorites_Failures(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		username    string
+		status      int
+		body        string
+		wantMessage string
+	}{
+		{
+			name:        "empty username is rejected before any request",
+			username:    "",
+			status:      http.StatusOK,
+			body:        "{}",
+			wantMessage: "username cannot be empty",
+		},
+		{
+			name:        "404 covers unknown, private and upstream-rejected users",
+			username:    "ghost",
+			status:      http.StatusNotFound,
+			body:        "{}",
+			wantMessage: "not found, profile is private, or MyAnimeList rejected the lookup",
+		},
+		{
+			name:        "unexpected status is reported, not swallowed",
+			username:    "tester",
+			status:      http.StatusTooManyRequests,
+			body:        "{}",
+			wantMessage: "failed to fetch user favorites",
+		},
+		{
+			name:        "malformed payload is reported",
+			username:    "tester",
+			status:      http.StatusOK,
+			body:        "{not json",
+			wantMessage: "failed to decode favorites response",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(tt.status)
+				_, _ = w.Write([]byte(tt.body))
+			}))
+			defer server.Close()
+
+			client := newTestJikanClient(t, server.URL, t.TempDir())
+			animeIDs, mangaIDs, err := client.GetUserFavorites(t.Context(), tt.username)
+
+			assert.Nil(t, animeIDs)
+			assert.Nil(t, mangaIDs)
+			assert.ErrorContains(t, err, tt.wantMessage)
+		})
+	}
+}
+
+func TestJikanClient_MalformedPayloadIsNotCached(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("{not json"))
+	}))
+	defer server.Close()
+
+	client := newTestJikanClient(t, server.URL, t.TempDir())
+
+	manga, found := client.GetMangaByMALID(t.Context(), 42)
+	assert.Nil(t, manga)
+	assert.False(t, found)
+
+	assert.Nil(t, client.SearchManga(t.Context(), "berserk"))
+
+	// A decode failure is not an answer — it must not poison the cache.
+	_, cached := client.cache.Get(42)
+	assert.False(t, cached)
+}
+
+func TestJikanClient_SearchManga_NotFound(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	client := newTestJikanClient(t, server.URL, t.TempDir())
+
+	assert.Nil(t, client.SearchManga(t.Context(), "nothing here"))
+}
+
+func TestJikanClient_DoRequest_InvalidURL(t *testing.T) {
+	t.Parallel()
+	client := newTestJikanClient(t, "http://example.test", t.TempDir())
+
+	resp, err := client.doRequest(t.Context(), "http://exa mple.test/manga/1") //nolint:bodyclose // no response on a malformed URL
+
+	assert.Nil(t, resp)
+	assert.ErrorContains(t, err, "create request")
+}
+
+func TestMatchJikanMangaToSource_CrossMatchesRomajiAgainstEnglish(t *testing.T) {
+	t.Parallel()
+	jikanData := &JikanMangaData{
+		MalID:        1,
+		Title:        "totally different",
+		TitleEnglish: "Vinland Saga",
+	}
+
+	assert.True(t, matchJikanMangaToSource(t.Context(), jikanData, "", "", "Vinland Saga"))
+	assert.False(t, matchJikanMangaToSource(t.Context(), jikanData, "", "", "Berserk"))
+}
+
+func TestJikanClient_SearchManga_RateLimited(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	defer server.Close()
+
+	client := newTestJikanClient(t, server.URL, t.TempDir())
+
+	// A quota failure yields no results and, unlike a 404, is not cached.
+	assert.Nil(t, client.SearchManga(t.Context(), "berserk"))
+	_, cached := client.cache.GetSearch("berserk")
+	assert.False(t, cached)
+}
+
+func TestJikanClient_DoRequest_TransportError(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
+	unreachableURL := server.URL
+	server.Close()
+
+	client := newTestJikanClient(t, unreachableURL, t.TempDir())
+	resp, err := client.doRequest(t.Context(), unreachableURL+"/manga/1") //nolint:bodyclose // no response when the dial fails
+
+	assert.Nil(t, resp)
+	assert.ErrorContains(t, err, "request")
 }
