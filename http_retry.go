@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -53,15 +56,41 @@ func shouldRetryStatus(statusCode int) bool {
 // isRetryable determines if an error or response should trigger a retry.
 func isRetryable(err error, resp *http.Response) bool {
 	if err != nil {
-		errStr := err.Error()
-		return strings.Contains(errStr, "connection refused") ||
-			strings.Contains(errStr, "connection reset") ||
-			strings.Contains(errStr, "broken pipe")
+		return isTransientNetworkError(err)
 	}
 	if resp == nil {
 		return false
 	}
 	return shouldRetryStatus(resp.StatusCode)
+}
+
+// isTransientNetworkError reports whether a transport error is worth retrying.
+// A per-attempt timeout counts: slow upstreams (Jikan proxies MyAnimeList)
+// routinely stall on one connection and answer on the next.
+func isTransientNetworkError(err error) bool {
+	if errors.Is(err, context.Canceled) {
+		return false
+	}
+
+	switch {
+	case errors.Is(err, syscall.ECONNREFUSED),
+		errors.Is(err, syscall.ECONNRESET),
+		errors.Is(err, syscall.EPIPE),
+		errors.Is(err, io.EOF),
+		errors.Is(err, io.ErrUnexpectedEOF):
+		return true
+	}
+
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return true
+	}
+
+	// Transports that only carry a message (test doubles, wrapped strings).
+	errStr := err.Error()
+	return strings.Contains(errStr, "connection refused") ||
+		strings.Contains(errStr, "connection reset") ||
+		strings.Contains(errStr, "broken pipe")
 }
 
 // cloneRequest creates a copy of an HTTP request, including its body.
@@ -112,6 +141,7 @@ func executeWithRetry(
 	doRequest func(*http.Request) (*http.Response, error),
 ) (*http.Response, error) {
 	var lastErr error
+	var lastStatus int
 	var nextWait time.Duration
 	var rateLimited bool
 
@@ -149,6 +179,7 @@ func executeWithRetry(
 		}
 
 		if resp != nil {
+			lastStatus = resp.StatusCode
 			_ = resp.Body.Close()
 		}
 
@@ -166,6 +197,12 @@ func executeWithRetry(
 
 	if lastErr != nil {
 		return nil, lastErr
+	}
+	// Keep the status: callers must be able to tell rate limiting (429)
+	// from an upstream outage (5xx) after the response body is gone.
+	if lastStatus != 0 {
+		return nil, fmt.Errorf("max retries (%d) exhausted, last status: %d %s",
+			maxRetries, lastStatus, http.StatusText(lastStatus))
 	}
 	return nil, fmt.Errorf("max retries (%d) exhausted", maxRetries)
 }

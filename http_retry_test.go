@@ -3,11 +3,14 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -742,5 +745,59 @@ func TestExecuteWithRetry_SkipsBackoffOnLastAttempt(t *testing.T) {
 	// The last attempt (3 == maxRetries) must NOT trigger a backoff call.
 	if cb.calls != maxRetries {
 		t.Fatalf("expected %d backoff calls, got %d", maxRetries, cb.calls)
+	}
+}
+
+// =============================================================================
+// executeWithRetry — exhausted retries keep the status visible
+// =============================================================================
+
+func TestExecuteWithRetry_ExhaustedRetriesReportStatus(t *testing.T) {
+	t.Parallel()
+
+	doRequest := func(_ *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusTooManyRequests,
+			Body:       io.NopCloser(strings.NewReader("")),
+		}, nil
+	}
+
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://localhost:1", nil)
+	resp, err := executeWithRetry(req, 2, &countingBackoff{}, doRequest)
+	if resp != nil {
+		_ = resp.Body.Close()
+	}
+
+	if err == nil {
+		t.Fatal("expected an error after retries are exhausted")
+	}
+	if !strings.Contains(err.Error(), "429") {
+		t.Fatalf("expected the 429 status in the error, got %q", err)
+	}
+}
+
+func TestIsRetryable_TypedNetworkErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{name: "connection reset syscall", err: syscall.ECONNRESET, expected: true},
+		{name: "unexpected EOF", err: io.ErrUnexpectedEOF, expected: true},
+		{name: "timeout", err: &net.DNSError{IsTimeout: true}, expected: true},
+		{name: "wrapped timeout", err: fmt.Errorf("get: %w", &net.DNSError{IsTimeout: true}), expected: true},
+		{name: "context canceled", err: context.Canceled, expected: false},
+		{name: "dns not found", err: &net.DNSError{IsNotFound: true}, expected: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := isRetryable(tt.err, nil); got != tt.expected {
+				t.Fatalf("expected %v, got %v", tt.expected, got)
+			}
+		})
 	}
 }
