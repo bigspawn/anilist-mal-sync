@@ -559,7 +559,7 @@ func (s HatoAPIStrategy) FindTarget(
 	if srcAnime, ok := src.(Anime); ok {
 		targetServiceID, found, err := s.lookupIDAnime(ctx, srcAnime)
 		if err != nil {
-			LogDebug(ctx, "[%s] Hato API error: %v", prefix, err)
+			LogWarn(ctx, "[%s] Hato API error: %v", prefix, err)
 			return nil, false, nil
 		}
 		if found {
@@ -572,7 +572,7 @@ func (s HatoAPIStrategy) FindTarget(
 	if srcManga, ok := src.(Manga); ok {
 		targetServiceID, found, err := s.lookupIDManga(ctx, srcManga)
 		if err != nil {
-			LogDebug(ctx, "[%s] Hato API error: %v", prefix, err)
+			LogWarn(ctx, "[%s] Hato API error: %v", prefix, err)
 			return nil, false, nil
 		}
 		if found {
