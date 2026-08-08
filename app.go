@@ -317,6 +317,8 @@ func (a *App) Run(ctx context.Context) error {
 
 	startTime := time.Now()
 
+	LogStage(ctx, "=== Sync started: %s ===", DirectionOf(a.reverse).Label())
+
 	var err error
 	if a.reverse {
 		err = a.runReverseSync(ctx)

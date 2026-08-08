@@ -344,3 +344,18 @@ func minimalMalManga(id int) mal.Manga {
 	m.Title = "Test"
 	return m
 }
+
+func TestGenerateUpdateDetail_StatesDirection(t *testing.T) {
+	t.Parallel()
+
+	// Princess Mononoke: same ID on both services, so the detail must still
+	// name both sides — otherwise a forward sync reads as a write to AniList.
+	sameID := Anime{IDAnilist: 164, IDMal: 164}
+	assert.Equal(t, "(AniList: 164 → MAL: 164)", generateUpdateDetail(sameID, TargetID(164), false))
+	assert.Equal(t, "(MAL: 164 → AniList: 164)", generateUpdateDetail(Anime{IDMal: 164}, TargetID(164), true))
+
+	// Differing IDs keep both sides too, ordered source → target.
+	movie := Anime{IDAnilist: 151117, IDMal: 52107}
+	assert.Equal(t, "(AniList: 151117 → MAL: 52107)", generateUpdateDetail(movie, TargetID(52107), false))
+	assert.Equal(t, "(MAL: 52107 → AniList: 151117)", generateUpdateDetail(Anime{IDMal: 52107}, TargetID(151117), true))
+}

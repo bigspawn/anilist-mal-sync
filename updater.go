@@ -473,10 +473,13 @@ func generateUpdateDetail(src Source, tgtID TargetID, reverse bool) string {
 		malID = tgtID // Use the found MAL ID
 	}
 
-	// Show both IDs if available and different
+	// Render as source → target: the line must state which way it was
+	// written, otherwise an update reads the same in both directions.
 	switch {
-	case malID > 0 && anilistID > 0 && malID != anilistID:
-		return fmt.Sprintf("(MAL: %d, AniList: %d)", malID, anilistID)
+	case malID > 0 && anilistID > 0 && reverse:
+		return fmt.Sprintf("(MAL: %d → AniList: %d)", malID, anilistID)
+	case malID > 0 && anilistID > 0:
+		return fmt.Sprintf("(AniList: %d → MAL: %d)", anilistID, malID)
 	case anilistID > 0:
 		return fmt.Sprintf("(AniList: %d)", anilistID)
 	case malID > 0:
