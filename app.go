@@ -261,7 +261,13 @@ func loadIDMappingStrategies(
 
 	var hatoClient *HatoClient
 	if config.HatoAPI.Enabled {
-		hatoClient = NewHatoClient(ctx, config.HatoAPI.BaseURL, config.GetHTTPTimeout(), config.HatoAPI.CacheDir)
+		hatoClient = NewHatoClient(
+			ctx,
+			config.HatoAPI.BaseURL,
+			config.GetHTTPTimeout(),
+			config.HatoAPI.CacheDir,
+			config.HatoAPI.CacheMaxAge,
+		)
 		LogInfoSuccess(ctx, "Hato API enabled (%s)", config.HatoAPI.BaseURL)
 	}
 

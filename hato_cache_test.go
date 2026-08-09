@@ -13,7 +13,7 @@ func TestNewHatoCache(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()
 
-	cache, err := NewHatoCache(tmpDir)
+	cache, err := NewHatoCache(tmpDir, 720*time.Hour)
 	assert.NoError(t, err)
 	assert.NotNil(t, cache)
 	assert.Equal(t, 0, cache.Size())
@@ -22,7 +22,7 @@ func TestNewHatoCache(t *testing.T) {
 func TestHatoCache_SetGet(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()
-	cache, _ := NewHatoCache(tmpDir)
+	cache, _ := NewHatoCache(tmpDir, 720*time.Hour)
 
 	anilistID := 123
 	malID := 456
@@ -45,7 +45,7 @@ func TestHatoCache_SetGet(t *testing.T) {
 func TestHatoCache_NotFound(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()
-	cache, _ := NewHatoCache(tmpDir)
+	cache, _ := NewHatoCache(tmpDir, 720*time.Hour)
 
 	_, found := cache.Get("mal", "anime", 999)
 	assert.False(t, found)
@@ -54,7 +54,7 @@ func TestHatoCache_NotFound(t *testing.T) {
 func TestHatoCache_SaveLoad(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()
-	cache, _ := NewHatoCache(tmpDir)
+	cache, _ := NewHatoCache(tmpDir, 720*time.Hour)
 
 	anilistID := 123
 	malID := 456
@@ -72,7 +72,7 @@ func TestHatoCache_SaveLoad(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Create new cache instance to load from disk
-	cache2, err := NewHatoCache(tmpDir)
+	cache2, err := NewHatoCache(tmpDir, 720*time.Hour)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, cache2.Size())
 
@@ -84,7 +84,7 @@ func TestHatoCache_SaveLoad(t *testing.T) {
 func TestHatoCache_DirtyFlag(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()
-	cache, _ := NewHatoCache(tmpDir)
+	cache, _ := NewHatoCache(tmpDir, 720*time.Hour)
 
 	ctx := t.Context()
 
@@ -139,7 +139,7 @@ func TestHatoCache_BuildCacheKey(t *testing.T) {
 func TestHatoCache_MultipleEntries(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()
-	cache, _ := NewHatoCache(tmpDir)
+	cache, _ := NewHatoCache(tmpDir, 720*time.Hour)
 
 	// Add multiple entries
 	for i := 1; i <= 10; i++ {
@@ -161,7 +161,7 @@ func TestHatoCache_MultipleEntries(t *testing.T) {
 func TestHatoCache_NegativeCache(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()
-	cache, _ := NewHatoCache(tmpDir)
+	cache, _ := NewHatoCache(tmpDir, 720*time.Hour)
 
 	// Cache a negative result (empty data)
 	data := HatoResponseData{}
@@ -179,4 +179,76 @@ func TestGetDefaultHatoCacheDir(t *testing.T) {
 	assert.NotEmpty(t, dir)
 	assert.Contains(t, dir, "anilist-mal-sync")
 	assert.Contains(t, dir, "hato-cache")
+}
+
+func TestHatoCache_ExpiredEntryIsAMiss(t *testing.T) {
+	t.Parallel()
+	cache, err := NewHatoCache(t.TempDir(), time.Nanosecond)
+	assert.NoError(t, err)
+
+	anilistID := 5
+	cache.Set("mal", mediaTypeAnime, 1, HatoResponseData{AniListID: &anilistID})
+
+	_, found := cache.Get("mal", mediaTypeAnime, 1)
+	assert.False(t, found)
+}
+
+func TestHatoCache_ExpiryAppliesToNegativeEntries(t *testing.T) {
+	t.Parallel()
+	cache, err := NewHatoCache(t.TempDir(), time.Nanosecond)
+	assert.NoError(t, err)
+
+	// A title with no mapping yet must be retried once the entry ages out.
+	cache.Set("anilist", mediaTypeManga, 7, HatoResponseData{})
+
+	_, found := cache.Get("anilist", mediaTypeManga, 7)
+	assert.False(t, found)
+}
+
+func TestHatoCache_ZeroMaxAgeKeepsEntriesForever(t *testing.T) {
+	t.Parallel()
+	cache, err := NewHatoCache(t.TempDir(), 0)
+	assert.NoError(t, err)
+
+	malID := 13
+	cache.Set("anilist", mediaTypeAnime, 21, HatoResponseData{MalID: &malID})
+
+	data, found := cache.Get("anilist", mediaTypeAnime, 21)
+	assert.True(t, found)
+	assert.Equal(t, malID, *data.MalID)
+}
+
+func TestNewHatoCache_FallsBackToTheDefaultDir(t *testing.T) {
+	t.Parallel()
+	cache, err := NewHatoCache("", 720*time.Hour)
+
+	assert.NoError(t, err)
+	assert.Equal(t, getDefaultHatoCacheDir(), filepath.Dir(cache.filePath))
+	assert.Equal(t, hatoCacheFile, filepath.Base(cache.filePath))
+}
+
+func TestNewHatoCache_CorruptFileStartsFresh(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+	assert.NoError(t, os.WriteFile(filepath.Join(tmpDir, hatoCacheFile), []byte("{not json"), 0o600))
+
+	cache, err := NewHatoCache(tmpDir, 720*time.Hour)
+
+	assert.NoError(t, err, "an unreadable cache must not break the run")
+	assert.Equal(t, 0, cache.Size())
+}
+
+func TestHatoCache_SaveReportsAnUnusableDirectory(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+	blocker := filepath.Join(tmpDir, "blocker")
+	assert.NoError(t, os.WriteFile(blocker, []byte("not a directory"), 0o600))
+
+	cache, err := NewHatoCache(blocker, 720*time.Hour)
+	assert.NoError(t, err)
+
+	malID := 13
+	cache.Set("anilist", mediaTypeAnime, 21, HatoResponseData{MalID: &malID})
+
+	assert.ErrorContains(t, cache.Save(t.Context()), "create cache directory")
 }

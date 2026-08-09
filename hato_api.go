@@ -5,10 +5,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 )
 
-const defaultHatoBaseURL = "https://hato.malupdaterosx.moe"
+const (
+	defaultHatoBaseURL     = "https://hato.malupdaterosx.moe"
+	defaultHatoCacheMaxAge = 720 * time.Hour // 30 days
+	hatoMaxFailureStreak   = 5
+)
 
 // HatoClient is an HTTP client for the Hato API (https://hato.malupdaterosx.moe).
 // Supports both anime and manga ID mapping with persistent JSON caching.
@@ -16,6 +21,13 @@ type HatoClient struct {
 	baseURL    string
 	httpClient HTTPClient
 	cache      *HatoCache // Persistent cache (can be nil)
+
+	// Hato is a small third-party service that goes down for long stretches.
+	// Once it does, every lookup costs four retries with backoff, so the
+	// client stops asking for the rest of the run.
+	mu            sync.Mutex
+	failureStreak int
+	givenUp       bool
 }
 
 // HatoResponse represents the response from /api/mappings/{service}/{media_type}/{id}.
@@ -37,15 +49,27 @@ type HatoResponseData struct {
 
 // NewHatoClient creates a new Hato API client with optional caching.
 // If cacheDir is empty, caching is disabled (cache = nil).
-func NewHatoClient(ctx context.Context, baseURL string, timeout time.Duration, cacheDir string) *HatoClient {
+func NewHatoClient(
+	ctx context.Context,
+	baseURL string,
+	timeout time.Duration,
+	cacheDir string,
+	cacheMaxAgeStr string,
+) *HatoClient {
 	if baseURL == "" {
 		baseURL = defaultHatoBaseURL
+	}
+
+	maxAge := defaultHatoCacheMaxAge
+	parsed, err := time.ParseDuration(cacheMaxAgeStr)
+	if err == nil {
+		maxAge = parsed
 	}
 
 	var cache *HatoCache
 	if cacheDir != "" {
 		var err error
-		cache, err = NewHatoCache(cacheDir) //nolint:contextcheck // Cache init doesn't need context
+		cache, err = NewHatoCache(cacheDir, maxAge) //nolint:contextcheck // Cache init doesn't need context
 		if err != nil {
 			LogWarn(ctx, "Failed to initialize Hato cache: %v (caching disabled)", err)
 		} else {
@@ -78,6 +102,37 @@ func (c *HatoClient) setCachedData(service, mediaType string, id int, data HatoR
 	}
 }
 
+// gaveUp reports whether the client stopped talking to Hato for this run.
+func (c *HatoClient) gaveUp() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.givenUp
+}
+
+// noteFailure counts a failed request and stops the client once Hato looks down.
+func (c *HatoClient) noteFailure(ctx context.Context, err error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.failureStreak++
+	if c.givenUp || c.failureStreak < hatoMaxFailureStreak {
+		return
+	}
+
+	c.givenUp = true
+	LogWarn(ctx, "Hato API failed %d times in a row (%v), skipping it for the rest of this run",
+		c.failureStreak, err)
+}
+
+// noteSuccess clears the streak — the service answered, whatever the answer was.
+func (c *HatoClient) noteSuccess() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.failureStreak = 0
+}
+
 // GetAniListID returns the AniList ID for a given MAL ID and media type.
 // mediaType should be "anime" or "manga".
 // Checks cache first, then makes API request if needed.
@@ -92,6 +147,11 @@ func (c *HatoClient) GetAniListID(ctx context.Context, malID int, mediaType stri
 		}
 		// Cached negative result
 		LogDebug(ctx, "[HATO CACHE] HIT: MAL %d -> not found (cached) (%s)", malID, mediaType)
+		return 0, false, nil
+	}
+
+	// A negative result is never cached here: Hato being down is not an answer.
+	if c.gaveUp() {
 		return 0, false, nil
 	}
 
@@ -131,6 +191,11 @@ func (c *HatoClient) GetMALID(ctx context.Context, anilistID int, mediaType stri
 		}
 		// Cached negative result
 		LogDebug(ctx, "[HATO CACHE] HIT: AniList %d -> not found (cached) (%s)", anilistID, mediaType)
+		return 0, false, nil
+	}
+
+	// A negative result is never cached here: Hato being down is not an answer.
+	if c.gaveUp() {
 		return 0, false, nil
 	}
 
@@ -175,24 +240,32 @@ func (c *HatoClient) doRequest(ctx context.Context, url string) (*HatoResponse, 
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("request: %w", err)
+		err = fmt.Errorf("request: %w", err)
+		c.noteFailure(ctx, err)
+		return nil, err
 	}
 	defer resp.Body.Close() //nolint:errcheck // best effort close
 
 	LogDebug(ctx, "[HATO API] Status: %d", resp.StatusCode)
 
 	if resp.StatusCode == http.StatusNotFound {
+		c.noteSuccess()
 		return nil, nil //nolint:nilnil // nil means "not found", not an error
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status: %s", resp.Status)
+		err = fmt.Errorf("unexpected status: %s", resp.Status)
+		c.noteFailure(ctx, err)
+		return nil, err
 	}
 
 	var hatoResp HatoResponse
 	if err := json.NewDecoder(resp.Body).Decode(&hatoResp); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
+		err = fmt.Errorf("decode response: %w", err)
+		c.noteFailure(ctx, err)
+		return nil, err
 	}
 
+	c.noteSuccess()
 	return &hatoResp, nil
 }

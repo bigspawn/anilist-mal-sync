@@ -26,13 +26,15 @@ type HatoCache struct {
 	entries  map[string]HatoCacheEntry
 	mu       sync.RWMutex
 	filePath string
+	maxAge   time.Duration
 	dirty    bool // Track if cache needs saving
 }
 
 // NewHatoCache creates a new cache instance and loads existing data.
+// A non-positive maxAge keeps entries forever.
 //
 //nolint:unparam // Error return kept for API compatibility
-func NewHatoCache(cacheDir string) (*HatoCache, error) {
+func NewHatoCache(cacheDir string, maxAge time.Duration) (*HatoCache, error) {
 	if cacheDir == "" {
 		cacheDir = getDefaultHatoCacheDir()
 	}
@@ -42,6 +44,7 @@ func NewHatoCache(cacheDir string) (*HatoCache, error) {
 	cache := &HatoCache{
 		entries:  make(map[string]HatoCacheEntry),
 		filePath: filePath,
+		maxAge:   maxAge,
 	}
 
 	// Load existing cache if it exists
@@ -57,7 +60,7 @@ func NewHatoCache(cacheDir string) (*HatoCache, error) {
 }
 
 // Get retrieves a cached mapping by key.
-// Returns (responseData, found).
+// Returns (responseData, found). Expired entries are treated as a cache miss.
 func (c *HatoCache) Get(service, mediaType string, id int) (*HatoResponseData, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -65,6 +68,12 @@ func (c *HatoCache) Get(service, mediaType string, id int) (*HatoResponseData, b
 	key := buildCacheKey(service, mediaType, id)
 	entry, exists := c.entries[key]
 	if !exists {
+		return nil, false
+	}
+
+	// Negative results are cached too, so without expiry a title that gained
+	// a mapping upstream would stay unmapped forever.
+	if c.maxAge > 0 && time.Since(entry.CachedAt) > c.maxAge {
 		return nil, false
 	}
 
