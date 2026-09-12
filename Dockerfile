@@ -8,8 +8,8 @@ WORKDIR /build
 
 COPY . .
 
-ARG TARGETOS=linux
-ARG TARGETARCH=amd64
+ARG TARGETOS
+ARG TARGETARCH
 ARG VERSION=dev
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -mod=vendor -ldflags="-w -s -X main.version=${VERSION}" -o main
 
