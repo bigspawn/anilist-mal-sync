@@ -1,12 +1,9 @@
 package main
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 )
 
@@ -15,19 +12,9 @@ const (
 	hatoCacheDir  = "hato-cache"
 )
 
-// HatoCacheEntry represents a single cached mapping with full API response.
-type HatoCacheEntry struct {
-	Data     HatoResponseData `json:"data"`
-	CachedAt time.Time        `json:"cached_at"`
-}
-
 // HatoCache provides persistent JSON-based caching for Hato API responses.
 type HatoCache struct {
-	entries  map[string]HatoCacheEntry
-	mu       sync.RWMutex
-	filePath string
-	maxAge   time.Duration
-	dirty    bool // Track if cache needs saving
+	*MappingCache[HatoResponseData]
 }
 
 // NewHatoCache creates a new cache instance and loads existing data.
@@ -41,111 +28,20 @@ func NewHatoCache(cacheDir string, maxAge time.Duration) (*HatoCache, error) {
 
 	filePath := filepath.Join(cacheDir, hatoCacheFile)
 
-	cache := &HatoCache{
-		entries:  make(map[string]HatoCacheEntry),
-		filePath: filePath,
-		maxAge:   maxAge,
-	}
+	cache := NewMappingCache[HatoResponseData](filePath, maxAge)
 
-	// Load existing cache if it exists
-	if fileExists(filePath) {
-		err := cache.load()
-		if err != nil {
-			// Non-fatal: continue with empty cache
-			LogWarn(context.Background(), "Failed to load Hato cache: %v (starting fresh)", err)
-		}
-	}
-
-	return cache, nil
+	return &HatoCache{MappingCache: cache}, nil
 }
 
 // Get retrieves a cached mapping by key.
 // Returns (responseData, found). Expired entries are treated as a cache miss.
 func (c *HatoCache) Get(service, mediaType string, id int) (*HatoResponseData, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	key := buildCacheKey(service, mediaType, id)
-	entry, exists := c.entries[key]
-	if !exists {
-		return nil, false
-	}
-
-	// Negative results are cached too, so without expiry a title that gained
-	// a mapping upstream would stay unmapped forever.
-	if c.maxAge > 0 && time.Since(entry.CachedAt) > c.maxAge {
-		return nil, false
-	}
-
-	return &entry.Data, true
+	return c.MappingCache.Get(buildCacheKey(service, mediaType, id))
 }
 
 // Set stores a complete API response in the cache.
 func (c *HatoCache) Set(service, mediaType string, id int, data HatoResponseData) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	key := buildCacheKey(service, mediaType, id)
-	c.entries[key] = HatoCacheEntry{
-		Data:     data,
-		CachedAt: time.Now(),
-	}
-	c.dirty = true
-}
-
-// Save persists the cache to disk if dirty.
-func (c *HatoCache) Save(ctx context.Context) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if !c.dirty {
-		return nil // No changes to save
-	}
-
-	// Ensure cache directory exists
-	cacheDir := filepath.Dir(c.filePath)
-	// #nosec G301 - Cache directory for non-sensitive data
-	if err := os.MkdirAll(cacheDir, 0o750); err != nil {
-		return fmt.Errorf("create cache directory: %w", err)
-	}
-
-	// Marshal to JSON
-	data, err := json.MarshalIndent(c.entries, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal cache: %w", err)
-	}
-
-	// Write to file
-	// #nosec G306 - Cache file is non-sensitive
-	if err := os.WriteFile(c.filePath, data, 0o600); err != nil {
-		return fmt.Errorf("write cache file: %w", err)
-	}
-
-	c.dirty = false
-	LogDebug(ctx, "[Hato Cache] Saved %d entries to %s", len(c.entries), c.filePath)
-	return nil
-}
-
-// load reads the cache from disk.
-func (c *HatoCache) load() error {
-	// #nosec G304 - File path comes from controlled cache directory
-	data, err := os.ReadFile(c.filePath)
-	if err != nil {
-		return fmt.Errorf("read cache file: %w", err)
-	}
-
-	if err := json.Unmarshal(data, &c.entries); err != nil {
-		return fmt.Errorf("unmarshal cache: %w", err)
-	}
-
-	return nil
-}
-
-// Size returns the number of cached entries.
-func (c *HatoCache) Size() int {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return len(c.entries)
+	c.MappingCache.Set(buildCacheKey(service, mediaType, id), data)
 }
 
 // buildCacheKey creates a unique cache key.

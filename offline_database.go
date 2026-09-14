@@ -98,16 +98,19 @@ func downloadAndCache(ctx context.Context, cacheDir, dbPath, metaPath string) er
 	}
 
 	// #nosec G301 - Cache directory for non-sensitive data
-	if err := os.MkdirAll(cacheDir, 0o750); err != nil {
+	err = os.MkdirAll(cacheDir, 0o750)
+	if err != nil {
 		return fmt.Errorf("create cache directory: %w", err)
 	}
 
-	if err := downloadAODFile(ctx, downloadURL, dbPath); err != nil {
+	err = downloadAODFile(ctx, downloadURL, dbPath)
+	if err != nil {
 		return fmt.Errorf("download file: %w", err)
 	}
 
 	// #nosec G306 - Version metadata is non-sensitive
-	if err := os.WriteFile(metaPath, []byte(tag), 0o600); err != nil {
+	err = os.WriteFile(metaPath, []byte(tag), 0o600)
+	if err != nil {
 		LogWarn(ctx, "Failed to save version metadata: %v", err)
 	}
 
@@ -131,12 +134,14 @@ func updateIfNeeded(ctx context.Context, dbPath, metaPath string) {
 
 	LogInfo(ctx, "Updating offline database: %s → %s", cachedVersion, latestTag)
 
-	if err := downloadAODFile(ctx, latestURL, dbPath); err != nil {
+	err = downloadAODFile(ctx, latestURL, dbPath)
+	if err != nil {
 		LogWarn(ctx, "Failed to update offline database: %v (using cached version)", err)
 		return
 	}
 
-	if err := os.WriteFile(metaPath, []byte(latestTag), 0o600); err != nil {
+	err = os.WriteFile(metaPath, []byte(latestTag), 0o600)
+	if err != nil {
 		LogWarn(ctx, "Failed to save version metadata: %v", err)
 	}
 }
@@ -165,14 +170,16 @@ func downloadAODFile(ctx context.Context, url, destPath string) error {
 	}
 	tmpPath := tmpFile.Name()
 
-	if _, err := io.Copy(tmpFile, resp.Body); err != nil {
+	_, err = io.Copy(tmpFile, resp.Body)
+	if err != nil {
 		_ = tmpFile.Close()
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("write file: %w", err)
 	}
 	_ = tmpFile.Close()
 
-	if err := os.Rename(tmpPath, destPath); err != nil {
+	err = os.Rename(tmpPath, destPath)
+	if err != nil {
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("rename file: %w", err)
 	}
@@ -198,7 +205,8 @@ func parseAODFile(filePath string) (*OfflineDatabase, error) {
 	decoder := json.NewDecoder(f)
 
 	// Read opening brace
-	if _, err := decoder.Token(); err != nil {
+	_, err = decoder.Token()
+	if err != nil {
 		return nil, fmt.Errorf("read opening token: %w", err)
 	}
 
@@ -242,7 +250,8 @@ func parseAODFile(filePath string) (*OfflineDatabase, error) {
 
 func parseDataArray(decoder *json.Decoder, db *OfflineDatabase) error {
 	// Read opening bracket of data array
-	if _, err := decoder.Token(); err != nil {
+	_, err := decoder.Token()
+	if err != nil {
 		return fmt.Errorf("read data array start: %w", err)
 	}
 
@@ -257,7 +266,8 @@ func parseDataArray(decoder *json.Decoder, db *OfflineDatabase) error {
 	}
 
 	// Read closing bracket
-	if _, err := decoder.Token(); err != nil {
+	_, err = decoder.Token()
+	if err != nil {
 		return fmt.Errorf("read data array end: %w", err)
 	}
 
@@ -334,7 +344,8 @@ func getLatestReleaseInfo(ctx context.Context) (downloadURL, tag string, err err
 	}
 
 	var release githubRelease
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+	err = json.NewDecoder(resp.Body).Decode(&release)
+	if err != nil {
 		return "", "", fmt.Errorf("decode response: %w", err)
 	}
 

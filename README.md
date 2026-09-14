@@ -94,6 +94,10 @@ services:
       # - HATO_API_URL=https://hato.malupdaterosx.moe  # Hato API base URL
       # - HATO_API_CACHE_DIR=/home/appuser/.config/anilist-mal-sync/hato-cache  # Cache directory
       # - HATO_API_CACHE_MAX_AGE=720h  # Cache max age (default: 720h / 30 days)
+      # - MANGABAKA_API_ENABLED=true  # Enable MangaBaka API for manga ID mapping (default: false)
+      # - MANGABAKA_API_URL=https://api.mangabaka.org/v1  # MangaBaka API base URL
+      # - MANGABAKA_API_CACHE_DIR=/home/appuser/.config/anilist-mal-sync/mangabaka-cache  # Cache directory
+      # - MANGABAKA_API_CACHE_MAX_AGE=720h  # Cache max age (default: 720h / 30 days)
       # - ARM_API_ENABLED=false  # Enable ARM API (default: false)
       # - ARM_API_URL=https://arm.haglund.dev  # ARM API base URL
       # - JIKAN_API_ENABLED=false  # Enable Jikan API for manga ID mapping
@@ -197,6 +201,10 @@ docker-compose logs -f sync
 | | `--offline-db-force-refresh` | Force re-download offline database |
 | | `--arm-api` | Enable ARM API for anime ID mapping (default: `false`, ignored for `--manga`) |
 | | `--arm-api-url` | ARM API base URL |
+| | `--hato-api` | Enable Hato API for anime and manga ID mapping (default: `true`) |
+| | `--hato-api-url` | Hato API base URL |
+| | `--mangabaka-api` | Enable MangaBaka API for manga ID mapping, fallback after Hato (default: `false`, ignored for anime) |
+| | `--mangabaka-api-url` | MangaBaka API base URL |
 | | `--jikan-api` | Enable Jikan API for manga ID mapping (default: `false`, ignored for anime) |
 | | `--favorites` | Sync favorites between services (requires Jikan API for MAL favorites) |
 
@@ -292,9 +300,10 @@ The tool uses different ID mapping strategies for anime and manga, and the chain
 1. **Manual Mapping** - User-defined AniList↔MAL mappings from `mappings.yaml`
 2. **Direct ID lookup** - If the entry already exists in your target list
 3. **Hato API** (optional, enabled by default) - Online API for manga ID mapping
-4. **Title matching** - Match by title similarity
-5. **Jikan API** (optional, disabled by default) - Online API for manga ID mapping via [Jikan](https://jikan.moe/) (unofficial MAL API)
-6. **API search** - Search the MAL API
+4. **MangaBaka API** (optional, enabled by default) - Online fallback to [MangaBaka](https://mangabaka.org) for manga ID mapping
+5. **Title matching** - Match by title similarity
+6. **Jikan API** (optional, disabled by default) - Online API for manga ID mapping via [Jikan](https://jikan.moe/) (unofficial MAL API)
+7. **API search** - Search the MAL API
 
 ### Reverse direction (MAL → AniList, `--reverse-direction`)
 
@@ -312,14 +321,16 @@ The tool uses different ID mapping strategies for anime and manga, and the chain
 1. **Manual Mapping**
 2. **Direct ID lookup**
 3. **Hato API** (optional, enabled by default)
-4. **Title matching**
-5. **Jikan API** (optional, disabled by default)
-6. **MAL ID lookup** - Find AniList entry by MAL ID directly
-7. **API search** - Search the AniList API
+4. **MangaBaka API** (optional, enabled by default)
+5. **Title matching**
+6. **Jikan API** (optional, disabled by default)
+7. **MAL ID lookup** - Find AniList entry by MAL ID directly
+8. **API search** - Search the AniList API
 
 **Notes:**
 - The offline database and ARM API are anime-only and automatically disabled when using `--manga` flag (without `--all`) to improve startup performance.
 - Hato API supports both anime and manga and is enabled by default.
+- MangaBaka API is manga-only and enabled by default; it sits after Hato in the manga chain as a broader six-provider fallback.
 
 ### Manual Mappings & Ignore Rules
 
@@ -383,6 +394,10 @@ One of `WATCH_INTERVAL` or `WATCH_SCHEDULE` (or their CLI flag equivalents) is r
 - `HATO_API_URL` - Hato API base URL (default: `https://hato.malupdaterosx.moe`)
 - `HATO_API_CACHE_DIR` - Hato API cache directory (default: `~/.config/anilist-mal-sync/hato-cache`)
 - `HATO_API_CACHE_MAX_AGE` - Hato API cache max age (default: `720h` / 30 days)
+- `MANGABAKA_API_ENABLED` - Enable MangaBaka API for manga ID mapping (default: `false`, manga-only)
+- `MANGABAKA_API_URL` - MangaBaka API base URL (default: `https://api.mangabaka.org/v1`)
+- `MANGABAKA_API_CACHE_DIR` - MangaBaka API cache directory (default: `~/.config/anilist-mal-sync/mangabaka-cache`)
+- `MANGABAKA_API_CACHE_MAX_AGE` - MangaBaka API cache max age (default: `720h` / 30 days)
 - `ARM_API_ENABLED` - Enable ARM API for anime ID mapping (default: `false`, not used for manga-only sync)
 - `ARM_API_URL` - ARM API base URL (default: `https://arm.haglund.dev`)
 - `JIKAN_API_ENABLED` - Enable Jikan API for manga ID mapping (default: `false`, not used for anime sync)
@@ -608,3 +623,4 @@ This project is not affiliated with AniList or MyAnimeList. Use at your own risk
 - [arm-server](https://github.com/BeeeQueue/arm-server) for API anime dataset
 - [Hato](https://github.com/Atelier-Shiori/Hato) for JSON API anime and manga
 - [Jikan](https://jikan.moe/) for unofficial MyAnimeList API
+- [MangaBaka](https://mangabaka.org) (CC BY-NC-SA 4.0) for manga ID mapping, aggregating data from AniList, MyAnimeList, Kitsu, MangaUpdates, Shikimori, and Anime-Planet

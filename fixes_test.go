@@ -249,7 +249,7 @@ func TestAnime_String_ContainsAllFields(t *testing.T) {
 	a := Anime{
 		IDAnilist: 111,
 		IDMal:     222,
-		TitleEN:   "Test Anime",
+		TitleEN:   testTitleAnime,
 		TitleJP:   "テストアニメ",
 		Status:    StatusWatching,
 		Score:     8,
@@ -258,7 +258,7 @@ func TestAnime_String_ContainsAllFields(t *testing.T) {
 	s := a.String()
 	assert.Contains(t, s, "111")
 	assert.Contains(t, s, "222")
-	assert.Contains(t, s, "Test Anime")
+	assert.Contains(t, s, testTitleAnime)
 	assert.Contains(t, s, "8")
 }
 
@@ -267,7 +267,7 @@ func TestManga_String_ContainsAllFields(t *testing.T) {
 	m := Manga{
 		IDAnilist: 333,
 		IDMal:     444,
-		TitleEN:   "Test Manga",
+		TitleEN:   testTitleManga,
 		Score:     7,
 		Progress:  10,
 		Chapters:  100,
@@ -275,7 +275,7 @@ func TestManga_String_ContainsAllFields(t *testing.T) {
 	s := m.String()
 	assert.Contains(t, s, "333")
 	assert.Contains(t, s, "444")
-	assert.Contains(t, s, "Test Manga")
+	assert.Contains(t, s, testTitleManga)
 	assert.Contains(t, s, "100")
 }
 

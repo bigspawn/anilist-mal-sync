@@ -45,7 +45,8 @@ func LoadUnmappedState(path string) (*UnmappedState, error) {
 	}
 
 	var state UnmappedState
-	if err := json.Unmarshal(data, &state); err != nil {
+	err = json.Unmarshal(data, &state)
+	if err != nil {
 		return nil, fmt.Errorf("parse unmapped state: %w", err)
 	}
 
@@ -59,7 +60,8 @@ func (s *UnmappedState) Save(path string) error {
 	}
 
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o750); err != nil { // #nosec G301 - State directory
+	err := os.MkdirAll(dir, 0o750) // #nosec G301 - State directory
+	if err != nil {
 		return fmt.Errorf("create unmapped state directory: %w", err)
 	}
 
@@ -68,7 +70,8 @@ func (s *UnmappedState) Save(path string) error {
 		return fmt.Errorf("marshal unmapped state: %w", err)
 	}
 
-	if err := os.WriteFile(path, data, 0o600); err != nil {
+	err = os.WriteFile(path, data, 0o600)
+	if err != nil {
 		return fmt.Errorf("write unmapped state: %w", err)
 	}
 

@@ -38,7 +38,8 @@ func runSync(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("create app: %w", err)
 	}
 
-	if err := app.Run(ctx); err != nil {
+	err = app.Run(ctx)
+	if err != nil {
 		return fmt.Errorf("run app: %w", err)
 	}
 

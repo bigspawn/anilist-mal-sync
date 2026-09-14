@@ -312,7 +312,7 @@ func TestNormalizeTitle(t *testing.T) {
 		{
 			name:  "removes content in parentheses",
 			title: "Anime (TV)",
-			want:  "anime",
+			want:  string(mediaTypeAnime),
 		},
 		{
 			name:  "removes colons",
@@ -398,7 +398,7 @@ func TestExactMatch(t *testing.T) {
 		{
 			name:       "different titles",
 			t1:         "Neon Genesis Evangelion",
-			t2:         "Cowboy Bebop",
+			t2:         testTitleCowboyBebop,
 			titleType:  "test",
 			wantResult: false,
 		},
@@ -476,7 +476,7 @@ func TestNormalizedMatch(t *testing.T) {
 		{
 			name:       "different titles",
 			t1:         "Neon Genesis Evangelion",
-			t2:         "Cowboy Bebop",
+			t2:         testTitleCowboyBebop,
 			titleType:  "test",
 			wantResult: false,
 		},
@@ -556,17 +556,17 @@ func TestBuildDiffString(t *testing.T) {
 	}{
 		{
 			name:  "no differences",
-			pairs: []any{"Status", "watching", "watching", "Score", 8, 8},
+			pairs: []any{"Status", string(StatusWatching), string(StatusWatching), "Score", 8, 8},
 			want:  "Diff{}",
 		},
 		{
 			name:  "single difference",
-			pairs: []any{"Status", "watching", "completed", "Score", 8, 8},
+			pairs: []any{"Status", string(StatusWatching), string(StatusCompleted), "Score", 8, 8},
 			want:  "Diff{Status: watching -> completed, }",
 		},
 		{
 			name:  "multiple differences",
-			pairs: []any{"Status", "watching", "completed", "Score", 8, 9},
+			pairs: []any{"Status", string(StatusWatching), string(StatusCompleted), "Score", 8, 9},
 			want:  "Diff{Status: watching -> completed, Score: 8 -> 9, }",
 		},
 		{
@@ -576,7 +576,7 @@ func TestBuildDiffString(t *testing.T) {
 		},
 		{
 			name:  "invalid params - not multiple of 3",
-			pairs: []any{"Status", "watching"},
+			pairs: []any{"Status", string(StatusWatching)},
 			want:  "Diff{invalid params}",
 		},
 		{

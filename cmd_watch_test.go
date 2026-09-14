@@ -45,21 +45,11 @@ func TestWatchCommand_HasFlags(t *testing.T) {
 	t.Parallel()
 	rootCmd := NewCLI()
 
-	var watchCmd *cli.Command
-	for _, c := range rootCmd.Commands {
-		if c.Name == watchCommandName {
-			watchCmd = c
-			break
-		}
-	}
+	watchCmd := mustFindCommand(t, rootCmd, watchCommandName)
 
-	if watchCmd == nil {
-		t.Fatal("watch command not found")
-	}
-
-	// watch has 3 own flags + 12 sync flags = 15 total
-	if len(watchCmd.Flags) != 15 {
-		t.Errorf("expected 15 flags (3 watch + 12 sync), got %d", len(watchCmd.Flags))
+	// watch has 3 own flags + 16 sync flags = 19 total
+	if len(watchCmd.Flags) != 19 {
+		t.Errorf("expected 19 flags (3 watch + 16 sync), got %d", len(watchCmd.Flags))
 	}
 
 	// Check flags by name
@@ -69,8 +59,9 @@ func TestWatchCommand_HasFlags(t *testing.T) {
 	}
 
 	expectedFlags := []string{
-		"interval", "schedule", "once", "force", "dry-run", "manga", "all", "verbose", "reverse-direction",
-		"offline-db", "offline-db-force-refresh", "arm-api", "arm-api-url", "jikan-api",
+		"interval", "schedule", "once", flagForce, flagDryRun, "manga", string(ServiceAll), "verbose", "reverse-direction",
+		flagOfflineDB, flagOfflineDBForceRefresh, flagARMAPI, flagARMAPIURL,
+		flagHatoAPI, flagHatoAPIURL, flagMangaBakaAPI, flagMangaBakaAPIURL, flagJikanAPI,
 	}
 	for _, name := range expectedFlags {
 		if !flagNames[name] {
@@ -273,7 +264,8 @@ myanimelist:
 watch:
   interval: "12h"
 `
-	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
+	err := os.WriteFile(configPath, []byte(configContent), 0o600)
+	if err != nil {
 		t.Fatalf("failed to write config: %v", err)
 	}
 
@@ -311,7 +303,8 @@ myanimelist:
   client_secret: "test"
   username: "mal_user"
 `
-	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
+	err := os.WriteFile(configPath, []byte(configContent), 0o600)
+	if err != nil {
 		t.Fatalf("failed to write config: %v", err)
 	}
 

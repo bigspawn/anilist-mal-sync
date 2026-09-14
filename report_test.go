@@ -29,14 +29,14 @@ func TestSyncReport_AddWarning(t *testing.T) {
 	}{
 		{
 			name:      "add warning with all fields",
-			title:     "Test Anime",
+			title:     testTitleAnime,
 			reason:    "episode count mismatch",
 			detail:    "(1 vs 12)",
 			mediaType: "Anime",
 		},
 		{
 			name:      "add warning with minimal fields",
-			title:     "Test Manga",
+			title:     testTitleManga,
 			reason:    "different MAL IDs",
 			detail:    "",
 			mediaType: "Manga",
@@ -159,7 +159,7 @@ func TestSyncReport_AddUnmappedItems(t *testing.T) {
 
 	items := []UnmappedEntry{
 		{Title: "Anime A", AniListID: 1, MediaType: "anime"},
-		{Title: "Manga B", MALID: 2, MediaType: "manga"},
+		{Title: "Manga B", MALID: 2, MediaType: string(mediaTypeManga)},
 	}
 	report.AddUnmappedItems(items)
 
@@ -215,7 +215,7 @@ func TestSyncReport_AddDuplicateConflict(t *testing.T) {
 	t.Parallel()
 	report := NewSyncReport()
 
-	report.AddDuplicateConflict("Loser", "Winner", "Target", "stratA", "stratB", "anime")
+	report.AddDuplicateConflict("Loser", "Winner", "Target", "stratA", "stratB", mediaTypeAnime)
 
 	assert.Len(t, report.DuplicateConflicts, 1)
 	c := report.DuplicateConflicts[0]
@@ -232,7 +232,7 @@ func TestSyncReport_AddDuplicateConflict_Multiple(t *testing.T) {
 	report := NewSyncReport()
 
 	report.AddDuplicateConflict("L1", "W1", "T1", "s1", "s2", "anime")
-	report.AddDuplicateConflict("L2", "W2", "T2", "s3", "s4", "manga")
+	report.AddDuplicateConflict("L2", "W2", "T2", "s3", "s4", string(mediaTypeManga))
 
 	assert.Len(t, report.DuplicateConflicts, 2)
 	assert.Equal(t, "L2", report.DuplicateConflicts[1].LoserTitle)
@@ -251,7 +251,7 @@ func TestSyncReport_HasDuplicateConflicts(t *testing.T) {
 		}, true},
 		{"two conflicts", func(r *SyncReport) {
 			r.AddDuplicateConflict("L1", "W1", "T1", "s1", "s2", "anime")
-			r.AddDuplicateConflict("L2", "W2", "T2", "s3", "s4", "manga")
+			r.AddDuplicateConflict("L2", "W2", "T2", "s3", "s4", string(mediaTypeManga))
 		}, true},
 	}
 	for _, tt := range tests {
@@ -274,7 +274,7 @@ func TestSyncReport_AddFavoritesResult(t *testing.T) {
 	result := FavoritesResult{
 		Added: 3,
 		Mismatches: []FavoriteMismatch{
-			{Title: "Anime X", AniListID: 1, MALID: 10, MediaType: "anime", OnAniList: true, OnMAL: false},
+			{Title: "Anime X", AniListID: 1, MALID: 10, MediaType: mediaTypeAnime, OnAniList: true, OnMAL: false},
 		},
 	}
 	report.AddFavoritesResult(result)

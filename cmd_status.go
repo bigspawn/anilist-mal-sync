@@ -9,9 +9,13 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
+// statusCommandName is the CLI command name, shared with the tests that look
+// up this command by name.
+const statusCommandName = "status"
+
 func newStatusCommand() *cli.Command {
 	return &cli.Command{
-		Name:   "status",
+		Name:   statusCommandName,
 		Usage:  "Check authentication status for services",
 		Action: runStatus,
 	}

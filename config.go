@@ -107,20 +107,19 @@ type OfflineDatabaseConfig struct {
 	ForceRefresh bool   `yaml:"-"` // CLI flag only
 }
 
-type ARMAPIConfig struct {
-	Enabled bool   `yaml:"enabled"`
-	BaseURL string `yaml:"base_url"`
-}
+// defaultMangaBakaBaseURL is the MangaBaka API base URL, verified 2026-09-12 (see plan docs).
+const defaultMangaBakaBaseURL = "https://api.mangabaka.org/v1"
 
-type HatoAPIConfig struct {
+// defaultLongCacheMaxAge is the shared default for ID-mapping caches whose
+// upstream data rarely changes (Hato, MangaBaka).
+const defaultLongCacheMaxAge = "720h"
+
+// MappingSourceConfig is the shared config shape for ID-mapping sources
+// (ARM, Hato, Jikan, MangaBaka). ARM and Jikan simply leave the fields
+// they never use unset.
+type MappingSourceConfig struct {
 	Enabled     bool   `yaml:"enabled"`
 	BaseURL     string `yaml:"base_url"`
-	CacheDir    string `yaml:"cache_dir"`
-	CacheMaxAge string `yaml:"cache_max_age"`
-}
-
-type JikanAPIConfig struct {
-	Enabled     bool   `yaml:"enabled"`
 	CacheDir    string `yaml:"cache_dir"`
 	CacheMaxAge string `yaml:"cache_max_age"`
 }
@@ -137,85 +136,34 @@ type Config struct {
 	Watch            WatchConfig           `yaml:"watch"`
 	HTTPTimeout      string                `yaml:"http_timeout"`
 	OfflineDatabase  OfflineDatabaseConfig `yaml:"offline_database"`
-	ARMAPI           ARMAPIConfig          `yaml:"arm_api"`
-	HatoAPI          HatoAPIConfig         `yaml:"hato_api"`
-	JikanAPI         JikanAPIConfig        `yaml:"jikan_api"`
+	ARMAPI           MappingSourceConfig   `yaml:"arm_api"`
+	HatoAPI          MappingSourceConfig   `yaml:"hato_api"`
+	JikanAPI         MappingSourceConfig   `yaml:"jikan_api"`
+	MangaBakaAPI     MappingSourceConfig   `yaml:"mangabaka_api"`
 	Favorites        FavoritesConfig       `yaml:"favorites"`
 	MappingsFilePath string                `yaml:"mappings_file_path"`
 }
 
-// loadConfigFromEnv loads configuration from environment variables.
+// loadConfigFromEnv builds a Config by layering environment variables on
+// top of defaultConfig() — the entry point used when no config file is
+// given. TokenFilePath is resolved here rather than in defaultConfig()
+// because getDefaultTokenPath can fail (a fallible OS lookup), and this is
+// the one entry point that has always surfaced that failure as an error.
 func loadConfigFromEnv() (Config, error) {
 	tokenPath, err := getDefaultTokenPath()
 	if err != nil {
 		return Config{}, err
 	}
 
-	cfg := Config{
-		OAuth: OAuthConfig{
-			Port:        getEnvOrDefault("OAUTH_PORT", getEnvOrDefault("PORT", "18080")),
-			RedirectURI: getEnvOrDefault("OAUTH_REDIRECT_URI", "http://localhost:18080/callback"),
-		},
-		Anilist: SiteConfig{
-			ClientID:     os.Getenv("ANILIST_CLIENT_ID"),
-			ClientSecret: os.Getenv("ANILIST_CLIENT_SECRET"),
-			Username:     os.Getenv("ANILIST_USERNAME"),
-			AuthURL:      "https://anilist.co/api/v2/oauth/authorize",
-			TokenURL:     "https://anilist.co/api/v2/oauth/token",
-		},
-		MyAnimeList: SiteConfig{
-			ClientID:     os.Getenv("MAL_CLIENT_ID"),
-			ClientSecret: os.Getenv("MAL_CLIENT_SECRET"),
-			Username:     os.Getenv("MAL_USERNAME"),
-			AuthURL:      "https://myanimelist.net/v1/oauth2/authorize",
-			TokenURL:     "https://myanimelist.net/v1/oauth2/token",
-		},
-		TokenFilePath: getEnvOrDefault("TOKEN_FILE_PATH", tokenPath),
-		Watch: WatchConfig{
-			Interval: os.Getenv("WATCH_INTERVAL"),
-			Schedule: os.Getenv("WATCH_SCHEDULE"),
-		},
-		HTTPTimeout: getEnvOrDefault("HTTP_TIMEOUT", "30s"),
-		OfflineDatabase: OfflineDatabaseConfig{
-			Enabled:    getEnvBoolOrDefault("OFFLINE_DATABASE_ENABLED", true),
-			CacheDir:   getEnvOrDefault("OFFLINE_DATABASE_CACHE_DIR", getDefaultCacheDir()),
-			AutoUpdate: getEnvBoolOrDefault("OFFLINE_DATABASE_AUTO_UPDATE", true),
-		},
-		ARMAPI: ARMAPIConfig{
-			Enabled: getEnvBoolOrDefault("ARM_API_ENABLED", false),
-			BaseURL: getEnvOrDefault("ARM_API_URL", defaultARMBaseURL),
-		},
-		HatoAPI: HatoAPIConfig{
-			Enabled:     getEnvBoolOrDefault("HATO_API_ENABLED", true),
-			BaseURL:     getEnvOrDefault("HATO_API_URL", defaultHatoBaseURL),
-			CacheDir:    getEnvOrDefault("HATO_API_CACHE_DIR", getDefaultHatoCacheDir()),
-			CacheMaxAge: getEnvOrDefault("HATO_API_CACHE_MAX_AGE", "720h"),
-		},
-		JikanAPI: JikanAPIConfig{
-			Enabled:     getEnvBoolOrDefault("JIKAN_API_ENABLED", false),
-			CacheDir:    getEnvOrDefault("JIKAN_API_CACHE_DIR", getDefaultJikanCacheDir()),
-			CacheMaxAge: getEnvOrDefault("JIKAN_API_CACHE_MAX_AGE", "168h"),
-		},
-		Favorites: FavoritesConfig{
-			Enabled: getEnvBoolOrDefault("FAVORITES_SYNC_ENABLED", false),
-		},
-		MappingsFilePath: getEnvOrDefault("MAPPINGS_FILE_PATH", getDefaultMappingsPath()),
-	}
+	cfg := defaultConfig()
+	cfg.TokenFilePath = getEnvOrDefault("TOKEN_FILE_PATH", tokenPath)
+	overrideConfigFromEnv(&cfg)
 	return cfg, nil
 }
 
 // parseBoolString parses a string as a boolean value.
 func parseBoolString(s string) bool {
 	return s == "true" || s == "1" || s == "yes"
-}
-
-// getEnvBoolOrDefault returns environment variable as bool or default if empty.
-func getEnvBoolOrDefault(key string, defaultValue bool) bool {
-	value := os.Getenv(key)
-	if value == "" {
-		return defaultValue
-	}
-	return parseBoolString(value)
 }
 
 // getEnvOrDefault returns environment variable value or default if empty.
@@ -244,9 +192,9 @@ func overrideConfigFromEnv(cfg *Config) {
 	overrideHTTPTimeoutFromEnv(cfg)
 	overrideTokenPathFromEnv(cfg)
 	overrideOfflineDatabaseFromEnv(&cfg.OfflineDatabase)
-	overrideARMAPIFromEnv(&cfg.ARMAPI)
-	overrideHatoAPIFromEnv(&cfg.HatoAPI)
-	overrideJikanAPIFromEnv(&cfg.JikanAPI)
+	for _, src := range mappingSources() {
+		overrideMappingSourceFromEnv(src.configField(cfg), src)
+	}
 	overrideFavoritesFromEnv(&cfg.Favorites)
 	overrideStringFromEnv(&cfg.MappingsFilePath, "MAPPINGS_FILE_PATH")
 }
@@ -261,16 +209,39 @@ func overrideOAuthFromEnv(oauth *OAuthConfig) {
 	overrideStringFromEnv(&oauth.RedirectURI, "OAUTH_REDIRECT_URI")
 }
 
+// overrideAnilistFromEnv applies the AniList env vars shared by both entry
+// points. The legacy CLIENT_SECRET_ANILIST fallback is not here — see
+// overrideLegacySecretsFromEnv — because loadConfigFromEnv (no config file)
+// has never supported it, only the YAML config path has.
 func overrideAnilistFromEnv(anilist *SiteConfig) {
 	overrideStringFromEnv(&anilist.ClientID, "ANILIST_CLIENT_ID")
-	overrideStringFromEnv(&anilist.ClientSecret, "ANILIST_CLIENT_SECRET", "CLIENT_SECRET_ANILIST")
+	overrideStringFromEnv(&anilist.ClientSecret, "ANILIST_CLIENT_SECRET")
 	overrideStringFromEnv(&anilist.Username, "ANILIST_USERNAME")
 }
 
+// overrideMyAnimeListFromEnv applies the MAL env vars shared by both entry
+// points; see overrideAnilistFromEnv's comment on the legacy secret.
 func overrideMyAnimeListFromEnv(mal *SiteConfig) {
 	overrideStringFromEnv(&mal.ClientID, "MAL_CLIENT_ID")
-	overrideStringFromEnv(&mal.ClientSecret, "MAL_CLIENT_SECRET", "CLIENT_SECRET_MYANIMELIST")
+	overrideStringFromEnv(&mal.ClientSecret, "MAL_CLIENT_SECRET")
 	overrideStringFromEnv(&mal.Username, "MAL_USERNAME")
+}
+
+// overrideLegacySecretsFromEnv falls back to the deprecated
+// CLIENT_SECRET_ANILIST / CLIENT_SECRET_MYANIMELIST env vars. Only the YAML
+// config path (loadConfigFromFile) calls this — loadConfigFromEnv
+// intentionally does not, and TestLoadConfigFromEnv_Legacy*SecretFallback
+// pin that.
+func overrideLegacySecretsFromEnv(cfg *Config) {
+	// The legacy key only applies when the new-style key wasn't set — same
+	// first-non-empty-wins precedence overrideStringFromEnv gives a single
+	// field with multiple keys, just split across two entry-point-scoped calls.
+	if os.Getenv("ANILIST_CLIENT_SECRET") == "" {
+		overrideStringFromEnv(&cfg.Anilist.ClientSecret, "CLIENT_SECRET_ANILIST")
+	}
+	if os.Getenv("MAL_CLIENT_SECRET") == "" {
+		overrideStringFromEnv(&cfg.MyAnimeList.ClientSecret, "CLIENT_SECRET_MYANIMELIST")
+	}
 }
 
 func overrideWatchFromEnv(watch *WatchConfig) {
@@ -296,22 +267,17 @@ func overrideOfflineDatabaseFromEnv(odc *OfflineDatabaseConfig) {
 	overrideBoolFromEnv(&odc.AutoUpdate, "OFFLINE_DATABASE_AUTO_UPDATE")
 }
 
-func overrideARMAPIFromEnv(ac *ARMAPIConfig) {
-	overrideBoolFromEnv(&ac.Enabled, "ARM_API_ENABLED")
-	overrideStringFromEnv(&ac.BaseURL, "ARM_API_URL")
-}
-
-func overrideHatoAPIFromEnv(hc *HatoAPIConfig) {
-	overrideBoolFromEnv(&hc.Enabled, "HATO_API_ENABLED")
-	overrideStringFromEnv(&hc.BaseURL, "HATO_API_URL")
-	overrideStringFromEnv(&hc.CacheDir, "HATO_API_CACHE_DIR")
-	overrideStringFromEnv(&hc.CacheMaxAge, "HATO_API_CACHE_MAX_AGE")
-}
-
-func overrideJikanAPIFromEnv(jc *JikanAPIConfig) {
-	overrideBoolFromEnv(&jc.Enabled, "JIKAN_API_ENABLED")
-	overrideStringFromEnv(&jc.CacheDir, "JIKAN_API_CACHE_DIR")
-	overrideStringFromEnv(&jc.CacheMaxAge, "JIKAN_API_CACHE_MAX_AGE")
+// overrideMappingSourceFromEnv applies env-var overrides for one ID-mapping
+// source, described by src, so all four sources share one override path.
+func overrideMappingSourceFromEnv(sc *MappingSourceConfig, src mappingSource) {
+	overrideBoolFromEnv(&sc.Enabled, src.envPrefix+"ENABLED")
+	if src.urlFlag != "" {
+		overrideStringFromEnv(&sc.BaseURL, src.envPrefix+"URL")
+	}
+	if src.defaultCacheDir != nil {
+		overrideStringFromEnv(&sc.CacheDir, src.envPrefix+"CACHE_DIR")
+		overrideStringFromEnv(&sc.CacheMaxAge, src.envPrefix+"CACHE_MAX_AGE")
+	}
 }
 
 func overrideFavoritesFromEnv(fc *FavoritesConfig) {
@@ -373,9 +339,11 @@ func loadConfigFromFile(filename string) (Config, error) {
 
 	// Environment variables override file values
 	overrideConfigFromEnv(&cfg)
+	overrideLegacySecretsFromEnv(&cfg)
 
 	// Validate required fields
-	if err := validateConfig(cfg); err != nil {
+	err = validateConfig(cfg)
+	if err != nil {
 		return Config{}, errors.New("required fields not set (anilist.client_id, anilist.username, myanimelist.client_id, myanimelist.username)")
 	}
 
@@ -387,7 +355,8 @@ func loadConfigFromEnvWithValidation() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	if err := validateConfig(cfg); err != nil {
+	err = validateConfig(cfg)
+	if err != nil {
 		return Config{}, errors.New("required environment variables not set (ANILIST_CLIENT_ID, ANILIST_USERNAME, MAL_CLIENT_ID, MAL_USERNAME)")
 	}
 	return cfg, nil
@@ -419,7 +388,7 @@ func tryLoadFromEnvWithHelp(filename string) (Config, error) {
 }
 
 func parseConfigFile(data []byte, filename string) (Config, error) {
-	cfg := configWithDefaults()
+	cfg := defaultConfig()
 	err := yaml.Unmarshal(data, &cfg)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, getConfigHelp(filename))
@@ -428,32 +397,61 @@ func parseConfigFile(data []byte, filename string) (Config, error) {
 	return cfg, nil
 }
 
-// configWithDefaults returns a Config with default values pre-filled
-// so that YAML fields not specified keep their defaults.
-func configWithDefaults() Config {
-	return Config{
+// AniList and MyAnimeList OAuth2 endpoints — public, well-known URLs, not
+// secrets — used as the SiteConfig defaults below.
+const (
+	defaultAnilistAuthURL  = "https://anilist.co/api/v2/oauth/authorize"
+	defaultAnilistTokenURL = "https://anilist.co/api/v2/oauth/token" // #nosec G101 -- public endpoint, not a secret
+	defaultMALAuthURL      = "https://myanimelist.net/v1/oauth2/authorize"
+	defaultMALTokenURL     = "https://myanimelist.net/v1/oauth2/token" // #nosec G101 -- public endpoint, not a secret
+)
+
+// defaultConfig is the one place every built-in default lives. Both
+// loadConfigFromEnv (no config file) and parseConfigFile (a config.yaml,
+// pre-filled here before unmarshalling) build their Config by layering on
+// top of this, so a default is never declared twice — the way MangaBaka's
+// Enabled default once was (hardcoded true here, false everywhere else).
+// TokenFilePath is not set here: see loadConfigFromEnv's doc comment.
+func defaultConfig() Config {
+	cfg := Config{
+		OAuth: OAuthConfig{
+			Port:        "18080",
+			RedirectURI: "http://localhost:18080/callback",
+		},
+		Anilist: SiteConfig{
+			AuthURL:  defaultAnilistAuthURL,
+			TokenURL: defaultAnilistTokenURL,
+		},
+		MyAnimeList: SiteConfig{
+			AuthURL:  defaultMALAuthURL,
+			TokenURL: defaultMALTokenURL,
+		},
+		HTTPTimeout: "30s",
 		OfflineDatabase: OfflineDatabaseConfig{
 			Enabled:    true,
 			CacheDir:   getDefaultCacheDir(),
 			AutoUpdate: true,
 		},
-		ARMAPI: ARMAPIConfig{
-			Enabled: false,
-			BaseURL: defaultARMBaseURL,
-		},
-		HatoAPI: HatoAPIConfig{
-			Enabled:     true,
-			BaseURL:     defaultHatoBaseURL,
-			CacheDir:    getDefaultHatoCacheDir(),
-			CacheMaxAge: "720h",
-		},
-		JikanAPI: JikanAPIConfig{
-			Enabled:     false,
-			CacheDir:    getDefaultJikanCacheDir(),
-			CacheMaxAge: "168h",
-		},
 		MappingsFilePath: getDefaultMappingsPath(),
 	}
+	for _, src := range mappingSources() {
+		src.setConfig(&cfg, mappingSourceDefaultConfig(src))
+	}
+	return cfg
+}
+
+// mappingSourceDefaultConfig builds one ID-mapping source's built-in-default
+// config, with no env vars involved.
+func mappingSourceDefaultConfig(src mappingSource) MappingSourceConfig {
+	sc := MappingSourceConfig{Enabled: src.defaultEnabled}
+	if src.urlFlag != "" {
+		sc.BaseURL = src.defaultBaseURL
+	}
+	if src.defaultCacheDir != nil {
+		sc.CacheDir = src.defaultCacheDir()
+		sc.CacheMaxAge = src.defaultCacheMaxAge
+	}
+	return sc
 }
 
 // getConfigHelp returns a helpful message for creating config file.

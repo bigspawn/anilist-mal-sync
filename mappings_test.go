@@ -34,7 +34,8 @@ ignore:
   titles:
   - "Some Title"
 `
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+	err := os.WriteFile(path, []byte(content), 0o600)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -65,7 +66,8 @@ func TestMappingsConfig_SaveAndLoad(t *testing.T) {
 		},
 	}
 
-	if err := cfg.Save(path); err != nil {
+	err := cfg.Save(path)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -203,11 +205,12 @@ func TestLoadMappings_InvalidYAML(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "mappings.yaml")
-	if err := os.WriteFile(path, []byte("{{invalid yaml"), 0o600); err != nil {
+	err := os.WriteFile(path, []byte("{{invalid yaml"), 0o600)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err := LoadMappings(path)
+	_, err = LoadMappings(path)
 	assert.Error(t, err)
 }
 
@@ -221,7 +224,7 @@ func TestMappingsConfig_MarshalWithComments(t *testing.T) {
 
 	// Add metadata for the IDs
 	cfg.Ignore.metadata = make(map[int]IgnoreEntry)
-	cfg.Ignore.metadata[100] = IgnoreEntry{Title: "Test Anime", Reason: "Different version"}
+	cfg.Ignore.metadata[100] = IgnoreEntry{Title: testTitleAnime, Reason: "Different version"}
 	cfg.Ignore.metadata[200] = IgnoreEntry{Title: "Another Anime", Reason: ""}
 
 	// Marshal to YAML
@@ -269,7 +272,8 @@ func TestMappingsConfig_BackwardCompatibility(t *testing.T) {
   titles:
   - "Some Title"
 `
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+	err := os.WriteFile(path, []byte(content), 0o600)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -299,7 +303,8 @@ func TestMappingsConfig_SaveAndLoad_WithMALIDs(t *testing.T) {
 		},
 	}
 
-	if err := cfg.Save(path); err != nil {
+	err := cfg.Save(path)
+	if err != nil {
 		t.Fatal(err)
 	}
 

@@ -24,7 +24,7 @@ func TestARMClient_GetAniListID(t *testing.T) {
 	anilistID := 10378
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/api/v2/ids", r.URL.Path)
-		assert.Equal(t, "myanimelist", r.URL.Query().Get("source"))
+		assert.Equal(t, string(ServiceMyAnimeList), r.URL.Query().Get("source"))
 		assert.Equal(t, "10378", r.URL.Query().Get("id"))
 		assert.Equal(t, "anilist", r.URL.Query().Get("include"))
 
@@ -48,7 +48,7 @@ func TestARMClient_GetMALID(t *testing.T) {
 		assert.Equal(t, "/api/v2/ids", r.URL.Path)
 		assert.Equal(t, "anilist", r.URL.Query().Get("source"))
 		assert.Equal(t, "10378", r.URL.Query().Get("id"))
-		assert.Equal(t, "myanimelist", r.URL.Query().Get("include"))
+		assert.Equal(t, string(ServiceMyAnimeList), r.URL.Query().Get("include"))
 
 		writeJSON(t, w, ARMResponse{MyAnimeList: &malID})
 	}))
@@ -119,7 +119,7 @@ func TestARMAPIStrategy_FindTarget(t *testing.T) {
 		source := r.URL.Query().Get("source")
 		idStr := r.URL.Query().Get("id")
 
-		if source == "myanimelist" && idStr == "10378" {
+		if source == string(ServiceMyAnimeList) && idStr == "10378" {
 			writeJSON(t, w, ARMResponse{AniList: &anilistID})
 			return
 		}
@@ -209,4 +209,44 @@ func TestNewARMClient_DefaultURL(t *testing.T) {
 func TestNewARMClient_CustomURL(t *testing.T) {
 	client := NewARMClient("http://localhost:3000", 5*time.Second)
 	assert.Equal(t, "http://localhost:3000", client.baseURL)
+}
+
+// A forward sync needs a MAL id. Asking ARM for the AniList id instead returns a
+// number from the wrong id space, which can collide with an unrelated MAL entry
+// in the user's list and mismatch the entry.
+func TestARMAPIStrategy_ForwardSync_LooksUpMALID(t *testing.T) {
+	srcAniList, srcMAL := 21, 30013
+	collidingAniListID, correctMALID := 104502, 777
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		source := r.URL.Query().Get("source")
+		id := r.URL.Query().Get("id")
+
+		switch {
+		case source == string(ServiceMyAnimeList) && id == "30013":
+			writeJSON(t, w, ARMResponse{AniList: &collidingAniListID})
+		case source == "anilist" && id == "21":
+			writeJSON(t, w, ARMResponse{MyAnimeList: &correctMALID})
+		default:
+			writeJSON(t, w, ARMResponse{})
+		}
+	}))
+	defer server.Close()
+
+	strategy := ARMAPIStrategy{Client: NewARMClient(server.URL, 5*time.Second)}
+	ctx := NewLogger(false).WithContext(context.Background())
+
+	// Forward sync: the source is an AniList entry that also knows its MAL id.
+	src := Anime{IDAnilist: srcAniList, IDMal: srcMAL, TitleEN: testTitleOnePiece}
+	// Targets are MAL entries keyed by MAL id; the colliding number is a
+	// different series that must never be selected.
+	existingTargets := map[TargetID]Target{
+		TargetID(collidingAniListID): Anime{IDMal: collidingAniListID, TitleEN: testTitleUnrelated},
+		TargetID(correctMALID):       Anime{IDMal: correctMALID, TitleEN: testTitleOnePiece},
+	}
+
+	target, found, err := strategy.FindTarget(ctx, src, existingTargets, "test", nil)
+	assert.NoError(t, err)
+	assert.True(t, found)
+	assert.Equal(t, testTitleOnePiece, target.GetTitle())
 }

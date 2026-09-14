@@ -4,10 +4,13 @@
 -include .env
 
 BINARY_NAME=anilist-mal-sync
-LINT_VERSION=v2.10.1
+LINT_VERSION=v2.13.2
 DOCKER_LINT_CMD=docker run --rm -v $(PWD):/app -w /app golangci/golangci-lint:$(LINT_VERSION)
 VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 LDFLAGS=-ldflags "-X main.version=$(VERSION)"
+# Formatters walk directories, so vendor/ and .claude/ must be pruned.
+# Reformatting vendored code or a nested worktree makes a huge unrelated diff.
+GO_FILES=$(shell find . -path ./vendor -prune -o -path ./.claude -prune -o -name '*.go' -print)
 
 .DEFAULT_GOAL := help
 
@@ -75,25 +78,29 @@ generate:
 # Format code with gofumpt
 fmt:
 	@echo "Formatting code with gofumpt..."
-	@gofumpt -l -w .
+	@gofumpt -l -w $(GO_FILES)
 	@echo "Formatting complete!"
 
-# Run linter using Docker
+# Run linter (new issues only, fast feedback)
 lint:
-	@echo "Running golangci-lint $(LINT_VERSION) in Docker..."
-	# $(DOCKER_LINT_CMD) golangci-lint run --new
+	@echo "Running golangci-lint $(LINT_VERSION) (new issues only)..."
 	golangci-lint run --new
+
+# Run full linter (all issues, used by CI)
+lint-all:
+	@echo "Running golangci-lint $(LINT_VERSION) (full run)..."
+	golangci-lint run --timeout=5m
 
 # Run all checks (same as Git hooks: format + imports + lint + vet + test)
 check: generate
 	@echo "🔍 Running all checks..."
 	@echo ""
 	@echo "1️⃣  Formatting code with gofumpt..."
-	@gofumpt -l -w .
+	@gofumpt -l -w $(GO_FILES)
 	@echo "✓ Format complete"
 	@echo ""
 	@echo "2️⃣  Organizing imports with goimports..."
-	@goimports -w .
+	@goimports -w $(GO_FILES)
 	@echo "✓ Imports organized"
 	@echo ""
 	@echo "3️⃣  Running go vet..."
@@ -126,7 +133,8 @@ help:
 	@echo "  test             - Run tests"
 	@echo "  generate         - Generate mocks using mockgen"
 	@echo "  fmt              - Format code with gofumpt"
-	@echo "  lint             - Run linter (golangci-lint $(LINT_VERSION))"
+	@echo "  lint             - Run linter (golangci-lint $(LINT_VERSION)) - new issues only"
+	@echo "  lint-all         - Run full linter (golangci-lint $(LINT_VERSION)) - all issues"
 	@echo "  check            - Run all checks (generate + format + imports + lint + vet + test)"
 	@echo "  clean            - Remove build artifacts, temporary files and clean test cache"
 	@echo "  help             - Show this help message"

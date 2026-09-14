@@ -26,16 +26,16 @@ func TestHatoCache_SetGet(t *testing.T) {
 
 	anilistID := 123
 	malID := 456
-	typeStr := "anime"
+	typeStr := string(mediaTypeAnime)
 	data := HatoResponseData{
 		AniListID: &anilistID,
 		MalID:     &malID,
 		TypeStr:   &typeStr,
 	}
 
-	cache.Set("mal", "anime", 456, data)
+	cache.Set("mal", string(mediaTypeAnime), 456, data)
 
-	retrieved, found := cache.Get("mal", "anime", 456)
+	retrieved, found := cache.Get("mal", string(mediaTypeAnime), 456)
 	assert.True(t, found)
 	assert.NotNil(t, retrieved)
 	assert.Equal(t, 123, *retrieved.AniListID)
@@ -47,7 +47,7 @@ func TestHatoCache_NotFound(t *testing.T) {
 	tmpDir := t.TempDir()
 	cache, _ := NewHatoCache(tmpDir, 720*time.Hour)
 
-	_, found := cache.Get("mal", "anime", 999)
+	_, found := cache.Get("mal", string(mediaTypeAnime), 999)
 	assert.False(t, found)
 }
 
@@ -58,14 +58,14 @@ func TestHatoCache_SaveLoad(t *testing.T) {
 
 	anilistID := 123
 	malID := 456
-	typeStr := "anime"
+	typeStr := string(mediaTypeAnime)
 	data := HatoResponseData{
 		AniListID: &anilistID,
 		MalID:     &malID,
 		TypeStr:   &typeStr,
 	}
 
-	cache.Set("mal", "anime", 456, data)
+	cache.Set("mal", string(mediaTypeAnime), 456, data)
 
 	ctx := t.Context()
 	err := cache.Save(ctx)
@@ -76,7 +76,7 @@ func TestHatoCache_SaveLoad(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, cache2.Size())
 
-	retrieved, found := cache2.Get("mal", "anime", 456)
+	retrieved, found := cache2.Get("mal", string(mediaTypeAnime), 456)
 	assert.True(t, found)
 	assert.Equal(t, 123, *retrieved.AniListID)
 }
@@ -91,7 +91,7 @@ func TestHatoCache_DirtyFlag(t *testing.T) {
 	// First save should create file
 	anilistID := 123
 	data := HatoResponseData{AniListID: &anilistID}
-	cache.Set("mal", "anime", 456, data)
+	cache.Set("mal", string(mediaTypeAnime), 456, data)
 	err := cache.Save(ctx)
 	assert.NoError(t, err)
 
@@ -114,7 +114,7 @@ func TestHatoCache_DirtyFlag(t *testing.T) {
 	// Add new entry
 	anilistID2 := 789
 	data2 := HatoResponseData{AniListID: &anilistID2}
-	cache.Set("mal", "anime", 789, data2)
+	cache.Set("mal", string(mediaTypeAnime), 789, data2)
 
 	time.Sleep(10 * time.Millisecond)
 
@@ -129,7 +129,7 @@ func TestHatoCache_DirtyFlag(t *testing.T) {
 
 func TestHatoCache_BuildCacheKey(t *testing.T) {
 	t.Parallel()
-	key := buildCacheKey("mal", "anime", 123)
+	key := buildCacheKey("mal", string(mediaTypeAnime), 123)
 	assert.Equal(t, "mal_anime_123", key)
 
 	key2 := buildCacheKey("anilist", "manga", 456)
@@ -145,14 +145,14 @@ func TestHatoCache_MultipleEntries(t *testing.T) {
 	for i := 1; i <= 10; i++ {
 		anilistID := i * 100
 		data := HatoResponseData{AniListID: &anilistID}
-		cache.Set("mal", "anime", i, data)
+		cache.Set("mal", string(mediaTypeAnime), i, data)
 	}
 
 	assert.Equal(t, 10, cache.Size())
 
 	// Verify all entries
 	for i := 1; i <= 10; i++ {
-		retrieved, found := cache.Get("mal", "anime", i)
+		retrieved, found := cache.Get("mal", string(mediaTypeAnime), i)
 		assert.True(t, found, "Entry %d should be found", i)
 		assert.Equal(t, i*100, *retrieved.AniListID)
 	}
@@ -165,9 +165,9 @@ func TestHatoCache_NegativeCache(t *testing.T) {
 
 	// Cache a negative result (empty data)
 	data := HatoResponseData{}
-	cache.Set("mal", "anime", 999, data)
+	cache.Set("mal", string(mediaTypeAnime), 999, data)
 
-	retrieved, found := cache.Get("mal", "anime", 999)
+	retrieved, found := cache.Get("mal", string(mediaTypeAnime), 999)
 	assert.True(t, found, "Negative result should be cached")
 	assert.Nil(t, retrieved.AniListID, "AniListID should be nil for negative cache")
 	assert.Nil(t, retrieved.MalID, "MalID should be nil for negative cache")

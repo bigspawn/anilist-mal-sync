@@ -162,7 +162,7 @@ func TestMALAnimeService_Update_InvalidSource(t *testing.T) {
 	ctx := context.Background()
 
 	// Pass Manga as source to Anime service - should fail type assertion
-	mangaSource := Manga{IDMal: 12345, TitleEN: "Test Manga"}
+	mangaSource := Manga{IDMal: 12345, TitleEN: testTitleManga}
 	err := service.Update(ctx, 12345, mangaSource, "[Test]")
 
 	if err == nil {
@@ -179,7 +179,7 @@ func TestMALMangaService_Update_InvalidSource(t *testing.T) {
 	ctx := context.Background()
 
 	// Pass Anime as source to Manga service - should fail type assertion
-	animeSource := Anime{IDMal: 12345, TitleEN: "Test Anime"}
+	animeSource := Anime{IDMal: 12345, TitleEN: testTitleAnime}
 	err := service.Update(ctx, 12345, animeSource, "[Test]")
 
 	if err == nil {
@@ -196,7 +196,7 @@ func TestAniListAnimeService_Update_InvalidSource(t *testing.T) {
 	ctx := context.Background()
 
 	// Pass Manga as source to Anime service
-	mangaSource := Manga{IDMal: 12345, TitleEN: "Test Manga"}
+	mangaSource := Manga{IDMal: 12345, TitleEN: testTitleManga}
 	err := service.Update(ctx, 12345, mangaSource, "[Test]")
 
 	if err == nil {
@@ -212,7 +212,7 @@ func TestAniListMangaService_Update_InvalidSource(t *testing.T) {
 	ctx := context.Background()
 
 	// Pass Anime as source to Manga service
-	animeSource := Anime{IDMal: 12345, TitleEN: "Test Anime"}
+	animeSource := Anime{IDMal: 12345, TitleEN: testTitleAnime}
 	err := service.Update(ctx, 12345, animeSource, "[Test]")
 
 	if err == nil {

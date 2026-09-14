@@ -54,7 +54,8 @@ func LoadMappings(path string) (*MappingsConfig, error) {
 	}
 
 	var cfg MappingsConfig
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
+	err = yaml.Unmarshal(data, &cfg)
+	if err != nil {
 		return nil, fmt.Errorf("parse mappings file: %w", err)
 	}
 
@@ -68,7 +69,8 @@ func (m *MappingsConfig) Save(path string) error {
 	}
 
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o750); err != nil { // #nosec G301 - Config directory
+	err := os.MkdirAll(dir, 0o750) // #nosec G301 - Config directory
+	if err != nil {
 		return fmt.Errorf("create mappings directory: %w", err)
 	}
 
@@ -80,7 +82,8 @@ func (m *MappingsConfig) Save(path string) error {
 
 	encoder := yaml.NewEncoder(file)
 	encoder.SetIndent(2) // Match default yaml.v2 indent
-	if err := encoder.Encode(m); err != nil {
+	err = encoder.Encode(m)
+	if err != nil {
 		return fmt.Errorf("marshal mappings: %w", err)
 	}
 
