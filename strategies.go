@@ -506,31 +506,53 @@ func (s ARMAPIStrategy) FindTarget(
 }
 
 func (s ARMAPIStrategy) lookupID(ctx context.Context, src Anime) (int, bool, error) {
-	if src.IDMal > 0 {
-		LogDebug(ctx, "[ARM API] Looking up AniList ID for MAL ID: %d", src.IDMal)
-		id, found, err := s.Client.GetAniListID(ctx, src.IDMal)
+	return directionalIDLookup(
+		ctx, src.IDMal, src.IDAnilist, src.isReverse, "ARM API", s.Client.GetAniListID, s.Client.GetMALID,
+	)
+}
+
+// directionalIDLookup asks only for the id the sync actually needs: a forward
+// sync (AniList→MAL) needs the MAL id, a reverse sync needs the AniList id.
+// Asking the other way round yields an id from the wrong space, and since the
+// two services' id ranges overlap it can match an unrelated entry.
+func directionalIDLookup(
+	ctx context.Context,
+	malID, anilistID int,
+	reverse bool,
+	apiName string,
+	malToAniList, aniListToMAL func(context.Context, int) (int, bool, error),
+) (int, bool, error) {
+	if reverse {
+		if malID <= 0 {
+			return 0, false, nil
+		}
+		LogDebug(ctx, "[%s] Looking up AniList ID for MAL ID: %d", apiName, malID)
+		id, found, err := malToAniList(ctx, malID)
 		if err != nil {
 			return 0, false, err
 		}
-		if found {
-			LogDebug(ctx, "[ARM API] Found: MAL %d -> AniList %d", src.IDMal, id)
-			return id, true, nil
+		if !found {
+			LogDebug(ctx, "[%s] Not found: MAL %d -> (no mapping)", apiName, malID)
+			return 0, false, nil
 		}
-		LogDebug(ctx, "[ARM API] Not found: MAL %d -> (no mapping)", src.IDMal)
+		LogDebug(ctx, "[%s] Found: MAL %d -> AniList %d", apiName, malID, id)
+		return id, true, nil
 	}
-	if src.IDAnilist > 0 {
-		LogDebug(ctx, "[ARM API] Looking up MAL ID for AniList ID: %d", src.IDAnilist)
-		id, found, err := s.Client.GetMALID(ctx, src.IDAnilist)
-		if err != nil {
-			return 0, false, err
-		}
-		if found {
-			LogDebug(ctx, "[ARM API] Found: AniList %d -> MAL %d", src.IDAnilist, id)
-			return id, true, nil
-		}
-		LogDebug(ctx, "[ARM API] Not found: AniList %d -> (no mapping)", src.IDAnilist)
+
+	if anilistID <= 0 {
+		return 0, false, nil
 	}
-	return 0, false, nil
+	LogDebug(ctx, "[%s] Looking up MAL ID for AniList ID: %d", apiName, anilistID)
+	id, found, err := aniListToMAL(ctx, anilistID)
+	if err != nil {
+		return 0, false, err
+	}
+	if !found {
+		LogDebug(ctx, "[%s] Not found: AniList %d -> (no mapping)", apiName, anilistID)
+		return 0, false, nil
+	}
+	LogDebug(ctx, "[%s] Found: AniList %d -> MAL %d", apiName, anilistID, id)
+	return id, true, nil
 }
 
 // HatoAPIStrategy finds targets using the Hato API for ID mapping.
@@ -584,46 +606,71 @@ func (s HatoAPIStrategy) FindTarget(
 	return nil, false, nil
 }
 
-// lookupID performs bidirectional ID lookup using the Hato API.
-// First tries MAL ID → AniList ID, then AniList ID → MAL ID.
-func (s HatoAPIStrategy) lookupID(ctx context.Context, malID, anilistID int, mediaType string) (int, bool, error) {
-	// Try MAL ID → AniList ID lookup
-	if malID > 0 {
-		LogDebug(ctx, "[HATO API] Looking up AniList ID for MAL ID: %d (%s)", malID, mediaType)
-		id, found, err := s.Client.GetAniListID(ctx, malID, mediaType)
-		if err != nil {
-			return 0, false, err
-		}
-		if found {
-			LogDebug(ctx, "[HATO API] Found: MAL %d -> AniList %d (%s)", malID, id, mediaType)
-			return id, true, nil
-		}
-		LogDebug(ctx, "[HATO API] Not found: MAL %d -> (no mapping) (%s)", malID, mediaType)
+// lookupID asks Hato only for the id this sync direction needs.
+func (s HatoAPIStrategy) lookupID(
+	ctx context.Context, malID, anilistID int, reverse bool, mediaType string,
+) (int, bool, error) {
+	malToAniList := func(ctx context.Context, id int) (int, bool, error) {
+		return s.Client.GetAniListID(ctx, id, mediaType)
+	}
+	aniListToMAL := func(ctx context.Context, id int) (int, bool, error) {
+		return s.Client.GetMALID(ctx, id, mediaType)
 	}
 
-	// Try AniList ID → MAL ID lookup
-	if anilistID > 0 {
-		LogDebug(ctx, "[HATO API] Looking up MAL ID for AniList ID: %d (%s)", anilistID, mediaType)
-		id, found, err := s.Client.GetMALID(ctx, anilistID, mediaType)
-		if err != nil {
-			return 0, false, err
-		}
-		if found {
-			LogDebug(ctx, "[HATO API] Found: AniList %d -> MAL %d (%s)", anilistID, id, mediaType)
-			return id, true, nil
-		}
-		LogDebug(ctx, "[HATO API] Not found: AniList %d -> (no mapping) (%s)", anilistID, mediaType)
-	}
-
-	return 0, false, nil
+	return directionalIDLookup(ctx, malID, anilistID, reverse, "HATO API", malToAniList, aniListToMAL)
 }
 
 func (s HatoAPIStrategy) lookupIDAnime(ctx context.Context, src Anime) (int, bool, error) {
-	return s.lookupID(ctx, src.IDMal, src.IDAnilist, "anime")
+	return s.lookupID(ctx, src.IDMal, src.IDAnilist, src.isReverse, mediaTypeAnime)
 }
 
 func (s HatoAPIStrategy) lookupIDManga(ctx context.Context, src Manga) (int, bool, error) {
-	return s.lookupID(ctx, src.IDMal, src.IDAnilist, "manga")
+	return s.lookupID(ctx, src.IDMal, src.IDAnilist, src.isReverse, mediaTypeManga)
+}
+
+// MangaBakaStrategy finds targets using the MangaBaka API for manga ID mapping.
+// Only works for manga (not anime); sits after HatoAPIStrategy in the chain.
+type MangaBakaStrategy struct {
+	Client *MangaBakaClient
+}
+
+func (s MangaBakaStrategy) Name() string {
+	return "MangaBakaStrategy"
+}
+
+func (s MangaBakaStrategy) FindTarget(
+	ctx context.Context,
+	src Source,
+	existingTargets map[TargetID]Target,
+	prefix string,
+	_ *SyncReport,
+) (Target, bool, error) {
+	if s.Client == nil {
+		return nil, false, nil
+	}
+
+	srcManga, ok := src.(Manga)
+	if !ok {
+		return nil, false, nil
+	}
+
+	targetServiceID, found, err := s.lookupID(ctx, srcManga)
+	if err != nil {
+		LogWarn(ctx, "[%s] MangaBaka API error: %v", prefix, err)
+		return nil, false, nil
+	}
+	if !found {
+		return nil, false, nil
+	}
+
+	return checkExistingTarget(ctx, existingTargets, targetServiceID, prefix, "MangaBaka API")
+}
+
+// lookupID asks MangaBaka only for the id this sync direction needs.
+func (s MangaBakaStrategy) lookupID(ctx context.Context, src Manga) (int, bool, error) {
+	return directionalIDLookup(
+		ctx, src.IDMal, src.IDAnilist, src.isReverse, "MANGABAKA API", s.Client.GetAniListID, s.Client.GetMALID,
+	)
 }
 
 // JikanAPIStrategy finds targets using the Jikan API for manga ID mapping.

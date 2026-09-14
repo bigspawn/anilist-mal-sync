@@ -124,7 +124,8 @@ func TestNeedInit_HasToken(t *testing.T) {
 		Expiry:      time.Now().Add(time.Hour),
 	}
 	tf := &TokenFile{Tokens: map[string]*oauth2.Token{"test": token}}
-	if err := writeTokenFile(tokenPath, tf); err != nil {
+	err := writeTokenFile(tokenPath, tf)
+	if err != nil {
 		t.Fatalf("setup: writeTokenFile() error = %v", err)
 	}
 
@@ -235,7 +236,8 @@ func TestCreateDirIfNotExists(t *testing.T) {
 			if !tt.expectError {
 				// Verify directory was created
 				dir := filepath.Dir(path)
-				if _, err := os.Stat(dir); os.IsNotExist(err) {
+				_, err = os.Stat(dir)
+				if os.IsNotExist(err) {
 					t.Errorf("directory was not created: %s", dir)
 				}
 			}
@@ -302,11 +304,12 @@ func TestInvalidTokenFileJSON(t *testing.T) {
 	tokenPath := filepath.Join(tmpDir, "invalid.json")
 
 	// Write invalid JSON
-	if err := os.WriteFile(tokenPath, []byte("{invalid json}"), 0o600); err != nil {
+	err := os.WriteFile(tokenPath, []byte("{invalid json}"), 0o600)
+	if err != nil {
 		t.Fatalf("setup: WriteFile() error = %v", err)
 	}
 
-	_, err := readTokenFile(tokenPath)
+	_, err = readTokenFile(tokenPath)
 	if err == nil {
 		t.Error("readTokenFile() should return error for invalid JSON")
 	}
@@ -320,7 +323,8 @@ func TestAtomicWritePreventsCorruption(t *testing.T) {
 	// Write first token
 	token1 := &oauth2.Token{AccessToken: "token1"}
 	tf1 := &TokenFile{Tokens: map[string]*oauth2.Token{"test": token1}}
-	if err := writeTokenFile(tokenPath, tf1); err != nil {
+	err := writeTokenFile(tokenPath, tf1)
+	if err != nil {
 		t.Fatalf("writeTokenFile() error = %v", err)
 	}
 
@@ -336,7 +340,8 @@ func TestAtomicWritePreventsCorruption(t *testing.T) {
 	// Write second token (should use atomic write)
 	token2 := &oauth2.Token{AccessToken: "token2"}
 	tf2 := &TokenFile{Tokens: map[string]*oauth2.Token{"test": token2}}
-	if err := writeTokenFile(tokenPath, tf2); err != nil {
+	err = writeTokenFile(tokenPath, tf2)
+	if err != nil {
 		t.Fatalf("writeTokenFile() error = %v", err)
 	}
 
@@ -528,7 +533,7 @@ func TestStateValidation_MissingState(t *testing.T) {
 	}
 
 	// Create request without state parameter
-	req := httptest.NewRequest(http.MethodGet, "/callback?code=test_code", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/callback?code=test_code", nil)
 	w := httptest.NewRecorder()
 
 	// Call the callback handler (extracted from startServer)
@@ -555,7 +560,8 @@ func TestStateValidation_MissingState(t *testing.T) {
 	handler.ServeHTTP(w, req)
 
 	resp := w.Result()
-	if err := resp.Body.Close(); err != nil {
+	err = resp.Body.Close()
+	if err != nil {
 		t.Logf("Warning: failed to close response body: %v", err)
 	}
 
@@ -576,7 +582,7 @@ func TestStateValidation_MismatchedState(t *testing.T) {
 	}
 
 	// Create request with wrong state
-	req := httptest.NewRequest(http.MethodGet, "/callback?code=test_code&state=wrong_state", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/callback?code=test_code&state=wrong_state", nil)
 	w := httptest.NewRecorder()
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -602,7 +608,8 @@ func TestStateValidation_MismatchedState(t *testing.T) {
 	handler.ServeHTTP(w, req)
 
 	resp := w.Result()
-	if err := resp.Body.Close(); err != nil {
+	err = resp.Body.Close()
+	if err != nil {
 		t.Logf("Warning: failed to close response body: %v", err)
 	}
 
@@ -623,7 +630,7 @@ func TestStateValidation_ValidState(t *testing.T) {
 	}
 
 	// Create request with correct state
-	req := httptest.NewRequest(http.MethodGet, "/callback?code=test_code&state="+oauth.state, nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/callback?code=test_code&state="+oauth.state, nil)
 	w := httptest.NewRecorder()
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -652,7 +659,8 @@ func TestStateValidation_ValidState(t *testing.T) {
 	handler.ServeHTTP(w, req)
 
 	resp := w.Result()
-	if err := resp.Body.Close(); err != nil {
+	err = resp.Body.Close()
+	if err != nil {
 		t.Logf("Warning: failed to close response body: %v", err)
 	}
 
@@ -826,7 +834,8 @@ func setupMockOAuthServer(t *testing.T) (*httptest.Server, *oauth2.Config) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/x-www-form-urlencoded")
-		if _, err := w.Write([]byte("access_token=mocktoken&token_type=bearer&expires_in=3600")); err != nil {
+		_, err := w.Write([]byte("access_token=mocktoken&token_type=bearer&expires_in=3600"))
+		if err != nil {
 			http.Error(w, "failed to write response", http.StatusInternalServerError)
 		}
 	})
@@ -944,7 +953,8 @@ func TestIsTokenValid_ValidToken(t *testing.T) {
 		Expiry:      time.Now().Add(time.Hour),
 	}
 	tf := &TokenFile{Tokens: map[string]*oauth2.Token{"test": token}}
-	if err := writeTokenFile(tokenPath, tf); err != nil {
+	err := writeTokenFile(tokenPath, tf)
+	if err != nil {
 		t.Fatalf("setup: writeTokenFile() error = %v", err)
 	}
 
@@ -971,7 +981,8 @@ func TestIsTokenValid_ExpiredToken(t *testing.T) {
 		Expiry:      time.Now().Add(-time.Hour),
 	}
 	tf := &TokenFile{Tokens: map[string]*oauth2.Token{"test": token}}
-	if err := writeTokenFile(tokenPath, tf); err != nil {
+	err := writeTokenFile(tokenPath, tf)
+	if err != nil {
 		t.Fatalf("setup: writeTokenFile() error = %v", err)
 	}
 
@@ -998,7 +1009,8 @@ func TestIsTokenValid_ZeroExpiry(t *testing.T) {
 		Expiry:      time.Time{},
 	}
 	tf := &TokenFile{Tokens: map[string]*oauth2.Token{"test": token}}
-	if err := writeTokenFile(tokenPath, tf); err != nil {
+	err := writeTokenFile(tokenPath, tf)
+	if err != nil {
 		t.Fatalf("setup: writeTokenFile() error = %v", err)
 	}
 
@@ -1042,7 +1054,8 @@ func TestTokenExpiry_HasToken(t *testing.T) {
 		Expiry:      expectedExpiry,
 	}
 	tf := &TokenFile{Tokens: map[string]*oauth2.Token{"test": token}}
-	if err := writeTokenFile(tokenPath, tf); err != nil {
+	err := writeTokenFile(tokenPath, tf)
+	if err != nil {
 		t.Fatalf("setup: writeTokenFile() error = %v", err)
 	}
 
@@ -1079,7 +1092,8 @@ func TestDeleteToken_Success(t *testing.T) {
 		Expiry:      time.Now().Add(time.Hour),
 	}
 	tf := &TokenFile{Tokens: map[string]*oauth2.Token{"test": token}}
-	if err := writeTokenFile(tokenPath, tf); err != nil {
+	err := writeTokenFile(tokenPath, tf)
+	if err != nil {
 		t.Fatalf("setup: writeTokenFile() error = %v", err)
 	}
 
@@ -1095,7 +1109,8 @@ func TestDeleteToken_Success(t *testing.T) {
 	}
 
 	// Delete token
-	if err := oauth.DeleteToken(); err != nil {
+	err = oauth.DeleteToken()
+	if err != nil {
 		t.Fatalf("DeleteToken() error = %v", err)
 	}
 
@@ -1126,7 +1141,8 @@ func TestDeleteToken_NoToken(t *testing.T) {
 	}
 
 	// DeleteToken should succeed even if no token exists
-	if err := oauth.DeleteToken(); err != nil {
+	err = oauth.DeleteToken()
+	if err != nil {
 		t.Errorf("DeleteToken() should not error when no token: %v", err)
 	}
 }
@@ -1143,7 +1159,8 @@ func TestInitToken_AlreadyHasToken(t *testing.T) {
 		Expiry:      time.Now().Add(time.Hour),
 	}
 	tf := &TokenFile{Tokens: map[string]*oauth2.Token{"test": token}}
-	if err := writeTokenFile(tokenPath, tf); err != nil {
+	err := writeTokenFile(tokenPath, tf)
+	if err != nil {
 		t.Fatalf("setup: writeTokenFile() error = %v", err)
 	}
 
@@ -1155,7 +1172,8 @@ func TestInitToken_AlreadyHasToken(t *testing.T) {
 
 	// InitToken should return nil immediately if token exists
 	ctx := t.Context()
-	if err := oauth.InitToken(ctx, "18080"); err != nil {
+	err = oauth.InitToken(ctx, "18080")
+	if err != nil {
 		t.Errorf("InitToken() should return nil when token exists: %v", err)
 	}
 }
@@ -1213,8 +1231,8 @@ func TestGetAuthURL_EnvConfigIncludesHost(t *testing.T) {
 			siteConfig: SiteConfig{
 				ClientID:     "test_id",
 				ClientSecret: "test_secret",
-				AuthURL:      "https://myanimelist.net/v1/oauth2/authorize",
-				TokenURL:     "https://myanimelist.net/v1/oauth2/token",
+				AuthURL:      defaultMALAuthURL,
+				TokenURL:     defaultMALTokenURL,
 			},
 			expectedHost: "myanimelist.net",
 			expectedPath: "/v1/oauth2/authorize",
@@ -1287,11 +1305,11 @@ func TestNewOAuth_EnvConfigEndpoints(t *testing.T) {
 			siteConfig: SiteConfig{
 				ClientID:     "test_id",
 				ClientSecret: "test_secret",
-				AuthURL:      "https://myanimelist.net/v1/oauth2/authorize",
-				TokenURL:     "https://myanimelist.net/v1/oauth2/token",
+				AuthURL:      defaultMALAuthURL,
+				TokenURL:     defaultMALTokenURL,
 			},
-			expectedAuthURL:  "https://myanimelist.net/v1/oauth2/authorize",
-			expectedTokenURL: "https://myanimelist.net/v1/oauth2/token",
+			expectedAuthURL:  defaultMALAuthURL,
+			expectedTokenURL: defaultMALTokenURL,
 		},
 	}
 

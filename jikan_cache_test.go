@@ -24,13 +24,13 @@ func TestJikanCache_SetGet(t *testing.T) {
 	tmpDir := t.TempDir()
 	cache := NewJikanCache(tmpDir, 168*time.Hour)
 
-	data, _ := json.Marshal(map[string]any{"mal_id": 123, "title": "One Piece"})
+	data, _ := json.Marshal(map[string]any{"mal_id": 123, "title": testTitleOnePiece})
 	cache.Set(123, data)
 
 	retrieved, found := cache.Get(123)
 	assert.True(t, found)
 	assert.NotNil(t, retrieved)
-	assert.JSONEq(t, `{"mal_id":123,"title":"One Piece"}`, string(retrieved))
+	assert.JSONEq(t, `{"mal_id":123,"title":"`+testTitleOnePiece+`"}`, string(retrieved))
 }
 
 func TestJikanCache_NotFound(t *testing.T) {
@@ -47,7 +47,7 @@ func TestJikanCache_SaveLoad(t *testing.T) {
 	tmpDir := t.TempDir()
 	cache := NewJikanCache(tmpDir, 168*time.Hour)
 
-	data, _ := json.Marshal(map[string]any{"mal_id": 123, "title": "One Piece"})
+	data, _ := json.Marshal(map[string]any{"mal_id": 123, "title": testTitleOnePiece})
 	cache.Set(123, data)
 
 	ctx := t.Context()
@@ -60,7 +60,7 @@ func TestJikanCache_SaveLoad(t *testing.T) {
 
 	retrieved, found := cache2.Get(123)
 	assert.True(t, found)
-	assert.JSONEq(t, `{"mal_id":123,"title":"One Piece"}`, string(retrieved))
+	assert.JSONEq(t, `{"mal_id":123,"title":"`+testTitleOnePiece+`"}`, string(retrieved))
 }
 
 func TestJikanCache_Expiration(t *testing.T) {
@@ -89,12 +89,12 @@ func TestJikanCache_SearchSetGet(t *testing.T) {
 	cache := NewJikanCache(tmpDir, 168*time.Hour)
 
 	data, _ := json.Marshal([]map[string]any{
-		{"mal_id": 123, "title": "One Piece"},
+		{"mal_id": 123, "title": testTitleOnePiece},
 		{"mal_id": 456, "title": "One Piece: Film Z"},
 	})
-	cache.SetSearch("One Piece", data)
+	cache.SetSearch(testTitleOnePiece, data)
 
-	retrieved, found := cache.GetSearch("One Piece")
+	retrieved, found := cache.GetSearch(testTitleOnePiece)
 	assert.True(t, found)
 	assert.NotNil(t, retrieved)
 
@@ -183,7 +183,7 @@ func TestJikanCache_SearchNormalization(t *testing.T) {
 	cache := NewJikanCache(tmpDir, 168*time.Hour)
 
 	data, _ := json.Marshal([]map[string]any{{"mal_id": 123}})
-	cache.SetSearch("One Piece", data)
+	cache.SetSearch(testTitleOnePiece, data)
 
 	// Should find with different casing due to normalization
 	_, found := cache.GetSearch("one piece")

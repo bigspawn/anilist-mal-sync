@@ -36,7 +36,7 @@ concurrency:
 
 jobs:
   golangci:
-    name: lint
+    name: lint (new issues)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -45,8 +45,25 @@ jobs:
         with:
           go-version: "1.25"
           cache: true
-      - name: golangci-lint
+      - name: golangci-lint (new issues only)
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
-          version: v2.10.1
+          version: v2.13.2
           only-new-issues: true
+
+  golangci-full:
+    name: lint (full)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.25"
+          cache: true
+      - name: golangci-lint (full run)
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
+        with:
+          version: v2.13.2
+          only-new-issues: false
+          args: --timeout=5m

@@ -35,7 +35,7 @@ func jikanMangaResponse(id int, title, titleEN, titleJP string) map[string]any {
 			"type":           "Manga",
 			"chapters":       nil,
 			"volumes":        nil,
-			"status":         "Publishing",
+			graphqlVarStatus: "Publishing",
 		},
 	}
 }
@@ -64,7 +64,7 @@ func jikanSearchEntry(id int, title, titleEN, titleJP string) map[string]any {
 		"type":           "Manga",
 		"chapters":       nil,
 		"volumes":        nil,
-		"status":         "Publishing",
+		graphqlVarStatus: "Publishing",
 	}
 }
 
@@ -72,7 +72,7 @@ func TestJikanClient_GetMangaByMALID(t *testing.T) {
 	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/manga/13" {
-			writeJSON(t, w, jikanMangaResponse(13, "One Piece", "One Piece", "ONE PIECE"))
+			writeJSON(t, w, jikanMangaResponse(13, testTitleOnePiece, testTitleOnePiece, "ONE PIECE"))
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -87,8 +87,8 @@ func TestJikanClient_GetMangaByMALID(t *testing.T) {
 	assert.True(t, found)
 	assert.NotNil(t, data)
 	assert.Equal(t, 13, data.MalID)
-	assert.Equal(t, "One Piece", data.Title)
-	assert.Equal(t, "One Piece", data.TitleEnglish)
+	assert.Equal(t, testTitleOnePiece, data.Title)
+	assert.Equal(t, testTitleOnePiece, data.TitleEnglish)
 	assert.Equal(t, "ONE PIECE", data.TitleJapanese)
 }
 
@@ -97,7 +97,7 @@ func TestJikanClient_GetMangaByMALID_CacheHit(t *testing.T) {
 	requestCount := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		requestCount++
-		writeJSON(t, w, jikanMangaResponse(13, "One Piece", "One Piece", "ONE PIECE"))
+		writeJSON(t, w, jikanMangaResponse(13, testTitleOnePiece, testTitleOnePiece, "ONE PIECE"))
 	}))
 	defer server.Close()
 
@@ -162,9 +162,9 @@ func TestJikanClient_SearchManga(t *testing.T) {
 	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		query := r.URL.Query().Get("q")
-		if query == "One Piece" {
+		if query == testTitleOnePiece {
 			writeJSON(t, w, jikanSearchResponseHelper(
-				jikanSearchEntry(13, "One Piece", "One Piece", "ONE PIECE"),
+				jikanSearchEntry(13, testTitleOnePiece, testTitleOnePiece, "ONE PIECE"),
 				jikanSearchEntry(100, "One Piece: Film Z", "One Piece Film Z", ""),
 			))
 			return
@@ -177,10 +177,10 @@ func TestJikanClient_SearchManga(t *testing.T) {
 	client := newTestJikanClient(t, server.URL, tmpDir)
 	ctx := NewLogger(false).WithContext(t.Context())
 
-	results := client.SearchManga(ctx, "One Piece")
+	results := client.SearchManga(ctx, testTitleOnePiece)
 	assert.Len(t, results, 2)
 	assert.Equal(t, 13, results[0].MalID)
-	assert.Equal(t, "One Piece", results[0].Title)
+	assert.Equal(t, testTitleOnePiece, results[0].Title)
 }
 
 func TestJikanClient_SearchManga_Empty(t *testing.T) {
@@ -334,15 +334,15 @@ func TestMatchJikanMangaToSource(t *testing.T) {
 	}{
 		{
 			name:     "exact english match",
-			jikan:    JikanMangaData{TitleEnglish: "One Piece", TitleJapanese: "ONE PIECE", Title: "One Piece"},
-			en:       "One Piece",
+			jikan:    JikanMangaData{TitleEnglish: testTitleOnePiece, TitleJapanese: "ONE PIECE", Title: testTitleOnePiece},
+			en:       testTitleOnePiece,
 			jp:       "",
 			romaji:   "",
 			expected: true,
 		},
 		{
 			name:     "exact japanese match",
-			jikan:    JikanMangaData{TitleEnglish: "", TitleJapanese: "ONE PIECE", Title: "One Piece"},
+			jikan:    JikanMangaData{TitleEnglish: "", TitleJapanese: "ONE PIECE", Title: testTitleOnePiece},
 			en:       "",
 			jp:       "ONE PIECE",
 			romaji:   "",
@@ -359,9 +359,9 @@ func TestMatchJikanMangaToSource(t *testing.T) {
 		{
 			name:     "no match",
 			jikan:    JikanMangaData{TitleEnglish: "Naruto", TitleJapanese: "ナルト", Title: "Naruto"},
-			en:       "One Piece",
+			en:       testTitleOnePiece,
 			jp:       "ONE PIECE",
-			romaji:   "One Piece",
+			romaji:   testTitleOnePiece,
 			expected: false,
 		},
 		{
@@ -399,10 +399,10 @@ func TestFindBestJikanMatch(t *testing.T) {
 	t.Parallel()
 	results := []JikanMangaData{
 		{MalID: 100, Title: "One Piece Film Z", TitleEnglish: "One Piece Film Z", TitleJapanese: ""},
-		{MalID: 13, Title: "One Piece", TitleEnglish: "One Piece", TitleJapanese: "ONE PIECE"},
+		{MalID: 13, Title: testTitleOnePiece, TitleEnglish: testTitleOnePiece, TitleJapanese: "ONE PIECE"},
 	}
 
-	malID := findBestJikanMatch(t.Context(), results, "One Piece", "ONE PIECE", "")
+	malID := findBestJikanMatch(t.Context(), results, testTitleOnePiece, "ONE PIECE", "")
 	assert.Equal(t, 13, malID)
 }
 
@@ -412,14 +412,14 @@ func TestFindBestJikanMatch_NoMatch(t *testing.T) {
 		{MalID: 100, Title: "Naruto", TitleEnglish: "Naruto", TitleJapanese: "ナルト"},
 	}
 
-	malID := findBestJikanMatch(t.Context(), results, "One Piece", "ONE PIECE", "")
+	malID := findBestJikanMatch(t.Context(), results, testTitleOnePiece, "ONE PIECE", "")
 	assert.Equal(t, 0, malID)
 }
 
 func TestSearchTitlesForJikan(t *testing.T) {
 	t.Parallel()
-	titles := searchTitlesForJikan("One Piece", "", "One Piece")
-	// Should deduplicate "One Piece" (romaji == EN after normalization)
+	titles := searchTitlesForJikan(testTitleOnePiece, "", testTitleOnePiece)
+	// Should deduplicate testTitleOnePiece (romaji == EN after normalization)
 	assert.Len(t, titles, 1)
 
 	titles2 := searchTitlesForJikan("Rascal Does Not Dream", "", "Seishun Buta Yarou")

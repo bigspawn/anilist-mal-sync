@@ -141,7 +141,8 @@ func (oauth *OAuth) TokenWithContext(ctx context.Context) (*oauth2.Token, error)
 
 	oauth.token = t
 
-	if err = oauth.saveTokenToFile(); err != nil {
+	err = oauth.saveTokenToFile()
+	if err != nil {
 		return nil, fmt.Errorf("error saving token: %w", err)
 	}
 
@@ -286,20 +287,23 @@ func writeTokenFile(tokenFilePath string, tokenFile *TokenFile) error {
 	tmpPath := tmpFile.Name()
 
 	// Write to temp file
-	if err := json.NewEncoder(tmpFile).Encode(tokenFile); err != nil {
+	err = json.NewEncoder(tmpFile).Encode(tokenFile)
+	if err != nil {
 		cleanupFile(tmpFile, tmpPath)
 		return fmt.Errorf("error encoding token file: %w", err)
 	}
 
 	// Ensure data is flushed to disk before rename
-	if err := tmpFile.Sync(); err != nil {
+	err = tmpFile.Sync()
+	if err != nil {
 		cleanupFile(tmpFile, tmpPath)
 		return fmt.Errorf("error syncing temp file: %w", err)
 	}
 
-	if err := tmpFile.Close(); err != nil {
+	err = tmpFile.Close()
+	if err != nil {
 		// File already closed with error, just remove temp file
-		err := os.Remove(tmpPath) //nolint:gosec // tmpPath from os.CreateTemp, not user input
+		err := os.Remove(tmpPath)
 		if err != nil {
 			log.Printf("Error removing temp file %s: %v", tmpPath, err)
 		}
@@ -307,7 +311,8 @@ func writeTokenFile(tokenFilePath string, tokenFile *TokenFile) error {
 	}
 
 	// Atomic rename (overwrites target if exists)
-	if err := os.Rename(tmpPath, tokenFilePath); err != nil {
+	err = os.Rename(tmpPath, tokenFilePath)
+	if err != nil {
 		return fmt.Errorf("error renaming temp file: %w", err)
 	}
 
@@ -321,7 +326,7 @@ func cleanupFile(f *os.File, path string) {
 	if err != nil {
 		log.Printf("Error closing temp file %s: %v", path, err)
 	}
-	err = os.Remove(path) //nolint:gosec // path is an internal temp file path, not user input
+	err = os.Remove(path)
 	if err != nil {
 		log.Printf("Error removing temp file %s: %v", path, err)
 	}
@@ -352,7 +357,7 @@ func startServer(oauth *OAuth, port string, done chan<- bool) *http.Server {
 
 		if state != expectedState {
 			http.Error(w, "Invalid state parameter", http.StatusBadRequest)
-			log.Printf("State mismatch: expected=%s, got=%s", expectedState, state)
+			LogWarn(callbackCtx, "State mismatch: expected=%q, got=%q", expectedState, state)
 			return
 		}
 

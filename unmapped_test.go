@@ -25,13 +25,14 @@ func TestUnmappedState_SaveAndLoad(t *testing.T) {
 	now := time.Now().Truncate(time.Second)
 	state := &UnmappedState{
 		Entries: []UnmappedEntry{
-			{AniListID: 100, Title: "Test Manga", MediaType: "manga", Direction: DirectionForwardStr},
-			{AniListID: 200, MALID: 300, Title: "Test Anime", MediaType: "anime", Direction: DirectionReverseStr},
+			{AniListID: 100, Title: testTitleManga, MediaType: mediaTypeManga, Direction: DirectionForwardStr},
+			{AniListID: 200, MALID: 300, Title: testTitleAnime, MediaType: mediaTypeAnime, Direction: DirectionReverseStr},
 		},
 		UpdatedAt: now,
 	}
 
-	if err := state.Save(path); err != nil {
+	err := state.Save(path)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -40,9 +41,9 @@ func TestUnmappedState_SaveAndLoad(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Len(t, loaded.Entries, 2)
-	assert.Equal(t, "Test Manga", loaded.Entries[0].Title)
+	assert.Equal(t, testTitleManga, loaded.Entries[0].Title)
 	assert.Equal(t, 100, loaded.Entries[0].AniListID)
-	assert.Equal(t, "manga", loaded.Entries[0].MediaType)
+	assert.Equal(t, string(mediaTypeManga), loaded.Entries[0].MediaType)
 	assert.Equal(t, DirectionForwardStr, loaded.Entries[0].Direction)
 	assert.Equal(t, 200, loaded.Entries[1].AniListID)
 	assert.Equal(t, 300, loaded.Entries[1].MALID)
@@ -59,20 +60,21 @@ func TestUnmappedEntry_DirectionField(t *testing.T) {
 			{
 				AniListID: 100,
 				Title:     "Forward Entry",
-				MediaType: "anime",
+				MediaType: string(mediaTypeAnime),
 				Direction: DirectionForwardStr,
 			},
 			{
 				MALID:     500,
 				Title:     "Reverse Entry",
-				MediaType: "anime",
+				MediaType: string(mediaTypeAnime),
 				Direction: DirectionReverseStr,
 			},
 		},
 		UpdatedAt: time.Now().Truncate(time.Second),
 	}
 
-	if err := state.Save(path); err != nil {
+	err := state.Save(path)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -91,15 +93,16 @@ func TestUnmappedState_MixedDirections(t *testing.T) {
 
 	state := &UnmappedState{
 		Entries: []UnmappedEntry{
-			{AniListID: 100, Title: "AniList Anime", MediaType: "anime", Direction: DirectionForwardStr},
-			{MALID: 200, Title: "MAL Anime", MediaType: "anime", Direction: DirectionReverseStr},
-			{AniListID: 300, Title: "AniList Manga", MediaType: "manga", Direction: DirectionForwardStr},
-			{MALID: 400, Title: "MAL Manga", MediaType: "manga", Direction: DirectionReverseStr},
+			{AniListID: 100, Title: "AniList Anime", MediaType: string(mediaTypeAnime), Direction: DirectionForwardStr},
+			{MALID: 200, Title: "MAL Anime", MediaType: string(mediaTypeAnime), Direction: DirectionReverseStr},
+			{AniListID: 300, Title: "AniList Manga", MediaType: string(mediaTypeManga), Direction: DirectionForwardStr},
+			{MALID: 400, Title: "MAL Manga", MediaType: string(mediaTypeManga), Direction: DirectionReverseStr},
 		},
 		UpdatedAt: time.Now().Truncate(time.Second),
 	}
 
-	if err := state.Save(path); err != nil {
+	err := state.Save(path)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -126,10 +129,11 @@ func TestLoadUnmappedState_InvalidJSON(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "unmapped.json")
-	if err := os.WriteFile(path, []byte("not json"), 0o600); err != nil {
+	err := os.WriteFile(path, []byte("not json"), 0o600)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err := LoadUnmappedState(path)
+	_, err = LoadUnmappedState(path)
 	assert.Error(t, err)
 }

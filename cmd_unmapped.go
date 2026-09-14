@@ -12,9 +12,13 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
+// unmappedCommandName is the CLI command name, shared with the tests that
+// look up this command by name.
+const unmappedCommandName = "unmapped"
+
 func newUnmappedCommand() *cli.Command {
 	return &cli.Command{
-		Name:  "unmapped",
+		Name:  unmappedCommandName,
 		Usage: "Show and manage unmapped entries from last sync",
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
@@ -107,7 +111,8 @@ func runUnmappedIgnoreAll(state *UnmappedState, mappingsPath string) error {
 		return nil
 	}
 
-	if err := mappings.Save(mappingsPath); err != nil {
+	err = mappings.Save(mappingsPath)
+	if err != nil {
 		return fmt.Errorf("save mappings: %w", err)
 	}
 

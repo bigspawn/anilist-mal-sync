@@ -126,7 +126,7 @@ func TestNormalizeTitle_EdgeCases(t *testing.T) {
 		{
 			name:  "nested parentheses",
 			title: "Anime (TV (2023))",
-			want:  "anime", // parens removed, trailing space trimmed
+			want:  string(mediaTypeAnime), // parens removed, trailing space trimmed
 		},
 		{
 			name:  "mixed punctuation - single pass",
@@ -209,8 +209,8 @@ func TestBuildDiffString_EdgeCases(t *testing.T) {
 	}{
 		{
 			name:  "nil values",
-			pairs: []any{"Status", (*Status)(nil), "watching"},
-			want:  "Diff{Status: <nil> -> watching, }",
+			pairs: []any{"Status", (*Status)(nil), string(StatusWatching)},
+			want:  "Diff{Status: <nil> -> " + string(StatusWatching) + ", }",
 		},
 		{
 			name:  "empty strings",
@@ -253,7 +253,7 @@ func TestAnime_SameTypeWithTarget_NilAndZero(t *testing.T) {
 	anime := Anime{
 		IDAnilist: 123,
 		IDMal:     456,
-		TitleEN:   "Test Anime",
+		TitleEN:   testTitleAnime,
 	}
 
 	tests := []struct {
@@ -508,7 +508,7 @@ func TestLogger_Progress_VeryLongTitle(t *testing.T) {
 	longTitle := strings.Repeat("A", 200)
 
 	// For non-terminal output, Progress outputs each item
-	logger.Progress(10, 10, "watching", longTitle)
+	logger.Progress(10, 10, string(StatusWatching), longTitle)
 
 	// Should not panic and should show progress message
 	output := buf.String()
@@ -530,7 +530,7 @@ func TestLogger_Progress_VeryLongTitle_Verbose(t *testing.T) {
 	longTitle := strings.Repeat("A", 200)
 
 	// For non-terminal output, Progress outputs each item
-	logger.Progress(10, 10, "watching", longTitle)
+	logger.Progress(10, 10, string(StatusWatching), longTitle)
 
 	// Should not panic and should show progress message
 	output := buf.String()

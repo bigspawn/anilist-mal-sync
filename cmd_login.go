@@ -83,7 +83,8 @@ func loginAnilist(ctx context.Context, config Config) error {
 		return nil
 	}
 
-	if err := oauth.InitToken(ctx, config.OAuth.Port); err != nil {
+	err = oauth.InitToken(ctx, config.OAuth.Port)
+	if err != nil {
 		return fmt.Errorf("anilist authentication failed: %w", err)
 	}
 
@@ -107,7 +108,8 @@ func loginMyAnimeList(ctx context.Context, config Config) error {
 		return nil
 	}
 
-	if err := oauth.InitToken(ctx, config.OAuth.Port); err != nil {
+	err = oauth.InitToken(ctx, config.OAuth.Port)
+	if err != nil {
 		return fmt.Errorf("myanimelist authentication failed: %w", err)
 	}
 

@@ -18,70 +18,120 @@ const (
 	ServiceAll         = "all"
 )
 
+// Flag names for the ID-mapping sources. Each name is spelled in three places —
+// the shared sync flags, the root command's own flag list, and the config
+// override — so a literal would drift.
+// Flag names shared between newSyncFlags and getSyncFlagsFromCmd/applySyncFlagsToConfig.
+const (
+	flagForce            = "force"
+	flagDryRun           = "dry-run"
+	flagManga            = "manga"
+	flagAllMedia         = "all"
+	flagVerbose          = "verbose"
+	flagReverseDirection = "reverse-direction"
+	flagFavorites        = "favorites"
+)
+
+const (
+	flagARMAPI          = "arm-api"
+	flagARMAPIURL       = "arm-api-url"
+	flagHatoAPI         = "hato-api"
+	flagHatoAPIURL      = "hato-api-url"
+	flagMangaBakaAPI    = "mangabaka-api"
+	flagMangaBakaAPIURL = "mangabaka-api-url"
+	flagJikanAPI        = "jikan-api"
+
+	flagOfflineDB             = "offline-db"
+	flagOfflineDBForceRefresh = "offline-db-force-refresh"
+)
+
 // syncFlags are the common flags shared between sync and watch commands.
-var syncFlags = []cli.Flag{
-	&cli.BoolFlag{
-		Name:    "force",
-		Aliases: []string{"f"},
-		Usage:   "force sync all entries",
-	},
-	&cli.BoolFlag{
-		Name:    "dry-run",
-		Aliases: []string{"d"},
-		Usage:   "dry run without updating target service",
-	},
-	&cli.BoolFlag{
-		Name:  "manga",
-		Usage: "sync manga instead of anime",
-	},
-	&cli.BoolFlag{
-		Name:  "all",
-		Usage: "sync all anime and manga",
-	},
-	&cli.BoolFlag{
-		Name:  "verbose",
-		Usage: "enable verbose logging",
-	},
-	&cli.BoolFlag{
-		Name:  "reverse-direction",
-		Usage: "sync from MyAnimeList to AniList (default is AniList to MyAnimeList)",
-	},
-	&cli.BoolFlag{
-		Name:  "offline-db",
-		Usage: "enable offline database for anime ID mapping (ignored for --manga) (default: true)",
-		Value: true,
-	},
-	&cli.BoolFlag{
-		Name:  "offline-db-force-refresh",
-		Usage: "force re-download offline database",
-	},
-	&cli.BoolFlag{
-		Name:  "arm-api",
-		Usage: "enable ARM API for anime ID mapping (ignored for --manga, fallback after offline DB) (default: false)",
-	},
-	&cli.StringFlag{
-		Name:  "arm-api-url",
-		Usage: "ARM API base URL",
-	},
-	&cli.BoolFlag{
-		Name:  "jikan-api",
-		Usage: "enable Jikan API for manga ID mapping (default: false)",
-	},
-	&cli.BoolFlag{
-		Name:  "favorites",
+var syncFlags = newSyncFlags(false)
+
+// newSyncFlags builds the sync/watch flag set. local marks each flag Local,
+// which NewCLI's root-command copy needs and the sync/watch commands don't;
+// building both from one function is what keeps them from drifting apart.
+func newSyncFlags(local bool) []cli.Flag {
+	flags := []cli.Flag{
+		&cli.BoolFlag{
+			Name:    flagForce,
+			Aliases: []string{"f"},
+			Usage:   "force sync all entries",
+			Local:   local,
+		},
+		&cli.BoolFlag{
+			Name:    flagDryRun,
+			Aliases: []string{"d"},
+			Usage:   "dry run without updating target service",
+			Local:   local,
+		},
+		&cli.BoolFlag{
+			Name:  flagManga,
+			Usage: "sync manga instead of anime",
+			Local: local,
+		},
+		&cli.BoolFlag{
+			Name:  flagAllMedia,
+			Usage: "sync all anime and manga",
+			Local: local,
+		},
+		&cli.BoolFlag{
+			Name:  flagVerbose,
+			Usage: "enable verbose logging",
+			Local: local,
+		},
+		&cli.BoolFlag{
+			Name:  flagReverseDirection,
+			Usage: "sync from MyAnimeList to AniList (default is AniList to MyAnimeList)",
+			Local: local,
+		},
+		&cli.BoolFlag{
+			Name:  flagOfflineDB,
+			Usage: "enable offline database for anime ID mapping (ignored for --manga) (default: true)",
+			Value: true,
+			Local: local,
+		},
+		&cli.BoolFlag{
+			Name:  flagOfflineDBForceRefresh,
+			Usage: "force re-download offline database",
+			Local: local,
+		},
+	}
+
+	for _, src := range mappingSources() {
+		flags = append(flags, &cli.BoolFlag{
+			Name:  src.flag,
+			Usage: src.usage,
+			Value: src.defaultEnabled,
+			Local: local,
+		})
+		if src.urlFlag != "" {
+			flags = append(flags, &cli.StringFlag{
+				Name:  src.urlFlag,
+				Usage: src.urlUsage,
+				Local: local,
+			})
+		}
+	}
+
+	flags = append(flags, &cli.BoolFlag{
+		Name:  flagFavorites,
 		Usage: "sync favorites between services (requires Jikan API for MAL favorites)",
-	},
+		Local: local,
+	})
+
+	return flags
 }
 
 // getSyncFlagsFromCmd extracts sync flags, updates package-level globals,
 // and returns verbose and reverse values explicitly.
 func getSyncFlagsFromCmd(cmd *cli.Command) (verboseOut bool, reverseOut bool) {
-	forceVal := cmd.Bool("force")
-	dryVal := cmd.Bool("dry-run")
-	mangaVal := cmd.Bool("manga")
-	allVal := cmd.Bool("all")
-	verboseVal := cmd.Bool("verbose")
-	reverseVal := cmd.Bool("reverse-direction")
+	forceVal := cmd.Bool(flagForce)
+	dryVal := cmd.Bool(flagDryRun)
+	mangaVal := cmd.Bool(flagManga)
+	allVal := cmd.Bool(flagAllMedia)
+	verboseVal := cmd.Bool(flagVerbose)
+	reverseVal := cmd.Bool(flagReverseDirection)
 
 	forceSync = &forceVal
 	dryRun = &dryVal
@@ -94,25 +144,25 @@ func getSyncFlagsFromCmd(cmd *cli.Command) (verboseOut bool, reverseOut bool) {
 
 // applySyncFlagsToConfig applies CLI sync flag overrides to config.
 func applySyncFlagsToConfig(cmd *cli.Command, cfg *Config) {
-	if cmd.IsSet("offline-db") {
-		cfg.OfflineDatabase.Enabled = cmd.Bool("offline-db")
+	if cmd.IsSet(flagOfflineDB) {
+		cfg.OfflineDatabase.Enabled = cmd.Bool(flagOfflineDB)
 	}
-	if cmd.IsSet("offline-db-force-refresh") && cmd.Bool("offline-db-force-refresh") {
+	if cmd.IsSet(flagOfflineDBForceRefresh) && cmd.Bool(flagOfflineDBForceRefresh) {
 		cfg.OfflineDatabase.ForceRefresh = true
 	}
-	if cmd.IsSet("arm-api") {
-		cfg.ARMAPI.Enabled = cmd.Bool("arm-api")
-	}
-	if cmd.IsSet("arm-api-url") {
-		if v := cmd.String("arm-api-url"); v != "" {
-			cfg.ARMAPI.BaseURL = v
+	for _, src := range mappingSources() {
+		sc := src.configField(cfg)
+		if cmd.IsSet(src.flag) {
+			sc.Enabled = cmd.Bool(src.flag)
+		}
+		if src.urlFlag != "" && cmd.IsSet(src.urlFlag) {
+			if v := cmd.String(src.urlFlag); v != "" {
+				sc.BaseURL = v
+			}
 		}
 	}
-	if cmd.IsSet("jikan-api") {
-		cfg.JikanAPI.Enabled = cmd.Bool("jikan-api")
-	}
-	if cmd.IsSet("favorites") {
-		cfg.Favorites.Enabled = cmd.Bool("favorites")
+	if cmd.IsSet(flagFavorites) {
+		cfg.Favorites.Enabled = cmd.Bool(flagFavorites)
 		// Favorites sync requires Jikan API to read MAL favorites
 		if cfg.Favorites.Enabled {
 			cfg.JikanAPI.Enabled = true
@@ -128,90 +178,19 @@ func NewCLI() *cli.Command {
 		Aliases: []string{"c"},
 		Usage:   "path to config file (optional, uses env vars if not specified)",
 	}
-	forceSyncFlag := &cli.BoolFlag{
-		Name:    "force",
-		Aliases: []string{"f"},
-		Usage:   "force sync all entries",
-		Local:   true,
-	}
-	dryRunFlag := &cli.BoolFlag{
-		Name:    "dry-run",
-		Aliases: []string{"d"},
-		Usage:   "dry run without updating target service",
-		Local:   true,
-	}
-	mangaSyncFlag := &cli.BoolFlag{
-		Name:  "manga",
-		Usage: "sync manga instead of anime",
-		Local: true,
-	}
-	allSyncFlag := &cli.BoolFlag{
-		Name:  "all",
-		Usage: "sync all anime and manga",
-		Local: true,
-	}
-	verboseFlag := &cli.BoolFlag{
-		Name:  "verbose",
-		Usage: "enable verbose logging",
-		Local: true,
-	}
-	reverseDirectionFlag := &cli.BoolFlag{
-		Name:  "reverse-direction",
-		Usage: "sync from MyAnimeList to AniList (default is AniList to MyAnimeList)",
-		Local: true,
-	}
-	offlineDbFlag := &cli.BoolFlag{
-		Name:  "offline-db",
-		Usage: "enable offline database for anime ID mapping (ignored for --manga) (default: true)",
-		Value: true,
-		Local: true,
-	}
-	offlineDbForceRefreshFlag := &cli.BoolFlag{
-		Name:  "offline-db-force-refresh",
-		Usage: "force re-download offline database",
-		Local: true,
-	}
-	armAPIFlag := &cli.BoolFlag{
-		Name:  "arm-api",
-		Usage: "enable ARM API for anime ID mapping (ignored for --manga, fallback after offline DB) (default: false)",
-		Local: true,
-	}
-	armAPIURLFlag := &cli.StringFlag{
-		Name:  "arm-api-url",
-		Usage: "ARM API base URL",
-		Local: true,
-	}
-	jikanAPIFlag := &cli.BoolFlag{
-		Name:  "jikan-api",
-		Usage: "enable Jikan API for manga ID mapping (default: false)",
-		Local: true,
-	}
-	favoritesFlag := &cli.BoolFlag{
-		Name:  "favorites",
-		Usage: "sync favorites between services (requires Jikan API for MAL favorites)",
-		Local: true,
-	}
+
+	// The root command runs sync when no subcommand is given, so it needs its
+	// own copy of every sync flag, marked Local so cli/v3 doesn't also expose
+	// it as a global flag on subcommands. newSyncFlags(true) is the same
+	// table-driven build as syncFlags, just Local instead of shared.
+	flags := append([]cli.Flag{configFlag}, newSyncFlags(true)...)
 
 	return &cli.Command{
 		Name:        "anilist-mal-sync",
 		Usage:       "Synchronize anime and manga lists between AniList and MyAnimeList",
 		Version:     version,
 		Description: "Sync your anime/manga lists between AniList and MyAnimeList.",
-		Flags: []cli.Flag{
-			configFlag,
-			forceSyncFlag,
-			dryRunFlag,
-			mangaSyncFlag,
-			allSyncFlag,
-			verboseFlag,
-			reverseDirectionFlag,
-			offlineDbFlag,
-			offlineDbForceRefreshFlag,
-			armAPIFlag,
-			armAPIURLFlag,
-			jikanAPIFlag,
-			favoritesFlag,
-		},
+		Flags:       flags,
 		Commands: []*cli.Command{
 			newLoginCommand(),
 			newLogoutCommand(),

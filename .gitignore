@@ -6,6 +6,10 @@ anilist-mal-sync
 .token*
 .claude
 
+# ralphex working files — plans and run logs stay local
+.ralphex/
+docs/plans/
+
 docker-compose.yaml
 config.yaml
 CLAUDE.md

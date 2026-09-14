@@ -64,7 +64,8 @@ func logoutAnilist(ctx context.Context, config Config) error {
 		return nil
 	}
 
-	if err := oauth.DeleteToken(); err != nil {
+	err = oauth.DeleteToken()
+	if err != nil {
 		return fmt.Errorf("error removing anilist token: %w", err)
 	}
 
@@ -83,7 +84,8 @@ func logoutMyAnimeList(ctx context.Context, config Config) error {
 		return nil
 	}
 
-	if err := oauth.DeleteToken(); err != nil {
+	err = oauth.DeleteToken()
+	if err != nil {
 		return fmt.Errorf("error removing myanimelist token: %w", err)
 	}
 

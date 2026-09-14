@@ -5,6 +5,8 @@ import (
 	"math/big"
 )
 
+// letters must contain only ASCII characters (no runes outside 0-127) because
+// the byte conversion below depends on it — converting a non-ASCII rune to byte would truncate.
 var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
 func randHTTPParamString(n int) string {
@@ -14,7 +16,7 @@ func randHTTPParamString(n int) string {
 		if err != nil {
 			return ""
 		}
-		b[i] = byte(letters[num.Int64()])
+		b[i] = byte(letters[num.Int64()]) // #nosec G115 -- letters is ASCII-only, so the byte conversion cannot truncate
 	}
 	return string(b)
 }

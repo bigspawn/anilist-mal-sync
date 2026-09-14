@@ -181,15 +181,15 @@ func TestStatistics_StatusCounts(t *testing.T) {
 	t.Parallel()
 	stats := NewStatistics()
 
-	stats.RecordUpdate(UpdateResult{Title: "Test1", Status: "watching"})
-	stats.RecordUpdate(UpdateResult{Title: "Test2", Status: "watching"})
-	stats.RecordSkip(UpdateResult{Title: "Test3", Status: "completed", SkipReason: "test"})
+	stats.RecordUpdate(UpdateResult{Title: "Test1", Status: string(StatusWatching)})
+	stats.RecordUpdate(UpdateResult{Title: "Test2", Status: string(StatusWatching)})
+	stats.RecordSkip(UpdateResult{Title: "Test3", Status: string(StatusCompleted), SkipReason: "test"})
 
-	if stats.StatusCounts["watching"] != 2 {
-		t.Errorf("StatusCounts[watching] = %d, want 2", stats.StatusCounts["watching"])
+	if stats.StatusCounts[string(StatusWatching)] != 2 {
+		t.Errorf("StatusCounts[watching] = %d, want 2", stats.StatusCounts[string(StatusWatching)])
 	}
-	if stats.StatusCounts["completed"] != 1 {
-		t.Errorf("StatusCounts[completed] = %d, want 1", stats.StatusCounts["completed"])
+	if stats.StatusCounts[string(StatusCompleted)] != 1 {
+		t.Errorf("StatusCounts[completed] = %d, want 1", stats.StatusCounts[string(StatusCompleted)])
 	}
 	if stats.UpdatedCount != 2 {
 		t.Errorf("UpdatedCount = %d, want 2", stats.UpdatedCount)
@@ -206,7 +206,7 @@ func TestStatistics_RecordError(t *testing.T) {
 	testErr := errors.New("test error")
 	stats.RecordError(UpdateResult{
 		Title:  "Failed Anime",
-		Status: "watching",
+		Status: string(StatusWatching),
 		Error:  testErr,
 	})
 
@@ -245,8 +245,8 @@ func TestStatistics_ResetClearsSlices(t *testing.T) {
 	t.Parallel()
 	stats := NewStatistics()
 
-	stats.RecordUpdate(UpdateResult{Title: "Test", Status: "watching"})
-	stats.RecordSkip(UpdateResult{Title: "Test", Status: "completed", SkipReason: "test"})
+	stats.RecordUpdate(UpdateResult{Title: "Test", Status: string(StatusWatching)})
+	stats.RecordSkip(UpdateResult{Title: "Test", Status: string(StatusCompleted), SkipReason: "test"})
 
 	if len(stats.UpdatedItems) != 1 {
 		t.Error("UpdatedItems should have 1 item before Reset")
@@ -275,10 +275,10 @@ func TestStatistics_StatusCountsMap(t *testing.T) {
 	}
 
 	// Add some counts
-	stats.StatusCounts["watching"] = 5
-	stats.StatusCounts["completed"] = 10
+	stats.StatusCounts[string(StatusWatching)] = 5
+	stats.StatusCounts[string(StatusCompleted)] = 10
 
-	if stats.StatusCounts["watching"] != 5 {
+	if stats.StatusCounts[string(StatusWatching)] != 5 {
 		t.Error("Failed to set StatusCounts value")
 	}
 
@@ -306,9 +306,9 @@ func TestStatistics_ItemsSlices(t *testing.T) {
 	}
 
 	// Add items
-	stats.RecordUpdate(UpdateResult{Title: "U1", Status: "watching"})
-	stats.RecordSkip(UpdateResult{Title: "S1", Status: "completed", SkipReason: "test"})
-	stats.RecordError(UpdateResult{Title: "E1", Status: "dropped", Error: errors.New("err")})
+	stats.RecordUpdate(UpdateResult{Title: "U1", Status: string(StatusWatching)})
+	stats.RecordSkip(UpdateResult{Title: "S1", Status: string(StatusCompleted), SkipReason: "test"})
+	stats.RecordError(UpdateResult{Title: "E1", Status: string(StatusDropped), Error: errors.New("err")})
 
 	if len(stats.UpdatedItems) != 1 {
 		t.Error("UpdatedItems should have 1 item")
@@ -537,7 +537,7 @@ func TestUpdateResult_IsSkipped(t *testing.T) {
 	t.Parallel()
 	result := UpdateResult{
 		Title:      "Test",
-		Status:     "watching",
+		Status:     string(StatusWatching),
 		Skipped:    true,
 		SkipReason: "no changes",
 	}
@@ -552,7 +552,7 @@ func TestUpdateResult_HasError(t *testing.T) {
 	testErr := errors.New("test error")
 	result := UpdateResult{
 		Title:  "Failed",
-		Status: "watching",
+		Status: string(StatusWatching),
 		Error:  testErr,
 	}
 

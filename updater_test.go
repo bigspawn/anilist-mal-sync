@@ -28,7 +28,7 @@ func TestUpdater_Update(t *testing.T) {
 				Anime{
 					IDMal:       12345,
 					IDAnilist:   67890,
-					TitleEN:     "Test Anime",
+					TitleEN:     testTitleAnime,
 					Status:      StatusWatching,
 					Score:       8,
 					Progress:    10,
@@ -57,7 +57,7 @@ func TestUpdater_Update(t *testing.T) {
 				Anime{
 					IDMal:       12345,
 					IDAnilist:   67890,
-					TitleEN:     "Test Anime",
+					TitleEN:     testTitleAnime,
 					Status:      StatusWatching,
 					Score:       8,
 					Progress:    10,
@@ -118,7 +118,7 @@ func TestUpdater_Update(t *testing.T) {
 				Anime{
 					IDMal:       12345,
 					IDAnilist:   67890,
-					TitleEN:     "Test Anime",
+					TitleEN:     testTitleAnime,
 					Status:      "",
 					Score:       8,
 					Progress:    10,
@@ -137,7 +137,7 @@ func TestUpdater_Update(t *testing.T) {
 				Anime{
 					IDMal:       12345,
 					IDAnilist:   67890,
-					TitleEN:     "Test Anime",
+					TitleEN:     testTitleAnime,
 					Status:      StatusWatching,
 					Score:       8,
 					Progress:    10,
@@ -228,7 +228,7 @@ func TestUpdater_updateTarget(t *testing.T) {
 			name: "successful update",
 			src: Anime{
 				IDMal:    12345,
-				TitleEN:  "Test Anime",
+				TitleEN:  testTitleAnime,
 				Status:   StatusWatching,
 				Score:    8,
 				Progress: 10,
@@ -242,7 +242,7 @@ func TestUpdater_updateTarget(t *testing.T) {
 			name: "service update error",
 			src: Anime{
 				IDMal:    12345,
-				TitleEN:  "Test Anime",
+				TitleEN:  testTitleAnime,
 				Status:   StatusWatching,
 				Score:    8,
 				Progress: 10,
@@ -306,7 +306,7 @@ func TestUpdater_updateSourceByTargets(t *testing.T) {
 			name: "force sync with different progress",
 			src: Anime{
 				IDMal:       12345,
-				TitleEN:     "Test Anime",
+				TitleEN:     testTitleAnime,
 				Status:      StatusWatching,
 				Score:       8,
 				Progress:    10,
@@ -315,7 +315,7 @@ func TestUpdater_updateSourceByTargets(t *testing.T) {
 			targets: map[TargetID]Target{
 				12345: Anime{
 					IDMal:       12345,
-					TitleEN:     "Test Anime",
+					TitleEN:     testTitleAnime,
 					Status:      StatusCompleted,
 					Score:       9,
 					Progress:    12,
@@ -330,7 +330,7 @@ func TestUpdater_updateSourceByTargets(t *testing.T) {
 			name: "dry run - update without service call",
 			src: Anime{
 				IDMal:       12345,
-				TitleEN:     "Test Anime",
+				TitleEN:     testTitleAnime,
 				Status:      StatusWatching,
 				Score:       8,
 				Progress:    10,
@@ -339,7 +339,7 @@ func TestUpdater_updateSourceByTargets(t *testing.T) {
 			targets: map[TargetID]Target{
 				12345: Anime{
 					IDMal:       12345,
-					TitleEN:     "Test Anime",
+					TitleEN:     testTitleAnime,
 					Status:      StatusCompleted,
 					Score:       9,
 					Progress:    12,
@@ -415,7 +415,7 @@ func TestUpdater_DryRunRecordsInDryRunItems(t *testing.T) {
 
 	src := Anime{
 		IDMal:       12345,
-		TitleEN:     "Test Anime",
+		TitleEN:     testTitleAnime,
 		Status:      StatusWatching,
 		Score:       8,
 		Progress:    10,
@@ -452,13 +452,13 @@ func TestDeduplicateMappings_NoDuplicates(t *testing.T) {
 		{
 			src:          Anime{IDMal: 1, TitleEN: "Anime A", Status: StatusWatching},
 			target:       Anime{IDMal: 100, TitleEN: "Target A"},
-			strategyName: "IDStrategy",
+			strategyName: StrategyNameID,
 			strategyIdx:  0,
 		},
 		{
 			src:          Anime{IDMal: 2, TitleEN: "Anime B", Status: StatusWatching},
 			target:       Anime{IDMal: 200, TitleEN: "Target B"},
-			strategyName: "IDStrategy",
+			strategyName: StrategyNameID,
 			strategyIdx:  0,
 		},
 	}
@@ -495,7 +495,7 @@ func TestDeduplicateMappings_KeepsHigherPriority(t *testing.T) {
 		{
 			src:          Anime{IDMal: 2, TitleEN: "Anime B (ID)", Status: StatusWatching},
 			target:       sharedTarget,
-			strategyName: "IDStrategy",
+			strategyName: StrategyNameID,
 			strategyIdx:  0, // higher priority
 		},
 	}
@@ -510,7 +510,7 @@ func TestDeduplicateMappings_KeepsHigherPriority(t *testing.T) {
 	}
 
 	// Winner should be the one with IDStrategy (idx=0)
-	if kept[0].strategyName != "IDStrategy" {
+	if kept[0].strategyName != StrategyNameID {
 		t.Errorf("Expected winner to use IDStrategy, got %s", kept[0].strategyName)
 	}
 	if kept[0].src.GetTitle() != "Anime B (ID)" {
@@ -521,7 +521,7 @@ func TestDeduplicateMappings_KeepsHigherPriority(t *testing.T) {
 	if conflicts[0].loserSrc.GetTitle() != "Anime A (API)" {
 		t.Errorf("Expected loser title 'Anime A (API)', got %s", conflicts[0].loserSrc.GetTitle())
 	}
-	if conflicts[0].winnerStrat != "IDStrategy" {
+	if conflicts[0].winnerStrat != StrategyNameID {
 		t.Errorf("Expected winner strategy IDStrategy, got %s", conflicts[0].winnerStrat)
 	}
 }
@@ -601,7 +601,7 @@ func TestUpdate_DuplicateTargetDetection(t *testing.T) {
 		StrategyChain: chain,
 		Service:       mockService,
 		DryRun:        true, // dry run to avoid needing Update mock
-		MediaType:     "manga",
+		MediaType:     string(mediaTypeManga),
 	}
 
 	report := NewSyncReport()
