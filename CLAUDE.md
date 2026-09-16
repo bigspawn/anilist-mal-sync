@@ -183,6 +183,10 @@ kept in sync by hand" trap above no longer applies. Adding one of these sources 
 3. a strategy, wired into `loadIDMappingStrategies` and the relevant chain(s) in `app.go`
 4. a row in `README.md`'s flag table and env var list, and a commented line in
    `docker-compose.example.yaml`
+5. a section in both YAML examples — README's `config.yaml` block and `config.example.yaml` —
+   plus the source in README's strategy chains with the right "enabled/disabled by default"
+
+`docs_test.go` checks steps 4 and 5 against `mappingSources()`.
 
 Offline database is not in this table: it has its own config shape (`AutoUpdate`,
 `ForceRefresh`) and no base-URL flag, so it stays wired the generic way above.
