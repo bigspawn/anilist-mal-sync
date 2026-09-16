@@ -292,32 +292,32 @@ func TestManga_GetStatusString(t *testing.T) {
 		{
 			name:   "reading",
 			status: MangaStatusReading,
-			want:   "reading",
+			want:   string(MangaStatusReading),
 		},
 		{
 			name:   "completed",
 			status: MangaStatusCompleted,
-			want:   "completed",
+			want:   string(MangaStatusCompleted),
 		},
 		{
 			name:   "on_hold",
 			status: MangaStatusOnHold,
-			want:   "on_hold",
+			want:   string(MangaStatusOnHold),
 		},
 		{
 			name:   "dropped",
 			status: MangaStatusDropped,
-			want:   "dropped",
+			want:   string(MangaStatusDropped),
 		},
 		{
 			name:   "plan_to_read",
 			status: MangaStatusPlanToRead,
-			want:   "plan_to_read",
+			want:   string(MangaStatusPlanToRead),
 		},
 		{
 			name:   "unknown",
 			status: MangaStatusUnknown,
-			want:   "unknown",
+			want:   string(MangaStatusUnknown),
 		},
 	}
 
@@ -456,10 +456,10 @@ func TestManga_SameTitleWithTarget(t *testing.T) {
 		{
 			name: "exact English title match",
 			source: Manga{
-				TitleEN: "Test Manga",
+				TitleEN: testTitleManga,
 			},
 			target: Manga{
-				TitleEN: "Test Manga",
+				TitleEN: testTitleManga,
 			},
 			want: true,
 		},
@@ -476,10 +476,10 @@ func TestManga_SameTitleWithTarget(t *testing.T) {
 		{
 			name: "exact Romaji title match",
 			source: Manga{
-				TitleRomaji: "Test Manga",
+				TitleRomaji: testTitleManga,
 			},
 			target: Manga{
-				TitleRomaji: "Test Manga",
+				TitleRomaji: testTitleManga,
 			},
 			want: true,
 		},
@@ -496,10 +496,10 @@ func TestManga_SameTitleWithTarget(t *testing.T) {
 		{
 			name: "target is not Manga",
 			source: Manga{
-				TitleEN: "Test Manga",
+				TitleEN: testTitleManga,
 			},
 			target: Anime{
-				TitleEN: "Test Manga",
+				TitleEN: testTitleManga,
 			},
 			want: false,
 		},
@@ -579,7 +579,7 @@ func TestManga_String(t *testing.T) {
 			manga: Manga{
 				IDAnilist:       12345,
 				IDMal:           67890,
-				TitleEN:         "Test Manga",
+				TitleEN:         testTitleManga,
 				TitleJP:         "テストマンガ",
 				Status:          MangaStatusReading,
 				Score:           8,

@@ -22,6 +22,7 @@ type App struct {
 	anilistScoreFormat verniy.ScoreFormat
 	hatoClient         *HatoClient
 	jikanClient        *JikanClient
+	cacheClients       []cacheSaver // clients whose cache is saved after each sync
 	mappings           *MappingsConfig
 	favSync            *FavoritesSync
 	reverse            bool // true for MAL→AniList direction
@@ -84,7 +85,7 @@ func NewApp(ctx context.Context, config Config, reverse bool) (*App, error) {
 	// Determine if anime synchronization will be performed.
 	// Offline database and ARM API are only needed for anime, not for manga.
 	needsAnime := !(*mangaSync) || *allSync
-	offlineStrategy, hatoStrategy, hatoClient, armStrategy, jikanStrategy, jikanClient := loadIDMappingStrategies(ctx, config, needsAnime)
+	idStrategies := loadIDMappingStrategies(ctx, config, needsAnime)
 
 	// Load user mappings
 	mappings, err := LoadMappings(config.MappingsFilePath)
@@ -120,92 +121,58 @@ func NewApp(ctx context.Context, config Config, reverse bool) (*App, error) {
 	reverseManualStrategy := ManualMappingStrategy{Mappings: mappings, Reverse: true}
 
 	animeUpdater := &Updater{
-		Prefix:       "AniList to MAL Anime",
-		Service:      malAnimeService,
-		Statistics:   NewStatistics(),
-		IgnoreTitles: defaultIgnoreTitles,
-		IgnoreIDs:    ignoreAniListIDs,
-		ForceSync:    *forceSync,
-		DryRun:       *dryRun,
-		Reverse:      false,
-		MediaType:    mediaTypeAnime,
-		StrategyChain: NewStrategyChain(
-			manualStrategy,
-			IDStrategy{},
-			offlineStrategy,
-			hatoStrategy,
-			armStrategy,
-			TitleStrategy{},
-			APISearchStrategy{Service: malAnimeService},
-		),
+		Prefix:        "AniList to MAL Anime",
+		Service:       malAnimeService,
+		Statistics:    NewStatistics(),
+		IgnoreTitles:  defaultIgnoreTitles,
+		IgnoreIDs:     ignoreAniListIDs,
+		ForceSync:     *forceSync,
+		DryRun:        *dryRun,
+		Reverse:       false,
+		MediaType:     mediaTypeAnime,
+		StrategyChain: buildForwardAnimeChain(manualStrategy, idStrategies, malAnimeService),
 	}
 
 	mangaUpdater := &Updater{
-		Prefix:       "AniList to MAL Manga",
-		Service:      malMangaService,
-		Statistics:   NewStatistics(),
-		IgnoreTitles: map[string]struct{}{},
-		IgnoreIDs:    ignoreAniListIDs,
-		ForceSync:    *forceSync,
-		DryRun:       *dryRun,
-		Reverse:      false,
-		MediaType:    mediaTypeManga,
-		StrategyChain: NewStrategyChain(
-			manualStrategy,
-			IDStrategy{},
-			hatoStrategy,
-			TitleStrategy{},
-			jikanStrategy,
-			APISearchStrategy{Service: malMangaService},
-		),
+		Prefix:        "AniList to MAL Manga",
+		Service:       malMangaService,
+		Statistics:    NewStatistics(),
+		IgnoreTitles:  map[string]struct{}{},
+		IgnoreIDs:     ignoreAniListIDs,
+		ForceSync:     *forceSync,
+		DryRun:        *dryRun,
+		Reverse:       false,
+		MediaType:     mediaTypeManga,
+		StrategyChain: buildForwardMangaChain(manualStrategy, idStrategies, malMangaService),
 	}
 
 	reverseAnimeUpdater := &Updater{
-		Prefix:       "MAL to AniList Anime",
-		Service:      anilistAnimeService,
-		Statistics:   NewStatistics(),
-		IgnoreTitles: map[string]struct{}{},
-		IgnoreIDs:    ignoreMALIDs,
-		ForceSync:    *forceSync,
-		DryRun:       *dryRun,
-		Reverse:      true,
-		MediaType:    mediaTypeAnime,
-		StrategyChain: NewStrategyChain(
-			reverseManualStrategy,
-			IDStrategy{},
-			offlineStrategy,
-			hatoStrategy,
-			armStrategy,
-			TitleStrategy{},
-			MALIDStrategy{Service: anilistAnimeService},
-			APISearchStrategy{Service: anilistAnimeService},
-		),
+		Prefix:        "MAL to AniList Anime",
+		Service:       anilistAnimeService,
+		Statistics:    NewStatistics(),
+		IgnoreTitles:  map[string]struct{}{},
+		IgnoreIDs:     ignoreMALIDs,
+		ForceSync:     *forceSync,
+		DryRun:        *dryRun,
+		Reverse:       true,
+		MediaType:     mediaTypeAnime,
+		StrategyChain: buildReverseAnimeChain(reverseManualStrategy, idStrategies, anilistAnimeService),
 	}
 
 	reverseMangaUpdater := &Updater{
-		Prefix:       "MAL to AniList Manga",
-		Service:      anilistMangaService,
-		Statistics:   NewStatistics(),
-		IgnoreTitles: map[string]struct{}{},
-		IgnoreIDs:    ignoreMALIDs,
-		ForceSync:    *forceSync,
-		DryRun:       *dryRun,
-		Reverse:      true,
-		MediaType:    mediaTypeManga,
-		StrategyChain: NewStrategyChain(
-			reverseManualStrategy,
-			IDStrategy{},
-			hatoStrategy,
-			TitleStrategy{},
-			jikanStrategy,
-			MALIDStrategy{Service: anilistMangaService},
-			APISearchStrategy{Service: anilistMangaService},
-		),
+		Prefix:        "MAL to AniList Manga",
+		Service:       anilistMangaService,
+		Statistics:    NewStatistics(),
+		IgnoreTitles:  map[string]struct{}{},
+		IgnoreIDs:     ignoreMALIDs,
+		ForceSync:     *forceSync,
+		DryRun:        *dryRun,
+		Reverse:       true,
+		MediaType:     mediaTypeManga,
+		StrategyChain: buildReverseMangaChain(reverseManualStrategy, idStrategies, anilistMangaService),
 	}
 
 	LogInfoSuccess(ctx, "Initialization complete")
-
-	// hatoClient is already created by loadIDMappingStrategies() and will be used for both strategies and cache saving
 
 	// Create favorites sync if enabled
 	var favSync *FavoritesSync
@@ -219,10 +186,11 @@ func NewApp(ctx context.Context, config Config, reverse bool) (*App, error) {
 		mal:                 malClient,
 		anilist:             anilistClient,
 		anilistScoreFormat:  scoreFormat,
-		hatoClient:          hatoClient,
-		jikanClient:         jikanClient,
+		hatoClient:          idStrategies.hatoClient,
+		jikanClient:         idStrategies.jikanClient,
+		cacheClients:        idStrategies.cacheClients,
 		mappings:            mappings,
-		offlineStrategy:     offlineStrategy,
+		offlineStrategy:     idStrategies.offline,
 		favSync:             favSync,
 		reverse:             reverse,
 		mangaSync:           *mangaSync,
@@ -235,17 +203,104 @@ func NewApp(ctx context.Context, config Config, reverse bool) (*App, error) {
 	}, nil
 }
 
+// cacheSaver is implemented by clients backed by a persistent lookup cache
+// that must be flushed to disk after a sync.
+type cacheSaver interface {
+	SaveCache(ctx context.Context) error
+}
+
+// idMappingStrategies groups the ID-mapping strategies and the clients that
+// own them, so loadIDMappingStrategies stays a single return value as more
+// sources are added.
+type idMappingStrategies struct {
+	offline   *OfflineDatabaseStrategy
+	hato      HatoAPIStrategy
+	arm       ARMAPIStrategy
+	mangaBaka MangaBakaStrategy
+	jikan     JikanAPIStrategy
+
+	hatoClient      *HatoClient
+	mangaBakaClient *MangaBakaClient
+	jikanClient     *JikanClient
+
+	// cacheClients holds only the enabled clients; a disabled source (nil
+	// client) is simply absent, so saving caches needs no nil checks.
+	cacheClients []cacheSaver
+}
+
+// buildForwardAnimeChain composes the AniList→MAL anime chain. Anime keeps the
+// offline database and ARM; MangaBaka is manga-only and has no place here.
+func buildForwardAnimeChain(
+	manualStrategy ManualMappingStrategy, idStrategies idMappingStrategies, service MediaService,
+) *StrategyChain {
+	return NewStrategyChain(
+		manualStrategy,
+		IDStrategy{},
+		idStrategies.offline,
+		idStrategies.hato,
+		idStrategies.arm,
+		TitleStrategy{},
+		APISearchStrategy{Service: service},
+	)
+}
+
+// buildForwardMangaChain composes the AniList→MAL manga chain. MangaBaka sits
+// directly after Hato: a curated source first, then the broader aggregate.
+func buildForwardMangaChain(
+	manualStrategy ManualMappingStrategy, idStrategies idMappingStrategies, service MediaService,
+) *StrategyChain {
+	return NewStrategyChain(
+		manualStrategy,
+		IDStrategy{},
+		idStrategies.hato,
+		idStrategies.mangaBaka,
+		TitleStrategy{},
+		idStrategies.jikan,
+		APISearchStrategy{Service: service},
+	)
+}
+
+// buildReverseAnimeChain composes the MAL→AniList anime chain, mirroring
+// buildForwardAnimeChain with the MAL-ID fallback the reverse direction needs.
+func buildReverseAnimeChain(
+	manualStrategy ManualMappingStrategy, idStrategies idMappingStrategies, service MediaServiceWithMALID,
+) *StrategyChain {
+	return NewStrategyChain(
+		manualStrategy,
+		IDStrategy{},
+		idStrategies.offline,
+		idStrategies.hato,
+		idStrategies.arm,
+		TitleStrategy{},
+		MALIDStrategy{Service: service},
+		APISearchStrategy{Service: service},
+	)
+}
+
+// buildReverseMangaChain composes the MAL→AniList manga chain, mirroring
+// buildForwardMangaChain with the MAL-ID fallback the reverse direction needs.
+func buildReverseMangaChain(
+	manualStrategy ManualMappingStrategy, idStrategies idMappingStrategies, service MediaServiceWithMALID,
+) *StrategyChain {
+	return NewStrategyChain(
+		manualStrategy,
+		IDStrategy{},
+		idStrategies.hato,
+		idStrategies.mangaBaka,
+		TitleStrategy{},
+		idStrategies.jikan,
+		MALIDStrategy{Service: service},
+		APISearchStrategy{Service: service},
+	)
+}
+
 // loadIDMappingStrategies loads ID mapping resources (offline database and ARM API).
 // These resources are only used for anime synchronization, not for manga.
 // Strategies with nil Database/Client are no-ops (return nil, false, nil).
 //
 // Parameters:
 //   - needsAnime: if false, offline DB and ARM API will not be loaded
-func loadIDMappingStrategies(
-	ctx context.Context,
-	config Config,
-	needsAnime bool,
-) (*OfflineDatabaseStrategy, HatoAPIStrategy, *HatoClient, ARMAPIStrategy, JikanAPIStrategy, *JikanClient) {
+func loadIDMappingStrategies(ctx context.Context, config Config, needsAnime bool) idMappingStrategies {
 	var offlineDB *OfflineDatabase
 	// Only load offline database for anime synchronization
 	if needsAnime && config.OfflineDatabase.Enabled {
@@ -278,25 +333,61 @@ func loadIDMappingStrategies(
 		LogInfoSuccess(ctx, "ARM API enabled (%s)", config.ARMAPI.BaseURL)
 	}
 
+	var mangaBakaClient *MangaBakaClient
+	if config.MangaBakaAPI.Enabled {
+		mangaBakaClient = NewMangaBakaClient(
+			ctx,
+			config.MangaBakaAPI.BaseURL,
+			config.GetHTTPTimeout(),
+			config.MangaBakaAPI.CacheDir,
+			config.MangaBakaAPI.CacheMaxAge,
+		)
+		LogInfoSuccess(ctx, "MangaBaka API enabled (%s)", config.MangaBakaAPI.BaseURL)
+	}
+
 	var jikanClient *JikanClient
 	if config.JikanAPI.Enabled {
 		jikanClient = NewJikanClient(ctx, config.JikanAPI.CacheDir, config.JikanAPI.CacheMaxAge)
 		LogInfoSuccess(ctx, "Jikan API enabled (manga ID mapping)")
 	}
 
-	return &OfflineDatabaseStrategy{Database: offlineDB},
-		HatoAPIStrategy{Client: hatoClient},
-		hatoClient,
-		ARMAPIStrategy{Client: armClient},
-		JikanAPIStrategy{Client: jikanClient},
-		jikanClient
+	strategies := idMappingStrategies{
+		offline:         &OfflineDatabaseStrategy{Database: offlineDB},
+		hato:            HatoAPIStrategy{Client: hatoClient},
+		arm:             ARMAPIStrategy{Client: armClient},
+		mangaBaka:       MangaBakaStrategy{Client: mangaBakaClient},
+		jikan:           JikanAPIStrategy{Client: jikanClient},
+		hatoClient:      hatoClient,
+		mangaBakaClient: mangaBakaClient,
+		jikanClient:     jikanClient,
+	}
+	strategies.cacheClients = appendCacheSaver(strategies.cacheClients, hatoClient)
+	strategies.cacheClients = appendCacheSaver(strategies.cacheClients, mangaBakaClient)
+	strategies.cacheClients = appendCacheSaver(strategies.cacheClients, jikanClient)
+
+	return strategies
+}
+
+// appendCacheSaver appends client to clients unless it is still the nil
+// pointer a disabled source leaves it as. T is constrained to comparable so
+// disabled (nil) clients can be told apart from constructed ones directly.
+func appendCacheSaver[T interface {
+	cacheSaver
+	comparable
+}](clients []cacheSaver, client T) []cacheSaver {
+	var disabled T
+	if client == disabled {
+		return clients
+	}
+	return append(clients, client)
 }
 
 // Refresh resets per-run state and optionally reloads the offline database.
 // Call before each Run() in watch mode to prevent state accumulation between cycles.
 func (a *App) Refresh(ctx context.Context) {
 	if a.config.OfflineDatabase.Enabled && a.config.OfflineDatabase.AutoUpdate {
-		if db, err := LoadOfflineDatabase(ctx, a.config.OfflineDatabase); err != nil {
+		db, err := LoadOfflineDatabase(ctx, a.config.OfflineDatabase)
+		if err != nil {
 			LogWarn(ctx, "Failed to refresh offline database: %v", err)
 		} else {
 			a.offlineStrategy.Database = db
@@ -385,6 +476,17 @@ func (a *App) saveUnmappedState(ctx context.Context, updaters []*Updater) {
 	}
 }
 
+// saveCaches persists every ID-mapping cache with unsaved changes.
+// Disabled sources are absent from cacheClients, so no nil checks are needed here.
+func (a *App) saveCaches(ctx context.Context) {
+	for _, c := range a.cacheClients {
+		err := c.SaveCache(ctx)
+		if err != nil {
+			LogWarn(ctx, "Failed to save cache: %v", err)
+		}
+	}
+}
+
 func (a *App) runNormalSync(ctx context.Context) error {
 	if a.mangaSync || a.allSync {
 		err := a.syncManga(ctx)
@@ -393,28 +495,14 @@ func (a *App) runNormalSync(ctx context.Context) error {
 		}
 	}
 
-	if !(a.mangaSync) || a.allSync {
+	if !a.mangaSync || a.allSync {
 		err := a.syncAnime(ctx)
 		if err != nil {
 			return fmt.Errorf("error syncing anime: %w", err)
 		}
 	}
 
-	// Save Hato cache if enabled
-	if a.hatoClient != nil {
-		err := a.hatoClient.SaveCache(ctx)
-		if err != nil {
-			LogWarn(ctx, "Failed to save Hato cache: %v", err)
-		}
-	}
-
-	// Save Jikan cache if enabled
-	if a.jikanClient != nil {
-		err := a.jikanClient.SaveCache(ctx)
-		if err != nil {
-			LogWarn(ctx, "Failed to save Jikan cache: %v", err)
-		}
-	}
+	a.saveCaches(ctx)
 
 	return nil
 }
@@ -427,28 +515,14 @@ func (a *App) runReverseSync(ctx context.Context) error {
 		}
 	}
 
-	if !(a.mangaSync) || a.allSync {
+	if !a.mangaSync || a.allSync {
 		err := a.reverseSyncAnime(ctx)
 		if err != nil {
 			return fmt.Errorf("error reverse syncing anime: %w", err)
 		}
 	}
 
-	// Save Hato cache if enabled
-	if a.hatoClient != nil {
-		err := a.hatoClient.SaveCache(ctx)
-		if err != nil {
-			LogWarn(ctx, "Failed to save Hato cache: %v", err)
-		}
-	}
-
-	// Save Jikan cache if enabled
-	if a.jikanClient != nil {
-		err := a.jikanClient.SaveCache(ctx)
-		if err != nil {
-			LogWarn(ctx, "Failed to save Jikan cache: %v", err)
-		}
-	}
+	a.saveCaches(ctx)
 
 	return nil
 }

@@ -4,6 +4,14 @@ run:
   timeout: 5m
   modules-download-mode: readonly
 
+# Both default to a nonzero cap (max-issues-per-linter: 50, max-same-issues: 3)
+# that silently truncates output — a "full run" can read far fewer issues than
+# actually exist, and the truncated count can stay flat while real debt is
+# being paid down. Disable both so every run reports the true total.
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
 linters:
   disable:
     - godox
@@ -84,6 +92,12 @@ linters:
           - gocyclo
           - cyclop
           - nestif
+          - goconst
+      # Exclude G101 (hardcoded credentials) from test files only
+      - path: "_test\\.go"
+        linters:
+          - gosec
+        text: "G101"
   settings:
     lll:
       line-length: 140

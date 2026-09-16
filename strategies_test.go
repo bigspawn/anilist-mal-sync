@@ -16,14 +16,14 @@ func TestIDStrategy_FindsExistingTarget(t *testing.T) {
 
 	source := Anime{
 		IDMal:       123,
-		TitleEN:     "Test Anime",
+		TitleEN:     testTitleAnime,
 		NumEpisodes: 12,
 	}
 
 	existingTargets := map[TargetID]Target{
 		123: Anime{
 			IDMal:       123,
-			TitleEN:     "Test Anime",
+			TitleEN:     testTitleAnime,
 			NumEpisodes: 12,
 		},
 	}
@@ -126,12 +126,12 @@ func TestTitleStrategy_ShouldRejectMismatchedMALIDs(t *testing.T) {
 			name: "Same MAL ID should match",
 			source: Anime{
 				IDMal:       12345,
-				TitleEN:     "Test Anime",
+				TitleEN:     testTitleAnime,
 				NumEpisodes: 12,
 			},
 			existingTarget: Anime{
 				IDMal:       12345,
-				TitleEN:     "Test Anime",
+				TitleEN:     testTitleAnime,
 				NumEpisodes: 12,
 			},
 			shouldMatch: true, // Should match - same MAL ID
@@ -141,12 +141,12 @@ func TestTitleStrategy_ShouldRejectMismatchedMALIDs(t *testing.T) {
 			name: "Source without MAL ID can match by title",
 			source: Anime{
 				IDMal:       0, // No MAL ID
-				TitleEN:     "Test Anime",
+				TitleEN:     testTitleAnime,
 				NumEpisodes: 12,
 			},
 			existingTarget: Anime{
 				IDMal:       12345,
-				TitleEN:     "Test Anime",
+				TitleEN:     testTitleAnime,
 				NumEpisodes: 12,
 			},
 			shouldMatch: true, // Can match - source has no MAL ID
@@ -213,12 +213,12 @@ func TestTitleStrategy_ShouldRejectLargeEpisodeCountDifference(t *testing.T) {
 			name: "12 episodes vs 13 episodes - should accept",
 			source: Anime{
 				IDMal:       0,
-				TitleEN:     "Test Anime",
+				TitleEN:     testTitleAnime,
 				NumEpisodes: 12,
 			},
 			existingTarget: Anime{
 				IDMal:       12345,
-				TitleEN:     "Test Anime",
+				TitleEN:     testTitleAnime,
 				NumEpisodes: 13,
 			},
 			shouldMatch: true,
@@ -472,7 +472,7 @@ func TestMALIDStrategy_SkipsZeroMALID(t *testing.T) {
 	source := Anime{
 		IDMal:       0, // No MAL ID
 		IDAnilist:   0,
-		TitleEN:     "Test Anime",
+		TitleEN:     testTitleAnime,
 		NumEpisodes: 12,
 		isReverse:   true,
 	}
@@ -510,7 +510,7 @@ func TestMALIDStrategy_ContextCancellation(t *testing.T) {
 	source := Anime{
 		IDMal:       12345,
 		IDAnilist:   0,
-		TitleEN:     "Test Anime",
+		TitleEN:     testTitleAnime,
 		NumEpisodes: 12,
 		isReverse:   true,
 	}
@@ -579,7 +579,7 @@ func TestAnime_GetSourceID(t *testing.T) {
 	base := Anime{
 		IDMal:     12345,
 		IDAnilist: 67890,
-		TitleEN:   "Test Anime",
+		TitleEN:   testTitleAnime,
 	}
 
 	// Normal sync (isReverse=false): source is AniList, so source ID is IDAnilist
@@ -604,7 +604,7 @@ func TestManga_GetSourceID(t *testing.T) {
 	base := Manga{
 		IDMal:     11111,
 		IDAnilist: 22222,
-		TitleEN:   "Test Manga",
+		TitleEN:   testTitleManga,
 	}
 
 	// Normal sync (isReverse=false): source is AniList, so source ID is IDAnilist
@@ -673,13 +673,13 @@ func TestAPISearchStrategy_FindTarget(t *testing.T) {
 			name: "find by ID in user list",
 			source: Anime{
 				IDMal:       12345,
-				TitleEN:     "Test Anime",
+				TitleEN:     testTitleAnime,
 				NumEpisodes: 12,
 			},
 			existingTargets: map[TargetID]Target{
 				12345: Anime{
 					IDMal:       12345,
-					TitleEN:     "Test Anime",
+					TitleEN:     testTitleAnime,
 					NumEpisodes: 12,
 					Status:      StatusCompleted,
 				},
@@ -687,7 +687,7 @@ func TestAPISearchStrategy_FindTarget(t *testing.T) {
 			setupMock: func(m *MockMediaService) {
 				apiTarget := Anime{
 					IDMal:       12345,
-					TitleEN:     "Test Anime",
+					TitleEN:     testTitleAnime,
 					NumEpisodes: 12,
 				}
 				m.EXPECT().GetByID(gomock.Any(), TargetID(12345), "[Test]").Return(apiTarget, nil)
@@ -699,7 +699,7 @@ func TestAPISearchStrategy_FindTarget(t *testing.T) {
 			name: "find by name search",
 			source: Anime{
 				IDMal:       0, // No ID
-				TitleEN:     "Test Anime",
+				TitleEN:     testTitleAnime,
 				NumEpisodes: 12,
 			},
 			existingTargets: map[TargetID]Target{},
@@ -707,11 +707,11 @@ func TestAPISearchStrategy_FindTarget(t *testing.T) {
 				searchResults := []Target{
 					Anime{
 						IDMal:       12345,
-						TitleEN:     "Test Anime",
+						TitleEN:     testTitleAnime,
 						NumEpisodes: 12,
 					},
 				}
-				m.EXPECT().GetByName(gomock.Any(), "Test Anime", "[Test]").Return(searchResults, nil)
+				m.EXPECT().GetByName(gomock.Any(), testTitleAnime, "[Test]").Return(searchResults, nil)
 			},
 			expectFound: true,
 			expectError: false,
@@ -720,7 +720,7 @@ func TestAPISearchStrategy_FindTarget(t *testing.T) {
 			name: "API returns error",
 			source: Anime{
 				IDMal:       12345,
-				TitleEN:     "Test Anime",
+				TitleEN:     testTitleAnime,
 				NumEpisodes: 12,
 			},
 			existingTargets: map[TargetID]Target{},
@@ -748,7 +748,7 @@ func TestAPISearchStrategy_FindTarget(t *testing.T) {
 			name: "context cancelled",
 			source: Anime{
 				IDMal:       12345,
-				TitleEN:     "Test Anime",
+				TitleEN:     testTitleAnime,
 				NumEpisodes: 12,
 			},
 			existingTargets: map[TargetID]Target{},
@@ -810,7 +810,7 @@ func TestAPISearchStrategy_FindTarget_SameTypeMatch(t *testing.T) {
 
 	source := Anime{
 		IDMal:       0,
-		TitleEN:     "Test Anime",
+		TitleEN:     testTitleAnime,
 		NumEpisodes: 12,
 	}
 
@@ -821,11 +821,11 @@ func TestAPISearchStrategy_FindTarget_SameTypeMatch(t *testing.T) {
 	// Return search results that match by type
 	searchResult := Anime{
 		IDMal:       12345,
-		TitleEN:     "Test Anime",
+		TitleEN:     testTitleAnime,
 		NumEpisodes: 12,
 		Status:      StatusWatching,
 	}
-	mockService.EXPECT().GetByName(ctx, "Test Anime", "[Test]").Return([]Target{searchResult}, nil)
+	mockService.EXPECT().GetByName(ctx, testTitleAnime, "[Test]").Return([]Target{searchResult}, nil)
 
 	strategy := APISearchStrategy{Service: mockService}
 	report := NewSyncReport()
@@ -852,7 +852,7 @@ func TestAPISearchStrategy_FindTarget_IgnoresTypeMismatch(t *testing.T) {
 
 	source := Anime{
 		IDMal:       0,
-		TitleEN:     "Test Anime",
+		TitleEN:     testTitleAnime,
 		NumEpisodes: 12,
 	}
 
@@ -863,10 +863,10 @@ func TestAPISearchStrategy_FindTarget_IgnoresTypeMismatch(t *testing.T) {
 	// Return search results with type mismatch (Manga instead of Anime)
 	searchResult := Manga{
 		IDMal:    12345,
-		TitleEN:  "Test Anime",
+		TitleEN:  testTitleAnime,
 		Chapters: 50,
 	}
-	mockService.EXPECT().GetByName(ctx, "Test Anime", "[Test]").Return([]Target{searchResult}, nil)
+	mockService.EXPECT().GetByName(ctx, testTitleAnime, "[Test]").Return([]Target{searchResult}, nil)
 
 	strategy := APISearchStrategy{Service: mockService}
 	report := NewSyncReport()
@@ -919,7 +919,7 @@ func TestManualMappingStrategy_FindsAnimeTarget(t *testing.T) {
 	// Forward sync: Reverse=false
 	strategy := ManualMappingStrategy{Mappings: mappings, Reverse: false}
 
-	source := Anime{IDAnilist: 100, IDMal: 0, TitleEN: "Test Anime"}
+	source := Anime{IDAnilist: 100, IDMal: 0, TitleEN: testTitleAnime}
 	existingTargets := map[TargetID]Target{
 		200: Anime{IDMal: 200, TitleEN: "Test Anime MAL"},
 	}
@@ -946,7 +946,7 @@ func TestManualMappingStrategy_FindsMangaTarget(t *testing.T) {
 	// Forward sync: Reverse=false
 	strategy := ManualMappingStrategy{Mappings: mappings, Reverse: false}
 
-	source := Manga{IDAnilist: 300, IDMal: 0, TitleEN: "Test Manga"}
+	source := Manga{IDAnilist: 300, IDMal: 0, TitleEN: testTitleManga}
 	existingTargets := map[TargetID]Target{
 		400: Manga{IDMal: 400, TitleEN: "Test Manga MAL"},
 	}
@@ -998,7 +998,7 @@ func TestManualMappingStrategy_NoMapping(t *testing.T) {
 
 	source := Anime{IDAnilist: 999, IDMal: 0, TitleEN: "Other Anime"}
 	existingTargets := map[TargetID]Target{
-		200: Anime{IDMal: 200, TitleEN: "Test Anime MAL"},
+		200: Anime{IDMal: 200, TitleEN: testTitleAnime + " MAL"},
 	}
 
 	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]", nil)
@@ -1019,14 +1019,14 @@ func TestFindTargetWithMeta_ReturnsMetadata(t *testing.T) {
 
 	source := Anime{
 		IDMal:       0, // No MAL ID, so IDStrategy won't find it
-		TitleEN:     "Test Anime",
+		TitleEN:     testTitleAnime,
 		NumEpisodes: 12,
 	}
 
 	existingTargets := map[TargetID]Target{
 		12345: Anime{
 			IDMal:       12345,
-			TitleEN:     "Test Anime",
+			TitleEN:     testTitleAnime,
 			NumEpisodes: 12,
 		},
 	}
@@ -1064,14 +1064,14 @@ func TestFindTargetWithMeta_FirstStrategy(t *testing.T) {
 
 	source := Anime{
 		IDMal:       12345,
-		TitleEN:     "Test Anime",
+		TitleEN:     testTitleAnime,
 		NumEpisodes: 12,
 	}
 
 	existingTargets := map[TargetID]Target{
 		12345: Anime{
 			IDMal:       12345,
-			TitleEN:     "Test Anime",
+			TitleEN:     testTitleAnime,
 			NumEpisodes: 12,
 		},
 	}
@@ -1132,9 +1132,9 @@ func TestManualMappingStrategy_ReverseSync(t *testing.T) {
 	strategy := ManualMappingStrategy{Mappings: mappings, Reverse: true}
 
 	// In reverse sync: source has MAL ID (isReverse=true), target is AniList (isReverse=true)
-	source := Anime{IDMal: 200, IDAnilist: 0, TitleEN: "Test Anime", isReverse: true}
+	source := Anime{IDMal: 200, IDAnilist: 0, TitleEN: testTitleAnime, isReverse: true}
 	existingTargets := map[TargetID]Target{
-		100: Anime{IDAnilist: 100, TitleEN: "Test Anime AniList", isReverse: true},
+		100: Anime{IDAnilist: 100, TitleEN: testTitleAnime + " AniList", isReverse: true},
 	}
 
 	target, found, err := strategy.FindTarget(ctx, source, existingTargets, "[Test]", nil)

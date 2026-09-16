@@ -12,6 +12,16 @@ import (
 	"golang.org/x/oauth2"
 )
 
+// GraphQL request body field names, shared by every mutation this client sends.
+const (
+	graphqlFieldQuery     = "query"
+	graphqlFieldVariables = "variables"
+)
+
+// graphqlVarStatus is the mutation variable name for AniList's list status
+// enum (CURRENT, COMPLETED, ...), shared by the anime and manga update mutations.
+const graphqlVarStatus = "status"
+
 type AnilistClient struct {
 	c           *verniy.Client
 	username    string
@@ -203,10 +213,10 @@ func (c *AnilistClient) UpdateAnimeEntry(
 	`
 
 	variables := map[string]any{
-		"mediaId":  mediaID,
-		"status":   status,
-		"progress": progress,
-		"score":    float64(score),
+		"mediaId":        mediaID,
+		graphqlVarStatus: status,
+		"progress":       progress,
+		"score":          float64(score),
 	}
 
 	if fd := timeToFuzzyDateInput(startedAt); fd != nil {
@@ -217,8 +227,8 @@ func (c *AnilistClient) UpdateAnimeEntry(
 	}
 
 	requestBody := map[string]any{
-		"query":     mutation,
-		"variables": variables,
+		graphqlFieldQuery:     mutation,
+		graphqlFieldVariables: variables,
 	}
 
 	jsonBody, err := json.Marshal(requestBody)
@@ -240,7 +250,8 @@ func (c *AnilistClient) UpdateAnimeEntry(
 
 	// Check for GraphQL errors first
 	var graphqlResp GraphQLResponse
-	if err := json.Unmarshal(responseBody, &graphqlResp); err != nil {
+	err = json.Unmarshal(responseBody, &graphqlResp)
+	if err != nil {
 		return fmt.Errorf(
 			"failed to unmarshal GraphQL response: %w", err,
 		)
@@ -251,7 +262,8 @@ func (c *AnilistClient) UpdateAnimeEntry(
 	}
 
 	var response SaveMediaListEntry
-	if err := json.Unmarshal(responseBody, &response); err != nil {
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
 		return fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 
@@ -303,7 +315,7 @@ func (c *AnilistClient) UpdateMangaEntry(
 
 	variables := map[string]any{
 		"mediaId":         mediaID,
-		"status":          status,
+		graphqlVarStatus:  status,
 		"progress":        progress,
 		"progressVolumes": progressVolumes,
 		"score":           float64(score),
@@ -317,8 +329,8 @@ func (c *AnilistClient) UpdateMangaEntry(
 	}
 
 	requestBody := map[string]any{
-		"query":     mutation,
-		"variables": variables,
+		graphqlFieldQuery:     mutation,
+		graphqlFieldVariables: variables,
 	}
 
 	jsonBody, err := json.Marshal(requestBody)
@@ -337,7 +349,8 @@ func (c *AnilistClient) UpdateMangaEntry(
 
 	// Check for GraphQL errors first
 	var graphqlResp GraphQLResponse
-	if err := json.Unmarshal(responseBody, &graphqlResp); err != nil {
+	err = json.Unmarshal(responseBody, &graphqlResp)
+	if err != nil {
 		return fmt.Errorf("failed to unmarshal GraphQL response: %w", err)
 	}
 
@@ -346,7 +359,8 @@ func (c *AnilistClient) UpdateMangaEntry(
 	}
 
 	var response SaveMediaListEntry
-	if err := json.Unmarshal(responseBody, &response); err != nil {
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
 		return fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 
@@ -390,8 +404,8 @@ func (c *AnilistClient) ToggleFavourite(ctx context.Context, animeID, mangaID in
 	}
 
 	requestBody := map[string]any{
-		"query":     mutation,
-		"variables": variables,
+		graphqlFieldQuery:     mutation,
+		graphqlFieldVariables: variables,
 	}
 
 	jsonBody, err := json.Marshal(requestBody)
@@ -410,7 +424,8 @@ func (c *AnilistClient) ToggleFavourite(ctx context.Context, animeID, mangaID in
 
 	// Check for GraphQL errors
 	var graphqlResp GraphQLResponse
-	if err := json.Unmarshal(responseBody, &graphqlResp); err != nil {
+	err = json.Unmarshal(responseBody, &graphqlResp)
+	if err != nil {
 		return fmt.Errorf("failed to unmarshal GraphQL response: %w", err)
 	}
 

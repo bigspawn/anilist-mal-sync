@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"sync"
 	"time"
 )
 
@@ -18,16 +17,8 @@ const (
 // HatoClient is an HTTP client for the Hato API (https://hato.malupdaterosx.moe).
 // Supports both anime and manga ID mapping with persistent JSON caching.
 type HatoClient struct {
-	baseURL    string
-	httpClient HTTPClient
-	cache      *HatoCache // Persistent cache (can be nil)
-
-	// Hato is a small third-party service that goes down for long stretches.
-	// Once it does, every lookup costs four retries with backoff, so the
-	// client stops asking for the rest of the run.
-	mu            sync.Mutex
-	failureStreak int
-	givenUp       bool
+	apiSource
+	cache *HatoCache // Persistent cache (can be nil)
 }
 
 // HatoResponse represents the response from /api/mappings/{service}/{media_type}/{id}.
@@ -78,11 +69,8 @@ func NewHatoClient(
 	}
 
 	return &HatoClient{
-		baseURL: baseURL,
-		httpClient: NewRetryableClient(&http.Client{
-			Timeout: timeout,
-		}, 3),
-		cache: cache,
+		apiSource: newAPISource("Hato", baseURL, timeout, hatoMaxFailureStreak),
+		cache:     cache,
 	}
 }
 
@@ -100,37 +88,6 @@ func (c *HatoClient) setCachedData(service, mediaType string, id int, data HatoR
 	if c.cache != nil {
 		c.cache.Set(service, mediaType, id, data)
 	}
-}
-
-// gaveUp reports whether the client stopped talking to Hato for this run.
-func (c *HatoClient) gaveUp() bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	return c.givenUp
-}
-
-// noteFailure counts a failed request and stops the client once Hato looks down.
-func (c *HatoClient) noteFailure(ctx context.Context, err error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	c.failureStreak++
-	if c.givenUp || c.failureStreak < hatoMaxFailureStreak {
-		return
-	}
-
-	c.givenUp = true
-	LogWarn(ctx, "Hato API failed %d times in a row (%v), skipping it for the rest of this run",
-		c.failureStreak, err)
-}
-
-// noteSuccess clears the streak — the service answered, whatever the answer was.
-func (c *HatoClient) noteSuccess() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	c.failureStreak = 0
 }
 
 // GetAniListID returns the AniList ID for a given MAL ID and media type.
@@ -260,7 +217,8 @@ func (c *HatoClient) doRequest(ctx context.Context, url string) (*HatoResponse, 
 	}
 
 	var hatoResp HatoResponse
-	if err := json.NewDecoder(resp.Body).Decode(&hatoResp); err != nil {
+	err = json.NewDecoder(resp.Body).Decode(&hatoResp)
+	if err != nil {
 		err = fmt.Errorf("decode response: %w", err)
 		c.noteFailure(ctx, err)
 		return nil, err

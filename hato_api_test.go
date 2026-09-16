@@ -267,16 +267,18 @@ func TestHatoAPIStrategy_FindTarget_Anime(t *testing.T) {
 	logCtx := NewLogger(false).WithContext(ctx)
 
 	t.Run("found in existing targets", func(t *testing.T) {
+		// MAL is the source and AniList the target, so this is a reverse sync.
 		src := Anime{
 			IDMal:     1,
 			IDAnilist: 0,
-			TitleEN:   "Cowboy Bebop",
+			TitleEN:   testTitleCowboyBebop,
+			isReverse: true,
 		}
 
 		targetAnime := Anime{
 			IDAnilist: 1,
 			IDMal:     1,
-			TitleEN:   "Cowboy Bebop",
+			TitleEN:   testTitleCowboyBebop,
 		}
 
 		existingTargets := map[TargetID]Target{
@@ -286,7 +288,7 @@ func TestHatoAPIStrategy_FindTarget_Anime(t *testing.T) {
 		target, found, err := strategy.FindTarget(logCtx, src, existingTargets, "test", nil)
 		assert.NoError(t, err)
 		assert.True(t, found)
-		assert.Equal(t, "Cowboy Bebop", target.GetTitle())
+		assert.Equal(t, testTitleCowboyBebop, target.GetTitle())
 	})
 }
 
@@ -314,16 +316,18 @@ func TestHatoAPIStrategy_FindTarget_Manga(t *testing.T) {
 	logCtx := NewLogger(false).WithContext(ctx)
 
 	t.Run("found in existing targets", func(t *testing.T) {
+		// MAL is the source and AniList the target, so this is a reverse sync.
 		src := Manga{
 			IDMal:     malID,
 			IDAnilist: 0,
-			TitleEN:   "Seishun Buta Yarou",
+			TitleEN:   testTitleSeishunButaYarou,
+			isReverse: true,
 		}
 
 		targetManga := Manga{
 			IDAnilist: anilistID,
 			IDMal:     malID,
-			TitleEN:   "Seishun Buta Yarou",
+			TitleEN:   testTitleSeishunButaYarou,
 		}
 
 		existingTargets := map[TargetID]Target{
@@ -333,7 +337,7 @@ func TestHatoAPIStrategy_FindTarget_Manga(t *testing.T) {
 		target, found, err := strategy.FindTarget(logCtx, src, existingTargets, "test", nil)
 		assert.NoError(t, err)
 		assert.True(t, found)
-		assert.Equal(t, "Seishun Buta Yarou", target.GetTitle())
+		assert.Equal(t, testTitleSeishunButaYarou, target.GetTitle())
 	})
 }
 
@@ -406,9 +410,12 @@ func TestNewHatoClient_WithCache(t *testing.T) {
 func newUnretryingHatoClient(t *testing.T, serverURL string, cache *HatoCache) *HatoClient {
 	t.Helper()
 	return &HatoClient{
-		baseURL:    serverURL,
-		httpClient: &http.Client{Timeout: 5 * time.Second},
-		cache:      cache,
+		apiSource: apiSource{
+			baseURL:     serverURL,
+			httpClient:  &http.Client{Timeout: 5 * time.Second},
+			maxFailures: hatoMaxFailureStreak,
+		},
+		cache: cache,
 	}
 }
 
@@ -635,4 +642,44 @@ func TestHatoClient_SaveCache(t *testing.T) {
 	client := newUnretryingHatoClient(t, "http://example.test", cache)
 	assert.NoError(t, client.SaveCache(ctx))
 	assert.FileExists(t, filepath.Join(tmpDir, hatoCacheFile))
+}
+
+// A forward sync needs a MAL id. Asking Hato for the AniList id instead returns
+// a number from the wrong id space, which can collide with an unrelated MAL
+// entry in the user's list and mismatch the entry.
+func TestHatoAPIStrategy_ForwardSync_LooksUpMALID(t *testing.T) {
+	t.Parallel()
+	srcAniList, srcMAL := 145164, 92182
+	collidingAniListID, correctMALID := 104502, 777
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := HatoResponse{}
+		switch r.URL.Path {
+		case "/api/mappings/mal/manga/92182":
+			resp.Data.AniListID = &collidingAniListID
+			resp.Data.MalID = &srcMAL
+		case "/api/mappings/anilist/manga/145164":
+			resp.Data.AniListID = &srcAniList
+			resp.Data.MalID = &correctMALID
+		default:
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		writeJSON(t, w, resp)
+	}))
+	defer server.Close()
+
+	ctx := NewLogger(false).WithContext(t.Context())
+	strategy := HatoAPIStrategy{Client: NewHatoClient(ctx, server.URL, 5*time.Second, t.TempDir(), "720h")}
+
+	src := Manga{IDAnilist: srcAniList, IDMal: srcMAL, TitleEN: testTitleBerserk}
+	existingTargets := map[TargetID]Target{
+		TargetID(collidingAniListID): Manga{IDMal: collidingAniListID, TitleEN: testTitleUnrelated},
+		TargetID(correctMALID):       Manga{IDMal: correctMALID, TitleEN: testTitleBerserk},
+	}
+
+	target, found, err := strategy.FindTarget(ctx, src, existingTargets, "test", nil)
+	assert.NoError(t, err)
+	assert.True(t, found)
+	assert.Equal(t, testTitleBerserk, target.GetTitle())
 }

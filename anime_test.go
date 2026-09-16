@@ -589,32 +589,32 @@ func TestAnime_GetStatusString(t *testing.T) {
 		{
 			name:   "watching",
 			status: StatusWatching,
-			want:   "watching",
+			want:   string(StatusWatching),
 		},
 		{
 			name:   "completed",
 			status: StatusCompleted,
-			want:   "completed",
+			want:   string(StatusCompleted),
 		},
 		{
 			name:   "on_hold",
 			status: StatusOnHold,
-			want:   "on_hold",
+			want:   string(StatusOnHold),
 		},
 		{
 			name:   "dropped",
 			status: StatusDropped,
-			want:   "dropped",
+			want:   string(StatusDropped),
 		},
 		{
 			name:   "plan_to_watch",
 			status: StatusPlanToWatch,
-			want:   "plan_to_watch",
+			want:   string(StatusPlanToWatch),
 		},
 		{
 			name:   "unknown",
 			status: StatusUnknown,
-			want:   "unknown",
+			want:   string(StatusUnknown),
 		},
 	}
 
@@ -748,7 +748,7 @@ func TestAnime_SameProgressWithTarget(t *testing.T) {
 				Progress: 10,
 			},
 			target: Manga{
-				Status:   "watching",
+				Status:   MangaStatusReading,
 				Score:    8,
 				Progress: 10,
 			},
@@ -776,10 +776,10 @@ func TestAnime_SameTitleWithTarget(t *testing.T) {
 		{
 			name: "exact English title match",
 			source: Anime{
-				TitleEN: "Test Anime",
+				TitleEN: testTitleAnime,
 			},
 			target: Anime{
-				TitleEN: "Test Anime",
+				TitleEN: testTitleAnime,
 			},
 			want: true,
 		},
@@ -796,10 +796,10 @@ func TestAnime_SameTitleWithTarget(t *testing.T) {
 		{
 			name: "exact Romaji title match",
 			source: Anime{
-				TitleRomaji: "Test Anime",
+				TitleRomaji: testTitleAnime,
 			},
 			target: Anime{
-				TitleRomaji: "Test Anime",
+				TitleRomaji: testTitleAnime,
 			},
 			want: true,
 		},
@@ -816,11 +816,11 @@ func TestAnime_SameTitleWithTarget(t *testing.T) {
 		{
 			name: "20% episode difference accepted",
 			source: Anime{
-				TitleEN:     "Test Anime",
+				TitleEN:     testTitleAnime,
 				NumEpisodes: 10,
 			},
 			target: Anime{
-				TitleEN:     "Test Anime",
+				TitleEN:     testTitleAnime,
 				NumEpisodes: 12,
 			},
 			want: true,
@@ -828,11 +828,11 @@ func TestAnime_SameTitleWithTarget(t *testing.T) {
 		{
 			name: "more than 20% episode difference rejected",
 			source: Anime{
-				TitleEN:     "Test Anime",
+				TitleEN:     testTitleAnime,
 				NumEpisodes: 10,
 			},
 			target: Anime{
-				TitleEN:     "Test Anime",
+				TitleEN:     testTitleAnime,
 				NumEpisodes: 13,
 			},
 			want: false,
@@ -840,11 +840,11 @@ func TestAnime_SameTitleWithTarget(t *testing.T) {
 		{
 			name: "zero NumEpisodes both accepted",
 			source: Anime{
-				TitleEN:     "Test Anime",
+				TitleEN:     testTitleAnime,
 				NumEpisodes: 0,
 			},
 			target: Anime{
-				TitleEN:     "Test Anime",
+				TitleEN:     testTitleAnime,
 				NumEpisodes: 0,
 			},
 			want: true,
@@ -852,10 +852,10 @@ func TestAnime_SameTitleWithTarget(t *testing.T) {
 		{
 			name: "target is not Anime",
 			source: Anime{
-				TitleEN: "Test Anime",
+				TitleEN: testTitleAnime,
 			},
 			target: Manga{
-				TitleEN: "Test Anime",
+				TitleEN: testTitleAnime,
 			},
 			want: false,
 		},
@@ -881,10 +881,10 @@ func TestAnime_IdenticalTitleMatch(t *testing.T) {
 		{
 			name: "exact English title match",
 			source: Anime{
-				TitleEN: "Test Anime",
+				TitleEN: testTitleAnime,
 			},
 			target: Anime{
-				TitleEN: "Test Anime",
+				TitleEN: testTitleAnime,
 			},
 			want: true,
 		},
@@ -901,10 +901,10 @@ func TestAnime_IdenticalTitleMatch(t *testing.T) {
 		{
 			name: "exact Romaji title match",
 			source: Anime{
-				TitleRomaji: "Test Anime",
+				TitleRomaji: testTitleAnime,
 			},
 			target: Anime{
-				TitleRomaji: "Test Anime",
+				TitleRomaji: testTitleAnime,
 			},
 			want: true,
 		},
@@ -1008,7 +1008,7 @@ func TestAnime_String(t *testing.T) {
 			anime: Anime{
 				IDAnilist:   12345,
 				IDMal:       67890,
-				TitleEN:     "Test Anime",
+				TitleEN:     testTitleAnime,
 				TitleJP:     "テストアニメ",
 				Status:      StatusWatching,
 				Score:       8,

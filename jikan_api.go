@@ -76,7 +76,8 @@ type JikanClient struct {
 // NewJikanClient creates a new Jikan API client with caching.
 func NewJikanClient(ctx context.Context, cacheDir string, cacheMaxAgeStr string) *JikanClient {
 	maxAge := defaultJikanCacheMaxAge
-	if parsed, err := time.ParseDuration(cacheMaxAgeStr); err == nil {
+	parsed, err := time.ParseDuration(cacheMaxAgeStr)
+	if err == nil {
 		maxAge = parsed
 	}
 
@@ -205,7 +206,8 @@ func (c *JikanClient) GetMangaByMALID(ctx context.Context, malID int) (*JikanMan
 	defer resp.Body.Close() //nolint:errcheck // best effort close
 
 	var jResp jikanResponse
-	if err := json.NewDecoder(resp.Body).Decode(&jResp); err != nil {
+	err = json.NewDecoder(resp.Body).Decode(&jResp)
+	if err != nil {
 		LogDebug(ctx, "[JIKAN API] manga %d: decode error: %v", malID, err)
 		return nil, false
 	}
@@ -254,7 +256,8 @@ func (c *JikanClient) SearchManga(ctx context.Context, query string) []JikanMang
 	defer resp.Body.Close() //nolint:errcheck // best effort close
 
 	var jResp jikanSearchResponse
-	if err := json.NewDecoder(resp.Body).Decode(&jResp); err != nil {
+	err = json.NewDecoder(resp.Body).Decode(&jResp)
+	if err != nil {
 		LogDebug(ctx, "[JIKAN API] search %q: decode error: %v", query, err)
 		return nil
 	}
@@ -292,7 +295,8 @@ func (c *JikanClient) GetUserFavorites(ctx context.Context, username string) (
 	defer resp.Body.Close() //nolint:errcheck // best effort close
 
 	var jResp jikanFavoritesResponse
-	if err := json.NewDecoder(resp.Body).Decode(&jResp); err != nil {
+	err = json.NewDecoder(resp.Body).Decode(&jResp)
+	if err != nil {
 		LogDebug(ctx, "[JIKAN API] user %s favorites: decode error: %v", username, err)
 		return nil, nil, fmt.Errorf("failed to decode favorites response: %w", err)
 	}

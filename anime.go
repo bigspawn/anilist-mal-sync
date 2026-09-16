@@ -685,8 +685,8 @@ func buildDiffString(pairs ...any) string {
 		if !ok {
 			continue
 		}
-		a := pairs[i+1]
-		b := pairs[i+2]
+		a := pairs[i+1] // #nosec G602 -- len(pairs)%3 guard above proves i+1 and i+2 are in range
+		b := pairs[i+2] // #nosec G602 -- len(pairs)%3 guard above proves i+1 and i+2 are in range
 
 		if !reflect.DeepEqual(a, b) {
 			fmt.Fprintf(&sb, "%s: %v -> %v, ", field, a, b)

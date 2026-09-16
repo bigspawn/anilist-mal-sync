@@ -32,7 +32,8 @@ myanimelist:
   token_url: "https://myanimelist.net/v1/oauth2/token"
   username: "test_user"
 `
-	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
+	err := os.WriteFile(configPath, []byte(configContent), 0o600)
+	if err != nil {
 		t.Fatalf("failed to write config file: %v", err)
 	}
 
@@ -84,11 +85,12 @@ func TestLoadConfigFromFile_InvalidYAML(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "invalid.yaml")
 
 	// Create invalid YAML
-	if err := os.WriteFile(configPath, []byte("{invalid yaml content"), 0o600); err != nil {
+	err := os.WriteFile(configPath, []byte("{invalid yaml content"), 0o600)
+	if err != nil {
 		t.Fatalf("failed to write config file: %v", err)
 	}
 
-	_, err := loadConfigFromFile(configPath)
+	_, err = loadConfigFromFile(configPath)
 	if err == nil {
 		t.Error("loadConfigFromFile() should return error for invalid YAML")
 	}
@@ -116,7 +118,8 @@ myanimelist:
   client_secret: "default_mal_secret"
   username: "mal_user"
 `
-	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
+	err := os.WriteFile(configPath, []byte(configContent), 0o600)
+	if err != nil {
 		t.Fatalf("failed to write config file: %v", err)
 	}
 
@@ -161,7 +164,8 @@ myanimelist:
   client_id: "mal_id"
   client_secret: "default_mal_secret"
 `
-	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
+	err := os.WriteFile(configPath, []byte(configContent), 0o600)
+	if err != nil {
 		t.Fatalf("failed to write config file: %v", err)
 	}
 
@@ -195,11 +199,12 @@ myanimelist:
   client_id: "mal_id"
   client_secret: "mal_secret"
 `
-	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
+	err := os.WriteFile(configPath, []byte(configContent), 0o600)
+	if err != nil {
 		t.Fatalf("failed to write config file: %v", err)
 	}
 
-	_, err := loadConfigFromFile(configPath)
+	_, err = loadConfigFromFile(configPath)
 	if err == nil {
 		t.Error("loadConfigFromFile() should return error when MAL_USERNAME is missing")
 	}
@@ -287,7 +292,8 @@ myanimelist:
   token_url: "https://myanimelist.net/v1/oauth2/token"
   username: "test_user"
 `
-	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
+	err := os.WriteFile(configPath, []byte(configContent), 0o600)
+	if err != nil {
 		t.Fatalf("failed to write config file: %v", err)
 	}
 
@@ -335,7 +341,8 @@ myanimelist:
   username: "test_user"
 token_file_path: "` + customTokenPath + `"
 `
-	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
+	err := os.WriteFile(configPath, []byte(configContent), 0o600)
+	if err != nil {
 		t.Fatalf("failed to write config file: %v", err)
 	}
 
@@ -577,8 +584,8 @@ func TestLoadConfigFromEnv_OAuthURLsHaveDefaults(t *testing.T) {
 	}
 
 	// Verify MAL OAuth URLs
-	expectedMALAuthURL := "https://myanimelist.net/v1/oauth2/authorize" // #nosec G101
-	expectedMALTokenURL := "https://myanimelist.net/v1/oauth2/token"    // #nosec G101
+	expectedMALAuthURL := defaultMALAuthURL   // #nosec G101
+	expectedMALTokenURL := defaultMALTokenURL // #nosec G101
 
 	if cfg.MyAnimeList.AuthURL != expectedMALAuthURL {
 		t.Errorf("MyAnimeList.AuthURL = %v, want %v", cfg.MyAnimeList.AuthURL, expectedMALAuthURL)
@@ -1075,14 +1082,14 @@ func TestLoadConfigFromEnv_ReadsWatchSchedule(t *testing.T) {
 	t.Setenv("ANILIST_USERNAME", "test_user")
 	t.Setenv("MAL_CLIENT_ID", "mal_id")
 	t.Setenv("MAL_USERNAME", "mal_user")
-	t.Setenv("WATCH_SCHEDULE", "0 3 * * *")
+	t.Setenv("WATCH_SCHEDULE", testCronScheduleDaily3)
 
 	cfg, err := loadConfigFromEnv()
 	if err != nil {
 		t.Fatalf("loadConfigFromEnv() failed: %v", err)
 	}
 
-	if cfg.Watch.Schedule != "0 3 * * *" {
+	if cfg.Watch.Schedule != testCronScheduleDaily3 {
 		t.Errorf("Watch.Schedule = %v, want 0 3 * * *", cfg.Watch.Schedule)
 	}
 }
@@ -1179,12 +1186,137 @@ func TestFavoritesSyncEnabled_FromEnv(t *testing.T) {
 }
 
 // =============================================================================
+// Suite: MangaBakaConfig
+// =============================================================================
+
+// TestLoadConfigFromFile_MangaBakaDefaultsToDisabledWhenSectionOmitted covers
+// the YAML path: a config.yaml without a mangabaka_api section must still
+// get the documented default (false), matching the env path, the CLI flag,
+// and the mappingSources() registry.
+func TestLoadConfigFromFile_MangaBakaDefaultsToDisabledWhenSectionOmitted(t *testing.T) {
+	t.Setenv("MANGABAKA_API_ENABLED", "")
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	configContent := `
+anilist:
+  client_id: "test_id"
+  username: "test_user"
+myanimelist:
+  client_id: "mal_id"
+  username: "mal_user"
+`
+	writeErr := os.WriteFile(configPath, []byte(configContent), 0o600)
+	if writeErr != nil {
+		t.Fatalf("failed to write config file: %v", writeErr)
+	}
+
+	config, err := loadConfigFromFile(configPath)
+	if err != nil {
+		t.Fatalf("loadConfigFromFile() error = %v", err)
+	}
+
+	if config.MangaBakaAPI.Enabled {
+		t.Error("MangaBakaAPI.Enabled should default to false when mangabaka_api is omitted from config.yaml")
+	}
+}
+
+func TestLoadConfigFromEnv_MangaBakaDefaults(t *testing.T) {
+	t.Setenv("ANILIST_CLIENT_ID", "test_id")
+	t.Setenv("ANILIST_USERNAME", "test_user")
+	t.Setenv("MAL_CLIENT_ID", "mal_id")
+	t.Setenv("MAL_USERNAME", "mal_user")
+	t.Setenv("MANGABAKA_API_ENABLED", "")
+	t.Setenv("MANGABAKA_API_URL", "")
+	t.Setenv("MANGABAKA_API_CACHE_MAX_AGE", "")
+
+	cfg, err := loadConfigFromEnv()
+	if err != nil {
+		t.Fatalf("loadConfigFromEnv() failed: %v", err)
+	}
+
+	if cfg.MangaBakaAPI.Enabled {
+		t.Error("MangaBakaAPI.Enabled should default to false")
+	}
+	if cfg.MangaBakaAPI.BaseURL != defaultMangaBakaBaseURL {
+		t.Errorf("MangaBakaAPI.BaseURL = %v, want %v", cfg.MangaBakaAPI.BaseURL, defaultMangaBakaBaseURL)
+	}
+	if cfg.MangaBakaAPI.CacheMaxAge != defaultLongCacheMaxAge {
+		t.Errorf("MangaBakaAPI.CacheMaxAge = %v, want %v", cfg.MangaBakaAPI.CacheMaxAge, defaultLongCacheMaxAge)
+	}
+}
+
+func TestLoadConfigFromEnv_MangaBakaOverride(t *testing.T) {
+	t.Setenv("ANILIST_CLIENT_ID", "test_id")
+	t.Setenv("ANILIST_USERNAME", "test_user")
+	t.Setenv("MAL_CLIENT_ID", "mal_id")
+	t.Setenv("MAL_USERNAME", "mal_user")
+	t.Setenv("MANGABAKA_API_ENABLED", "true")
+	t.Setenv("MANGABAKA_API_URL", "https://example.test/v1")
+	t.Setenv("MANGABAKA_API_CACHE_DIR", "/tmp/mangabaka-cache")
+	t.Setenv("MANGABAKA_API_CACHE_MAX_AGE", "24h")
+
+	cfg, err := loadConfigFromEnv()
+	if err != nil {
+		t.Fatalf("loadConfigFromEnv() failed: %v", err)
+	}
+
+	if !cfg.MangaBakaAPI.Enabled {
+		t.Error("MangaBakaAPI.Enabled should be true when the env var enables it")
+	}
+	if cfg.MangaBakaAPI.BaseURL != "https://example.test/v1" {
+		t.Errorf("MangaBakaAPI.BaseURL = %v, want https://example.test/v1", cfg.MangaBakaAPI.BaseURL)
+	}
+	if cfg.MangaBakaAPI.CacheDir != "/tmp/mangabaka-cache" {
+		t.Errorf("MangaBakaAPI.CacheDir = %v, want /tmp/mangabaka-cache", cfg.MangaBakaAPI.CacheDir)
+	}
+	if cfg.MangaBakaAPI.CacheMaxAge != "24h" {
+		t.Errorf("MangaBakaAPI.CacheMaxAge = %v, want 24h", cfg.MangaBakaAPI.CacheMaxAge)
+	}
+}
+
+func TestOverrideMangaBakaFromEnv_FileValueKeptWhenEnvEmpty(t *testing.T) {
+	t.Setenv("MANGABAKA_API_ENABLED", "")
+	t.Setenv("MANGABAKA_API_URL", "")
+	t.Setenv("MANGABAKA_API_CACHE_DIR", "")
+	t.Setenv("MANGABAKA_API_CACHE_MAX_AGE", "")
+
+	mc := MappingSourceConfig{
+		Enabled:     false,
+		BaseURL:     "https://from-yaml.test/v1",
+		CacheDir:    "/from/yaml",
+		CacheMaxAge: "48h",
+	}
+
+	var mangaBakaSource mappingSource
+	for _, src := range mappingSources() {
+		if src.name == mangaBakaSourceName {
+			mangaBakaSource = src
+		}
+	}
+	overrideMappingSourceFromEnv(&mc, mangaBakaSource)
+
+	if mc.Enabled {
+		t.Error("Enabled should keep YAML value when env is empty")
+	}
+	if mc.BaseURL != "https://from-yaml.test/v1" {
+		t.Errorf("BaseURL = %v, want https://from-yaml.test/v1", mc.BaseURL)
+	}
+	if mc.CacheDir != "/from/yaml" {
+		t.Errorf("CacheDir = %v, want /from/yaml", mc.CacheDir)
+	}
+	if mc.CacheMaxAge != "48h" {
+		t.Errorf("CacheMaxAge = %v, want 48h", mc.CacheMaxAge)
+	}
+}
+
+// =============================================================================
 // Suite: WatchConfig.Validate
 // =============================================================================
 
 func TestWatchConfig_Validate_BothSet_ReturnsError(t *testing.T) {
 	t.Parallel()
-	w := WatchConfig{Interval: "24h", Schedule: "0 3 * * *"}
+	w := WatchConfig{Interval: "24h", Schedule: testCronScheduleDaily3}
 	err := w.Validate()
 	if err == nil {
 		t.Fatal("expected error when both interval and schedule are set")
@@ -1238,7 +1370,7 @@ func TestWatchConfig_Validate_IntervalMalformed_ReturnsError(t *testing.T) {
 
 func TestWatchConfig_Validate_ScheduleOnly_Valid(t *testing.T) {
 	t.Parallel()
-	w := WatchConfig{Schedule: "0 3 * * *"}
+	w := WatchConfig{Schedule: testCronScheduleDaily3}
 	err := w.Validate()
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1281,7 +1413,7 @@ func TestWatchConfig_Validate_BothEmpty_ReturnsMissingSentinel(t *testing.T) {
 
 func TestWatchConfig_ParseSchedule_ValidReturnsSchedule(t *testing.T) {
 	t.Parallel()
-	w := WatchConfig{Schedule: "0 3 * * *"}
+	w := WatchConfig{Schedule: testCronScheduleDaily3}
 	sched, err := w.ParseSchedule()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

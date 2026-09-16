@@ -9,6 +9,10 @@ import (
 	"strings"
 )
 
+// skipReasonUnmapped explains a skip caused by no strategy finding a target,
+// as opposed to a manual ignore rule or the entry already being in sync.
+const skipReasonUnmapped = "unmapped"
+
 type TargetID int
 
 type Source interface {
@@ -86,7 +90,7 @@ func (u *Updater) Update(ctx context.Context, srcs []Source, tgts []Target, repo
 	u.recordUnmapped(ctx, unmapped)
 }
 
-func buildTargetMap(ctx context.Context, tgts []Target) map[TargetID]Target {
+func buildTargetMap(_ context.Context, tgts []Target) map[TargetID]Target {
 	tgtsByID := make(map[TargetID]Target, len(tgts))
 	for _, tgt := range tgts {
 		tgtsByID[tgt.GetTargetID()] = tgt
@@ -206,7 +210,7 @@ func (u *Updater) resolveAllMappings(
 				Title:      src.GetTitle(),
 				Status:     src.GetStatusString(),
 				Skipped:    true,
-				SkipReason: "unmapped",
+				SkipReason: skipReasonUnmapped,
 			})
 			unmapped = append(unmapped, src)
 			continue
@@ -354,7 +358,7 @@ func (u *Updater) recordConflicts(
 	}
 }
 
-func (u *Updater) recordUnmapped(ctx context.Context, unmapped []Source) {
+func (u *Updater) recordUnmapped(_ context.Context, unmapped []Source) {
 	for _, src := range unmapped {
 		u.trackUnmapped(src, "no matching entry found on target service")
 	}
@@ -378,7 +382,7 @@ func (u *Updater) updateSourceByTargets(ctx context.Context, src Source, tgts ma
 				Title:      src.GetTitle(),
 				Status:     src.GetStatusString(),
 				Skipped:    true,
-				SkipReason: "unmapped",
+				SkipReason: skipReasonUnmapped,
 			})
 			u.trackUnmapped(src, "no matching entry found on target service")
 			return

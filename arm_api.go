@@ -96,7 +96,8 @@ func (c *ARMClient) doRequest(ctx context.Context, url string) (*ARMResponse, er
 	}
 
 	var armResp ARMResponse
-	if err := json.NewDecoder(resp.Body).Decode(&armResp); err != nil {
+	err = json.NewDecoder(resp.Body).Decode(&armResp)
+	if err != nil {
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 

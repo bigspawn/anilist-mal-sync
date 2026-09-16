@@ -318,13 +318,13 @@ func TestStatistics_RecordSkipAndUpdate(t *testing.T) {
 	// with properly initialized Statistics
 	stats := NewStatistics()
 
-	stats.RecordSkip(UpdateResult{Title: "Test", Status: "watching", SkipReason: "test"})
+	stats.RecordSkip(UpdateResult{Title: "Test", Status: string(StatusWatching), SkipReason: "test"})
 	assert.Equal(t, 1, stats.SkippedCount)
-	assert.Equal(t, 1, stats.StatusCounts["watching"])
+	assert.Equal(t, 1, stats.StatusCounts[string(StatusWatching)])
 
-	stats.RecordUpdate(UpdateResult{Title: "Test2", Status: "completed"})
+	stats.RecordUpdate(UpdateResult{Title: "Test2", Status: string(StatusCompleted)})
 	assert.Equal(t, 1, stats.UpdatedCount)
-	assert.Equal(t, 1, stats.StatusCounts["completed"])
+	assert.Equal(t, 1, stats.StatusCounts[string(StatusCompleted)])
 }
 
 func TestStatistics_RecordSkipPanicWithoutInit(t *testing.T) {
@@ -334,7 +334,7 @@ func TestStatistics_RecordSkipPanicWithoutInit(t *testing.T) {
 	stats := &Statistics{} // or new(Statistics)
 
 	assert.Panics(t, func() {
-		stats.RecordSkip(UpdateResult{Title: "Test", Status: "watching"})
+		stats.RecordSkip(UpdateResult{Title: "Test", Status: string(StatusWatching)})
 	}, "RecordSkip should panic when StatusCounts is nil")
 }
 
@@ -345,7 +345,7 @@ func TestStatistics_RecordUpdatePanicWithoutInit(t *testing.T) {
 	stats := new(Statistics)
 
 	assert.Panics(t, func() {
-		stats.RecordUpdate(UpdateResult{Title: "Test", Status: "completed"})
+		stats.RecordUpdate(UpdateResult{Title: "Test", Status: string(StatusCompleted)})
 	}, "RecordUpdate should panic when StatusCounts is nil")
 }
 
@@ -361,19 +361,19 @@ func TestPrintGlobalSummary(t *testing.T) {
 	stats1.UpdatedCount = 5
 	stats1.SkippedCount = 10
 	stats1.TotalCount = 15
-	stats1.StatusCounts = map[string]int{"watching": 5, "completed": 10}
+	stats1.StatusCounts = map[string]int{string(StatusWatching): 5, string(StatusCompleted): 10}
 	stats1.SkippedItems = []UpdateResult{
-		{Title: "Skip1", Status: "watching", SkipReason: "no changes"},
-		{Title: "Skip2", Status: "watching", SkipReason: "target not found"},
+		{Title: "Skip1", Status: string(StatusWatching), SkipReason: "no changes"},
+		{Title: "Skip2", Status: string(StatusWatching), SkipReason: "target not found"},
 	}
 
 	stats2 := NewStatistics()
 	stats2.UpdatedCount = 3
 	stats2.SkippedCount = 7
 	stats2.TotalCount = 10
-	stats2.StatusCounts = map[string]int{"completed": 3, "watching": 7}
+	stats2.StatusCounts = map[string]int{string(StatusCompleted): 3, string(StatusWatching): 7}
 	stats2.SkippedItems = []UpdateResult{
-		{Title: "Skip3", Status: "completed", SkipReason: "no changes"},
+		{Title: "Skip3", Status: string(StatusCompleted), SkipReason: "no changes"},
 	}
 
 	report := NewSyncReport()
@@ -423,8 +423,8 @@ func TestPrintGlobalSummary_WithWarnings(t *testing.T) {
 	stats.TotalCount = 1
 
 	report := NewSyncReport()
-	report.AddWarning("Test Anime", "test reason", "(1 vs 12)", "Anime")
-	report.AddWarning("Test Manga", "test reason 2", "", "Manga")
+	report.AddWarning(testTitleAnime, "test reason", "(1 vs 12)", "Anime")
+	report.AddWarning(testTitleManga, "test reason 2", "", "Manga")
 
 	statsArray := []*Statistics{stats}
 
@@ -433,7 +433,7 @@ func TestPrintGlobalSummary_WithWarnings(t *testing.T) {
 	output := buf.String()
 
 	assert.Contains(t, output, "Warnings (2)", "Should show warnings count")
-	assert.Contains(t, output, "Test Anime", "Should show warning title")
+	assert.Contains(t, output, testTitleAnime, "Should show warning title")
 	assert.Contains(t, output, "test reason", "Should show warning reason")
 }
 
@@ -505,18 +505,18 @@ func TestStatistics_RecordDryRun(t *testing.T) {
 	t.Parallel()
 	stats := NewStatistics()
 
-	stats.RecordDryRun(UpdateResult{Title: "Test", Status: "watching", Detail: "dry run"})
+	stats.RecordDryRun(UpdateResult{Title: "Test", Status: string(StatusWatching), Detail: "dry run"})
 
 	assert.Equal(t, 1, stats.DryRunCount)
 	assert.Equal(t, 1, len(stats.DryRunItems))
 	assert.True(t, stats.DryRunItems[0].IsDryRun)
-	assert.Equal(t, 1, stats.StatusCounts["watching"])
+	assert.Equal(t, 1, stats.StatusCounts[string(StatusWatching)])
 }
 
 func TestStatistics_ResetClearsDryRun(t *testing.T) {
 	t.Parallel()
 	stats := NewStatistics()
-	stats.RecordDryRun(UpdateResult{Title: "Test", Status: "watching"})
+	stats.RecordDryRun(UpdateResult{Title: "Test", Status: string(StatusWatching)})
 	stats.DryRunCount = 5
 
 	stats.Reset()
@@ -556,8 +556,8 @@ func TestStatistics_RecordError_DoesNotUpdateStatusCounts(t *testing.T) {
 	t.Parallel()
 	stats := NewStatistics()
 
-	stats.RecordError(UpdateResult{Title: "Err1", Status: "watching", Error: errors.New("oops")})
-	stats.RecordError(UpdateResult{Title: "Err2", Status: "completed", Error: errors.New("fail")})
+	stats.RecordError(UpdateResult{Title: "Err1", Status: string(StatusWatching), Error: errors.New("oops")})
+	stats.RecordError(UpdateResult{Title: "Err2", Status: string(StatusCompleted), Error: errors.New("fail")})
 
 	assert.Equal(t, 2, stats.ErrorCount)
 	assert.Len(t, stats.ErrorItems, 2)
@@ -569,27 +569,27 @@ func TestStatistics_RecordUpdate_TracksStatus(t *testing.T) {
 	t.Parallel()
 	stats := NewStatistics()
 
-	stats.RecordUpdate(UpdateResult{Title: "A", Status: "watching"})
-	stats.RecordUpdate(UpdateResult{Title: "B", Status: "watching"})
-	stats.RecordUpdate(UpdateResult{Title: "C", Status: "completed"})
+	stats.RecordUpdate(UpdateResult{Title: "A", Status: string(StatusWatching)})
+	stats.RecordUpdate(UpdateResult{Title: "B", Status: string(StatusWatching)})
+	stats.RecordUpdate(UpdateResult{Title: "C", Status: string(StatusCompleted)})
 
 	assert.Equal(t, 3, stats.UpdatedCount)
 	assert.Len(t, stats.UpdatedItems, 3)
-	assert.Equal(t, 2, stats.StatusCounts["watching"])
-	assert.Equal(t, 1, stats.StatusCounts["completed"])
+	assert.Equal(t, 2, stats.StatusCounts[string(StatusWatching)])
+	assert.Equal(t, 1, stats.StatusCounts[string(StatusCompleted)])
 }
 
 func TestStatistics_RecordSkip_TracksReason(t *testing.T) {
 	t.Parallel()
 	stats := NewStatistics()
 
-	stats.RecordSkip(UpdateResult{Title: "X", Status: "on_hold", SkipReason: "no changes"})
-	stats.RecordSkip(UpdateResult{Title: "Y", Status: "completed", SkipReason: "in ignore list"})
+	stats.RecordSkip(UpdateResult{Title: "X", Status: string(StatusOnHold), SkipReason: "no changes"})
+	stats.RecordSkip(UpdateResult{Title: "Y", Status: string(StatusCompleted), SkipReason: "in ignore list"})
 
 	assert.Equal(t, 2, stats.SkippedCount)
 	assert.Len(t, stats.SkippedItems, 2)
-	assert.Equal(t, 1, stats.StatusCounts["on_hold"])
-	assert.Equal(t, 1, stats.StatusCounts["completed"])
+	assert.Equal(t, 1, stats.StatusCounts[string(StatusOnHold)])
+	assert.Equal(t, 1, stats.StatusCounts[string(StatusCompleted)])
 }
 
 // =============================================================================
@@ -604,18 +604,18 @@ func TestAggregateStats(t *testing.T) {
 	s1.IncrementTotal()
 	s1.IncrementTotal()
 	s1.IncrementTotal()
-	s1.RecordUpdate(UpdateResult{Title: "A", Status: "watching"})
-	s1.RecordSkip(UpdateResult{SkipReason: "no changes", Status: "completed"})
-	s1.RecordSkip(UpdateResult{SkipReason: "no changes", Status: "completed"})
-	s1.RecordSkip(UpdateResult{SkipReason: "unmapped", Status: "completed"})
+	s1.RecordUpdate(UpdateResult{Title: "A", Status: string(StatusWatching)})
+	s1.RecordSkip(UpdateResult{SkipReason: "no changes", Status: string(StatusCompleted)})
+	s1.RecordSkip(UpdateResult{SkipReason: "no changes", Status: string(StatusCompleted)})
+	s1.RecordSkip(UpdateResult{SkipReason: unmappedCommandName, Status: string(StatusCompleted)})
 	s1.RecordError(UpdateResult{Title: "Err1"})
-	s1.RecordDryRun(UpdateResult{Title: "Dry1", Status: "watching"})
+	s1.RecordDryRun(UpdateResult{Title: "Dry1", Status: string(StatusWatching)})
 
 	s2 := NewStatistics()
 	s2.IncrementTotal()
 	s2.IncrementTotal()
-	s2.RecordUpdate(UpdateResult{Title: "B", Status: "watching"})
-	s2.RecordSkip(UpdateResult{SkipReason: "no changes", Status: "watching"})
+	s2.RecordUpdate(UpdateResult{Title: "B", Status: string(StatusWatching)})
+	s2.RecordSkip(UpdateResult{SkipReason: "no changes", Status: string(StatusWatching)})
 	s2.RecordError(UpdateResult{Title: "Err2"})
 
 	result := aggregateStats([]*Statistics{s1, s2})
@@ -626,7 +626,7 @@ func TestAggregateStats(t *testing.T) {
 	assert.Equal(t, 2, result.errors)  // 1 + 1
 	assert.Equal(t, 1, result.dryRun)  // 1 + 0
 	assert.Equal(t, 3, result.skipReasons["no changes"])
-	assert.Equal(t, 1, result.skipReasons["unmapped"])
+	assert.Equal(t, 1, result.skipReasons[unmappedCommandName])
 	assert.Len(t, result.updatedItems, 2)
 	assert.Len(t, result.errorItems, 2)
 	assert.Len(t, result.dryRunItems, 1)
@@ -662,14 +662,14 @@ func TestGroupSkipReasons(t *testing.T) {
 	items := []UpdateResult{
 		{SkipReason: "no changes"},
 		{SkipReason: "no changes"},
-		{SkipReason: "unmapped"},
+		{SkipReason: unmappedCommandName},
 		{SkipReason: ""},
 	}
 
 	result := groupSkipReasons(items)
 
 	assert.Equal(t, 2, result["no changes"])
-	assert.Equal(t, 1, result["unmapped"])
+	assert.Equal(t, 1, result[unmappedCommandName])
 	assert.Equal(t, 1, result["unspecified"])
 	assert.Equal(t, 3, len(result))
 }
