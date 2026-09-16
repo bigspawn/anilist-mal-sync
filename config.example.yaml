@@ -42,6 +42,13 @@ hato_api:
   base_url: "https://hato.malupdaterosx.moe" # Hato API base URL
   cache_dir: "" # Leave empty for default: ~/.config/anilist-mal-sync/hato-cache
   cache_max_age: "720h" # Cache max age (default: 720h / 30 days)
+# ID Mapping: MangaBaka API (https://mangabaka.org)
+# Manga-only fallback after Hato, ignored for anime sync
+mangabaka_api:
+  enabled: false # Enable MangaBaka API for manga ID mapping (default: false)
+  base_url: "https://api.mangabaka.org/v1" # MangaBaka API base URL
+  cache_dir: "" # Leave empty for default: ~/.config/anilist-mal-sync/mangabaka-cache
+  cache_max_age: "720h" # Cache max age (default: 720h / 30 days)
 # ID Mapping: Jikan API (https://jikan.moe/)
 # Unofficial MyAnimeList API for manga ID mapping
 # NOTE: Used only for manga, ignored for anime sync

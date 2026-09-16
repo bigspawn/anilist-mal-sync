@@ -14,7 +14,8 @@ Program to synchronize your AniList and MyAnimeList accounts.
 - Duplicate target detection with automatic conflict resolution
 - Unmapped entries tracking with interactive management (`unmapped` command)
 - Offline ID mapping using anime-offline-database (prevents incorrect season matches)
-- Optional ARM API integration for online ID lookups
+- Online ID lookups via Hato (anime and manga), plus optional ARM (anime), MangaBaka and Jikan (manga)
+- Watch mode with a fixed interval or a cron schedule
 
 ## What gets synced
 
@@ -273,6 +274,11 @@ hato_api:
   base_url: "https://hato.malupdaterosx.moe"  # Hato API base URL
   cache_dir: ""  # Leave empty for default: ~/.config/anilist-mal-sync/hato-cache
   cache_max_age: "720h"  # Cache max age (default: 720h / 30 days)
+mangabaka_api:
+  enabled: false  # Enable MangaBaka API for manga ID mapping, fallback after Hato (default: false)
+  base_url: "https://api.mangabaka.org/v1"  # MangaBaka API base URL
+  cache_dir: ""  # Leave empty for default: ~/.config/anilist-mal-sync/mangabaka-cache
+  cache_max_age: "720h"  # Cache max age (default: 720h / 30 days)
 jikan_api:
   enabled: false  # Enable Jikan API for manga ID mapping (default: false)
   cache_dir: ""  # Default: ~/.config/anilist-mal-sync/jikan-cache
@@ -300,7 +306,7 @@ The tool uses different ID mapping strategies for anime and manga, and the chain
 1. **Manual Mapping** - User-defined AniList↔MAL mappings from `mappings.yaml`
 2. **Direct ID lookup** - If the entry already exists in your target list
 3. **Hato API** (optional, enabled by default) - Online API for manga ID mapping
-4. **MangaBaka API** (optional, enabled by default) - Online fallback to [MangaBaka](https://mangabaka.org) for manga ID mapping
+4. **MangaBaka API** (optional, disabled by default) - Online fallback to [MangaBaka](https://mangabaka.org) for manga ID mapping
 5. **Title matching** - Match by title similarity
 6. **Jikan API** (optional, disabled by default) - Online API for manga ID mapping via [Jikan](https://jikan.moe/) (unofficial MAL API)
 7. **API search** - Search the MAL API
@@ -321,7 +327,7 @@ The tool uses different ID mapping strategies for anime and manga, and the chain
 1. **Manual Mapping**
 2. **Direct ID lookup**
 3. **Hato API** (optional, enabled by default)
-4. **MangaBaka API** (optional, enabled by default)
+4. **MangaBaka API** (optional, disabled by default)
 5. **Title matching**
 6. **Jikan API** (optional, disabled by default)
 7. **MAL ID lookup** - Find AniList entry by MAL ID directly
@@ -330,7 +336,7 @@ The tool uses different ID mapping strategies for anime and manga, and the chain
 **Notes:**
 - The offline database and ARM API are anime-only and automatically disabled when using `--manga` flag (without `--all`) to improve startup performance.
 - Hato API supports both anime and manga and is enabled by default.
-- MangaBaka API is manga-only and enabled by default; it sits after Hato in the manga chain as a broader six-provider fallback.
+- MangaBaka API is manga-only and disabled by default; when enabled it sits after Hato in the manga chain as a broader six-provider fallback.
 
 ### Manual Mappings & Ignore Rules
 
@@ -368,10 +374,10 @@ Configuration can be provided entirely via environment variables (recommended fo
 
 **Required:**
 - `ANILIST_CLIENT_ID` - AniList Client ID
-- `ANILIST_CLIENT_SECRET` - AniList Client Secret (also accepts `CLIENT_SECRET_ANILIST`)
+- `ANILIST_CLIENT_SECRET` - AniList Client Secret (legacy `CLIENT_SECRET_ANILIST` is accepted only together with a config file)
 - `ANILIST_USERNAME` - AniList username
 - `MAL_CLIENT_ID` - MyAnimeList Client ID
-- `MAL_CLIENT_SECRET` - MyAnimeList Client Secret (also accepts `CLIENT_SECRET_MYANIMELIST`)
+- `MAL_CLIENT_SECRET` - MyAnimeList Client Secret (legacy `CLIENT_SECRET_MYANIMELIST` is accepted only together with a config file)
 - `MAL_USERNAME` - MyAnimeList username
 
 **Required for `watch` mode:**
@@ -382,7 +388,7 @@ One of `WATCH_INTERVAL` or `WATCH_SCHEDULE` (or their CLI flag equivalents) is r
 
 **Optional:**
 - `HTTP_TIMEOUT` - HTTP client timeout for API requests (default: `30s`, e.g., `10s`, `1m`)
-- `OAUTH_PORT` - OAuth server port (default: `18080`)
+- `OAUTH_PORT` - OAuth server port (default: `18080`, falls back to `PORT` if unset)
 - `OAUTH_REDIRECT_URI` - OAuth redirect URI (default: `http://localhost:18080/callback`)
 - `TOKEN_FILE_PATH` - Token file path (default: `~/.config/anilist-mal-sync/token.json`)
 - `MAPPINGS_FILE_PATH` - Path to manual mappings YAML file (default: `~/.config/anilist-mal-sync/mappings.yaml`)
@@ -457,8 +463,8 @@ Note: The `--favorites` flag automatically enables Jikan API (required for readi
 
 Example output:
 ```
-★ [Favorites] Added "Cowboy Bebop" to AniList favorites
-★ [Favorites] Added "Monster" to AniList favorites
+★ [Favorites] Added anime "Cowboy Bebop" to AniList favorites
+★ [Favorites] Added manga "Monster" to AniList favorites
 ★ Favorites sync complete: +2 added on AniList (15 skipped)
 ```
 
@@ -593,7 +599,7 @@ Or use your system's scheduler for one-off syncs:
 ## Troubleshooting
 
 **"Required environment variables not set"**
-- Set required env vars: `ANILIST_CLIENT_ID`, `ANILIST_CLIENT_SECRET`, `ANILIST_USERNAME`, `MAL_CLIENT_ID`, `MAL_CLIENT_SECRET`, `MAL_USERNAME`
+- Set required env vars: `ANILIST_CLIENT_ID`, `ANILIST_USERNAME`, `MAL_CLIENT_ID`, `MAL_USERNAME` (the client secrets are also needed to `login`)
 - Or use config file with `-c /path/to/config.yaml`
 
 **Authentication fails**
