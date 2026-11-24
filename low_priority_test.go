@@ -612,23 +612,23 @@ func TestConvertFuzzyDateToTimeOrNow(t *testing.T) {
 		},
 		{
 			name: "nil year",
-			fd:   &verniy.FuzzyDate{Year: nil, Month: intPtr(1), Day: intPtr(1)},
+			fd:   &verniy.FuzzyDate{Year: nil, Month: new(1), Day: new(1)},
 			want: nil,
 		},
 		{
 			name: "nil month",
-			fd:   &verniy.FuzzyDate{Year: intPtr(2023), Month: nil, Day: intPtr(1)},
+			fd:   &verniy.FuzzyDate{Year: new(2023), Month: nil, Day: new(1)},
 			want: nil,
 		},
 		{
 			name: "nil day",
-			fd:   &verniy.FuzzyDate{Year: intPtr(2023), Month: intPtr(1), Day: nil},
+			fd:   &verniy.FuzzyDate{Year: new(2023), Month: new(1), Day: nil},
 			want: nil,
 		},
 		{
 			name: "valid date",
-			fd:   &verniy.FuzzyDate{Year: intPtr(2023), Month: intPtr(6), Day: intPtr(15)},
-			want: timePtr(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC)),
+			fd:   &verniy.FuzzyDate{Year: new(2023), Month: new(6), Day: new(15)},
+			want: new(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC)),
 		},
 	}
 
@@ -696,18 +696,6 @@ func TestParseDateOrNow(t *testing.T) {
 			}
 		})
 	}
-}
-
-// ============================================
-// Helper Functions
-// ============================================
-
-func intPtr(i int) *int {
-	return &i
-}
-
-func timePtr(t time.Time) *time.Time {
-	return &t
 }
 
 // ============================================

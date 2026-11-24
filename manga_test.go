@@ -617,10 +617,10 @@ func TestManga_String(t *testing.T) {
 }
 
 func TestManga_SameProgressWithTarget_Dates(t *testing.T) {
-	jun1 := timePtr(time.Date(2023, 6, 1, 0, 0, 0, 0, time.UTC))
-	jun15 := timePtr(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC))
-	jul1 := timePtr(time.Date(2023, 7, 1, 0, 0, 0, 0, time.UTC))
-	jul15 := timePtr(time.Date(2023, 7, 15, 0, 0, 0, 0, time.UTC))
+	jun1 := new(time.Date(2023, 6, 1, 0, 0, 0, 0, time.UTC))
+	jun15 := new(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC))
+	jul1 := new(time.Date(2023, 7, 1, 0, 0, 0, 0, time.UTC))
+	jul15 := new(time.Date(2023, 7, 15, 0, 0, 0, 0, time.UTC))
 
 	base := Manga{
 		Status:          MangaStatusCompleted,
@@ -751,8 +751,8 @@ func TestManga_SameProgressWithTarget_Dates(t *testing.T) {
 }
 
 func TestManga_GetStringDiffWithTarget_Dates(t *testing.T) {
-	jun1 := timePtr(time.Date(2023, 6, 1, 0, 0, 0, 0, time.UTC))
-	jul1 := timePtr(time.Date(2023, 7, 1, 0, 0, 0, 0, time.UTC))
+	jun1 := new(time.Date(2023, 6, 1, 0, 0, 0, 0, time.UTC))
+	jul1 := new(time.Date(2023, 7, 1, 0, 0, 0, 0, time.UTC))
 
 	tests := []struct {
 		name       string
