@@ -4,7 +4,7 @@
 -include .env
 
 BINARY_NAME=anilist-mal-sync
-LINT_VERSION=v2.13.2
+LINT_VERSION=v2.15.0
 DOCKER_LINT_CMD=docker run --rm -v $(PWD):/app -w /app golangci/golangci-lint:$(LINT_VERSION)
 VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 LDFLAGS=-ldflags "-X main.version=$(VERSION)"

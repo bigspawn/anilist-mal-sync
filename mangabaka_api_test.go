@@ -27,11 +27,9 @@ const (
 func newUnretryingMangaBakaClient(t *testing.T, serverURL string) *MangaBakaClient {
 	t.Helper()
 	return &MangaBakaClient{
-		apiSource: apiSource{
-			baseURL:     serverURL,
-			httpClient:  &http.Client{Timeout: 5 * time.Second},
-			maxFailures: mangaBakaMaxFailureStreak,
-		},
+		baseURL:     serverURL,
+		httpClient:  &http.Client{Timeout: 5 * time.Second},
+		maxFailures: mangaBakaMaxFailureStreak,
 	}
 }
 

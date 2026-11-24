@@ -19,17 +19,17 @@ func TestTimeToFuzzyDateInput(t *testing.T) {
 		},
 		{
 			name:     "valid date",
-			input:    timePtr(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC)),
+			input:    new(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC)),
 			expected: map[string]int{"year": 2023, "month": 6, "day": 15},
 		},
 		{
 			name:     "new year edge",
-			input:    timePtr(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)),
+			input:    new(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)),
 			expected: map[string]int{"year": 2024, "month": 1, "day": 1},
 		},
 		{
 			name:     "end of year",
-			input:    timePtr(time.Date(2023, 12, 31, 0, 0, 0, 0, time.UTC)),
+			input:    new(time.Date(2023, 12, 31, 0, 0, 0, 0, time.UTC)),
 			expected: map[string]int{"year": 2023, "month": 12, "day": 31},
 		},
 	}
@@ -69,43 +69,43 @@ func TestSameDates(t *testing.T) {
 		{
 			name:   "source nil target set",
 			a:      nil,
-			b:      timePtr(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC)),
+			b:      new(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC)),
 			expect: true,
 		},
 		{
 			name:   "source set target nil",
-			a:      timePtr(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC)),
+			a:      new(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC)),
 			b:      nil,
 			expect: false,
 		},
 		{
 			name:   "same date",
-			a:      timePtr(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC)),
-			b:      timePtr(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC)),
+			a:      new(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC)),
+			b:      new(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC)),
 			expect: true,
 		},
 		{
 			name:   "different year",
-			a:      timePtr(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC)),
-			b:      timePtr(time.Date(2024, 6, 15, 0, 0, 0, 0, time.UTC)),
+			a:      new(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC)),
+			b:      new(time.Date(2024, 6, 15, 0, 0, 0, 0, time.UTC)),
 			expect: false,
 		},
 		{
 			name:   "different month",
-			a:      timePtr(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC)),
-			b:      timePtr(time.Date(2023, 7, 15, 0, 0, 0, 0, time.UTC)),
+			a:      new(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC)),
+			b:      new(time.Date(2023, 7, 15, 0, 0, 0, 0, time.UTC)),
 			expect: false,
 		},
 		{
 			name:   "different day",
-			a:      timePtr(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC)),
-			b:      timePtr(time.Date(2023, 6, 16, 0, 0, 0, 0, time.UTC)),
+			a:      new(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC)),
+			b:      new(time.Date(2023, 6, 16, 0, 0, 0, 0, time.UTC)),
 			expect: false,
 		},
 		{
 			name:   "same date different time of day",
-			a:      timePtr(time.Date(2023, 6, 15, 10, 0, 0, 0, time.UTC)),
-			b:      timePtr(time.Date(2023, 6, 15, 20, 0, 0, 0, time.UTC)),
+			a:      new(time.Date(2023, 6, 15, 10, 0, 0, 0, time.UTC)),
+			b:      new(time.Date(2023, 6, 15, 20, 0, 0, 0, time.UTC)),
 			expect: true,
 		},
 	}
@@ -1045,10 +1045,10 @@ func TestAnime_String(t *testing.T) {
 }
 
 func TestAnime_SameProgressWithTarget_Dates(t *testing.T) {
-	jun1 := timePtr(time.Date(2023, 6, 1, 0, 0, 0, 0, time.UTC))
-	jun15 := timePtr(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC))
-	jul1 := timePtr(time.Date(2023, 7, 1, 0, 0, 0, 0, time.UTC))
-	jul15 := timePtr(time.Date(2023, 7, 15, 0, 0, 0, 0, time.UTC))
+	jun1 := new(time.Date(2023, 6, 1, 0, 0, 0, 0, time.UTC))
+	jun15 := new(time.Date(2023, 6, 15, 0, 0, 0, 0, time.UTC))
+	jul1 := new(time.Date(2023, 7, 1, 0, 0, 0, 0, time.UTC))
+	jul15 := new(time.Date(2023, 7, 15, 0, 0, 0, 0, time.UTC))
 
 	base := Anime{
 		Status:   StatusCompleted,
@@ -1202,8 +1202,8 @@ func TestAnime_SameProgressWithTarget_Dates(t *testing.T) {
 }
 
 func TestAnime_GetStringDiffWithTarget_Dates(t *testing.T) {
-	jun1 := timePtr(time.Date(2023, 6, 1, 0, 0, 0, 0, time.UTC))
-	jul1 := timePtr(time.Date(2023, 7, 1, 0, 0, 0, 0, time.UTC))
+	jun1 := new(time.Date(2023, 6, 1, 0, 0, 0, 0, time.UTC))
+	jul1 := new(time.Date(2023, 7, 1, 0, 0, 0, 0, time.UTC))
 
 	tests := []struct {
 		name       string

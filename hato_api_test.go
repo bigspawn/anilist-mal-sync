@@ -410,12 +410,10 @@ func TestNewHatoClient_WithCache(t *testing.T) {
 func newUnretryingHatoClient(t *testing.T, serverURL string, cache *HatoCache) *HatoClient {
 	t.Helper()
 	return &HatoClient{
-		apiSource: apiSource{
-			baseURL:     serverURL,
-			httpClient:  &http.Client{Timeout: 5 * time.Second},
-			maxFailures: hatoMaxFailureStreak,
-		},
-		cache: cache,
+		baseURL:     serverURL,
+		httpClient:  &http.Client{Timeout: 5 * time.Second},
+		maxFailures: hatoMaxFailureStreak,
+		cache:       cache,
 	}
 }
 
