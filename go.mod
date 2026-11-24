@@ -1,8 +1,8 @@
 module github.com/bigspawn/anilist-mal-sync
 
-go 1.25
+go 1.27
 
-toolchain go1.25.5
+toolchain go1.27.4
 
 require (
 	github.com/nstratos/go-myanimelist v0.9.5
